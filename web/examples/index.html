@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>kitchenette-cooking-card · example</title>
+<style>
+  :root { color-scheme: light; }
+  body { margin: 0; background: #FAF9F5; color: #2A3550; font: 14px/1.5 -apple-system, "Segoe UI", "PingFang SC", "Noto Sans SC", sans-serif; }
+  body.dark { background: #131A2C; color: #EDE7D6; }
+  main { max-width: 420px; margin: 0 auto; padding: 20px 16px 80px; }
+  h1 { font-size: 18px; font-weight: 600; margin: 0 0 2px; }
+  .sub { font-size: 12px; opacity: .65; margin: 0 0 14px; }
+  fieldset { border: 0; padding: 0; margin: 12px 0 0; }
+  legend { font-size: 11px; opacity: .65; padding: 0; margin-bottom: 4px; }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; }
+  button { font: inherit; font-size: 13px; color: inherit; background: none; border: 1px solid currentColor; padding: 5px 10px; cursor: pointer; border-radius: 0; }
+  button[aria-pressed="true"] { background: #2A3550; color: #FAF9F5; border-color: #2A3550; }
+  body.dark button[aria-pressed="true"] { background: #EDE7D6; color: #131A2C; border-color: #EDE7D6; }
+  #clock { font-variant-numeric: tabular-nums; font-size: 12px; opacity: .75; margin-top: 6px; }
+  #chat { margin-top: 22px; }
+  .sample { margin-top: 22px; }
+  .head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 11px; opacity: .7; margin-bottom: 6px; }
+  .head button { font-size: 11px; padding: 2px 8px; }
+  .bubble { display: inline-block; background: #fff; border: 1px solid rgba(42,53,80,.22); padding: 7px 12px; font-size: 13px; margin-bottom: 2px; }
+  body.dark .bubble { background: #1C2438; border-color: rgba(237,231,214,.2); }
+  .state { font-size: 11px; opacity: .6; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  a { color: inherit; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Cooking card</h1>
+  <p class="sub">Local sample data and a clock you can speed up. Nothing here talks to a server. · 本页只用假数据，不连任何服务。<br><a href="gallery.html">Every clip, both outfits → 全部分段</a></p>
+
+  <fieldset><legend>Method · 做法</legend><div class="row" id="methods"></div></fieldset>
+  <fieldset><legend>Outfit · 衣服</legend><div class="row" id="outfits"></div></fieldset>
+  <fieldset><legend>Outcome · 出锅结果</legend><div class="row" id="outcomes"></div></fieldset>
+  <fieldset><legend>Start a pot · 开一锅</legend><div class="row" id="presets"></div></fieldset>
+  <fieldset><legend>Time · 时间</legend>
+    <div class="row" id="speeds"></div>
+    <div class="row" style="margin-top:6px">
+      <button id="skip">Skip to 8 s before done · 跳到出锅前 8 秒</button>
+      <button id="clear">Clear · 清空</button>
+    </div>
+    <div id="clock"></div>
+  </fieldset>
+  <fieldset><legend>Words and colours · 文字与配色</legend>
+    <div class="row">
+      <button id="lang" aria-pressed="false">English words</button>
+      <button id="theme" aria-pressed="false">Dark</button>
+    </div>
+  </fieldset>
+
+  <div id="chat"></div>
+</main>
+
+<script type="module">
+import { COOK_METHODS, METHOD_LABEL, outfitFor } from "../dist/kitchenette-cooking-card.js";
+
+// ── a clock that can run fast ──
+let speed = 1, baseReal = performance.now(), baseVirtual = Date.now();
+const now = () => baseVirtual + (performance.now() - baseReal) * speed;
+function setSpeed(s) { baseVirtual = now(); baseReal = performance.now(); speed = s; paint(); }
+function jump(ms) { baseVirtual += ms; }
+
+// ── local stand-in for the backend: what each pot's outcome will be, and which pots were cancelled ──
+const pots = new Map();      // id -> { dueMs, outcome }
+const cancelled = new Set();
+const probe = async (id) => {
+  if (cancelled.has(id)) return { status: "cancelled", outcome: null };
+  const p = pots.get(id);
+  if (!p) return { status: null, outcome: null };
+  return now() >= p.dueMs ? { status: "served", outcome: p.outcome } : { status: "cooking", outcome: null };
+};
+
+const state = { method: "stirfry", outfit: "toque", outcome: "great", lang: "zh", theme: "light" };
+const OUTFITS = ["toque", "scarf"];
+const OUTCOMES = [["great", "Great · 很好"], ["ok", "OK · 普通"], ["burnt", "Burnt · 糊了"], ["spoiled", "Spoiled · 坏了"]];
+const PRESETS = [
+  { key: "fresh", label: "Just started, 10 min · 刚下锅", make: (t) => ({ dish: "番茄炒蛋", note: "少放盐", duration_seconds: 600, started_at: t - 2 }) },
+  { key: "soon", label: "Done in 8 s · 8 秒后出锅", make: (t) => ({ dish: "味噌汤", note: "", duration_seconds: 60, started_at: t - 52 }) },
+  { key: "long", label: "A long stew · 炖了很久的", make: (t) => ({ dish: "牛肉炖萝卜（要炖很久的那种，名字也很长）", note: "小火慢慢炖，萝卜切滚刀块先焯一下，牛肉冷水下锅撇掉浮沫，最后十分钟再放盐——备注写得再长也要能看全", duration_seconds: 3 * 3600, started_at: t - 3600 }) },
+  { key: "done", label: "From history · 历史卡", make: (t) => ({ dish: "蛋包饭", note: "", duration_seconds: 900, started_at: t - 7200 }) },
+];
+
+let seq = 0;
+/** A pot id whose outfit is the chosen one (the outfit is decided by the id) */
+function idFor(key, outfit) {
+  for (;;) { const id = `demo-${key}-${++seq}`; if (outfitFor(id) === outfit) return id; }
+}
+
+const chat = document.getElementById("chat");
+function add(preset, over = {}) {
+  const o = { ...state, ...over };
+  const id = idFor(preset.key, o.outfit);
+  const session = { id, method: o.method, status: "cooking", ...preset.make(now() / 1000) };
+  pots.set(id, { dueMs: (session.started_at + session.duration_seconds) * 1000, outcome: o.outcome });
+
+  const box = document.createElement("div");
+  box.className = "sample";
+  const head = document.createElement("div");
+  head.className = "head";
+  const label = document.createElement("span");
+  label.textContent = `${METHOD_LABEL[o.method]} ${o.method} · ${o.outfit} · ${preset.label} · ${o.outcome}`;
+  const off = document.createElement("button");
+  off.textContent = "Heat off · 关火";
+  off.onclick = () => cancelled.add(id);   // the card notices on its next read (within 15 s)
+  head.append(label, off);
+  const bubble = document.createElement("div");
+  bubble.className = "bubble";
+  bubble.textContent = "(the message above the card · 上一条消息)";
+  const card = document.createElement("kitchenette-cooking-card");
+  card.clock = now;
+  card.probe = probe;
+  card.session = session;
+  if (state.lang === "en") card.setAttribute("lang", "en");
+  if (state.theme === "dark") card.setAttribute("theme", "dark");
+  const st = document.createElement("div");
+  st.className = "state";
+  box.append(head, bubble, card, st);
+  chat.prepend(box);
+  return card;
+}
+
+// ── controls ──
+function group(el, items, get, set) {
+  for (const [value, text] of items) {
+    const b = document.createElement("button");
+    b.textContent = text;
+    b.dataset.value = value;
+    b.onclick = () => { set(value); paint(); };
+    el.append(b);
+  }
+  return () => { for (const b of el.children) b.setAttribute("aria-pressed", String(b.dataset.value === String(get()))); };
+}
+const paints = [
+  group(document.getElementById("methods"), COOK_METHODS.map((m) => [m, `${METHOD_LABEL[m]} ${m}`]), () => state.method, (v) => (state.method = v)),
+  group(document.getElementById("outfits"), OUTFITS.map((o) => [o, o]), () => state.outfit, (v) => (state.outfit = v)),
+  group(document.getElementById("outcomes"), OUTCOMES, () => state.outcome, (v) => (state.outcome = v)),
+  group(document.getElementById("speeds"), [[1, "×1"], [10, "×10"], [60, "×60"]], () => speed, (v) => setSpeed(Number(v))),
+];
+function paint() { for (const p of paints) p(); }
+for (const p of PRESETS) {
+  const b = document.createElement("button");
+  b.textContent = p.label;
+  b.onclick = () => add(p);
+  document.getElementById("presets").append(b);
+}
+document.getElementById("skip").onclick = () => {
+  // Bring the pot that is furthest from done to 8 seconds before it
+  let latest = 0;
+  for (const [id, p] of pots) if (!cancelled.has(id) && p.dueMs > now()) latest = Math.max(latest, p.dueMs);
+  if (latest) jump(latest - 8000 - now());
+};
+document.getElementById("clear").onclick = () => { chat.replaceChildren(); pots.clear(); cancelled.clear(); };
+document.getElementById("lang").onclick = (e) => {
+  state.lang = state.lang === "en" ? "zh" : "en";
+  e.currentTarget.setAttribute("aria-pressed", String(state.lang === "en"));
+  for (const c of chat.querySelectorAll("kitchenette-cooking-card")) state.lang === "en" ? c.setAttribute("lang", "en") : c.removeAttribute("lang");
+};
+document.getElementById("theme").onclick = (e) => {
+  state.theme = state.theme === "dark" ? "light" : "dark";
+  e.currentTarget.setAttribute("aria-pressed", String(state.theme === "dark"));
+  document.body.classList.toggle("dark", state.theme === "dark");
+  for (const c of chat.querySelectorAll("kitchenette-cooking-card")) state.theme === "dark" ? c.setAttribute("theme", "dark") : c.removeAttribute("theme");
+};
+paint();
+
+const clockEl = document.getElementById("clock");
+setInterval(() => {
+  clockEl.textContent = `${new Date(now()).toLocaleTimeString()} · ×${speed}`;
+  for (const box of chat.querySelectorAll(".sample")) {
+    const c = box.querySelector("kitchenette-cooking-card");
+    box.querySelector(".state").textContent = `phase ${c.phase ?? "–"} · clip ${c.segment ?? "–"}`;
+  }
+}, 250);
+
+// For scripted walkthroughs of this page
+window.demo = { add, PRESETS, state, setSpeed, jump, now, cancel: (id) => cancelled.add(id) };
+</script>
+</body>
+</html>

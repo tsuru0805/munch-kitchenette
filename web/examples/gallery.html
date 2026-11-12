@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>kitchenette-cooking-card · every clip</title>
+<style>
+  body { margin: 0; background: #F3EFE6; color: #2A3550; font: 13px/1.5 -apple-system, "Segoe UI", "PingFang SC", "Noto Sans SC", sans-serif; }
+  main { max-width: 1280px; margin: 0 auto; padding: 20px 16px 60px; }
+  h1 { font-size: 18px; margin: 0 0 2px; }
+  h2 { font-size: 14px; margin: 26px 0 8px; }
+  .sub { font-size: 12px; opacity: .7; margin: 0; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 10px; }
+  figure { margin: 0; background: #FEFEFD; border: 1px solid rgba(42,53,80,.22); padding: 4px 4px 6px; }
+  figure.bad { border-color: #B0483B; background: #F8E4E0; }
+  /* Only the part above the counter line is ever visible on the card: 180 x 140 of the 180 x 180 canvas */
+  .crop { width: 120px; height: 93.3px; overflow: hidden; margin: 0 auto; }
+  .crop img { width: 120px; height: 120px; display: block; }
+  figcaption { font-size: 10.5px; text-align: center; opacity: .8; margin-top: 3px; word-break: break-all; }
+  #sum { font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Every clip in the pack</h1>
+  <p class="sub">Read from <code>assets/clawd/manifest.json</code>. <span id="sum"></span> · <a href="index.html">back to the card</a></p>
+  <div id="out"></div>
+</main>
+<script type="module">
+const base = new URL("../../assets/clawd/", import.meta.url);
+const manifest = await (await fetch(new URL("manifest.json", base))).json();
+const out = document.getElementById("out");
+const sum = document.getElementById("sum");
+let loaded = 0, failed = 0;
+const total = Object.keys(manifest.files).length;
+const tell = () => {
+  sum.textContent = `${loaded} of ${total} loaded${failed ? `, ${failed} failed` : ""}`;
+  document.body.dataset.loaded = String(loaded);
+  document.body.dataset.failed = String(failed);
+  document.body.dataset.total = String(total);
+};
+for (const outfit of manifest.outfits) {
+  const h = document.createElement("h2");
+  h.textContent = outfit;
+  const grid = document.createElement("div");
+  grid.className = "grid";
+  for (const [key, file] of Object.entries(manifest.files)) {
+    if (!key.startsWith(`${outfit}/`)) continue;
+    const fig = document.createElement("figure");
+    const crop = document.createElement("div");
+    crop.className = "crop";
+    const img = new Image();
+    img.alt = key;
+    img.onload = () => { loaded++; tell(); };
+    img.onerror = () => { failed++; fig.className = "bad"; tell(); };
+    img.src = new URL(file, base).href;
+    const cap = document.createElement("figcaption");
+    cap.textContent = key.slice(outfit.length + 1);
+    crop.append(img);
+    fig.append(crop, cap);
+    grid.append(fig);
+  }
+  out.append(h, grid);
+}
+tell();
+</script>
+</body>
+</html>

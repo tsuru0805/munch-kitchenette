@@ -3,7 +3,8 @@
 // the sentence past the daily cap, and changing one snack's cap.
 const mockToast = jest.fn();
 let mockRoles = ["aster", "birch"];
-jest.mock("../runtime/store", () => ({ useStore: () => ({ toast: mockToast, role: "aster", roles: mockRoles, tick: 0 }) }));
+let mockTick = 0;
+jest.mock("../runtime/store", () => ({ useStore: () => ({ toast: mockToast, role: "aster", roles: mockRoles, tick: mockTick }) }));
 const mockFetch = jest.fn();
 const mockFeed = jest.fn();
 const mockSave = jest.fn();
@@ -57,6 +58,7 @@ async function mount(snackId: string) {
 beforeAll(() => setZone("Asia/Tokyo"));      // the reset time below is written in the kitchen's zone
 afterAll(() => setZone(""));
 beforeEach(() => {
+  mockTick = 0;
   mockRoles = ["aster", "birch"];
   mockToast.mockReset();
   mockFetch.mockReset();
@@ -157,4 +159,26 @@ it("the reset time is written in the kitchen's time zone", () => {
   setZone("America/New_York");
   expect(resetText(at)).toBe("15:00");
   setZone("Asia/Tokyo");
+});
+
+it("when the page reads everything again, the shelf is re-read quietly: no \"读取中…\" flash, and a failed read keeps what is shown", async () => {
+  mockFetch.mockResolvedValue(parseSnackState(wire("aster", true)));
+  const { r } = await mount("cookie");
+  expect(texts(r)).toContain("/ 5 今天 · 04:00 重置");
+  // the next read hangs: what is shown must stay as it is meanwhile
+  let release!: (v: unknown) => void;
+  mockFetch.mockReturnValue(new Promise((res) => (release = res)));
+  mockTick = 1;
+  await act(async () => r.update(<SnackHand snackId="cookie" anchor={null} sceneH={390} onPick={() => {}} />));
+  expect(mockFetch).toHaveBeenCalledTimes(2);
+  expect(texts(r)).not.toContain("读取中…");
+  expect(texts(r)).toContain("/ 5 今天 · 04:00 重置");
+  await act(async () => release(parseSnackState(wire("aster", true, { cookie: 7 }))));
+  expect(texts(r)).toContain("/ 5 今天 · 04:00 重置"); // wire() only overrides coffee's cap: the cookie row is unchanged, and still there
+  // a read that fails changes nothing on screen
+  mockFetch.mockRejectedValue(new Error("offline"));
+  mockTick = 2;
+  await act(async () => r.update(<SnackHand snackId="cookie" anchor={null} sceneH={390} onPick={() => {}} />));
+  expect(texts(r)).toContain("曲奇");
+  expect(texts(r)).not.toContain("没读到 · 点一下重试");
 });

@@ -29,7 +29,15 @@ export function KitchenScene({
   const k = width / SCENE_SRC;
   const pickedKey = pick ? tapKey(pick) : "";
   const hits = hitBoxes(objs, k);
+  // One name per thing, the same from one render to the next whatever else comes or goes around it
+  // (the second coupon is "coupon-2", a dish's bowl after its strip "dish-<id>-2"). Used as the
+  // element key, so a thing keeps its element when the fridge fills up, and as its test id.
   const seen: Record<string, number> = {};
+  const names = objs.map((o) => {
+    const key = tapKey(o.tap);
+    seen[key] = (seen[key] ?? 0) + 1;
+    return seen[key] === 1 ? key : `${key}-${seen[key]}`;
+  });
   return (
     <View style={{ width, height: width, overflow: "hidden" }} testID="kitchen-scene">
       <Image source={BG_KITCHEN} style={{ width, height: width }} resizeMode="cover" accessible={false} />
@@ -53,7 +61,7 @@ export function KitchenScene({
         }
         if (o.paper) {
           return (
-            <View key={`paper-${i}`} style={[st.abs, b, o.paper === "blank" ? st.blank : st.strip, on && st.stripOn]}>
+            <View key={`paper-${names[i]}`} style={[st.abs, b, o.paper === "blank" ? st.blank : st.strip, on && st.stripOn]}>
               <View style={[st.clip, { width: Math.max(4, 14 * k), height: Math.max(3, 12 * k), top: -Math.max(1.5, 5 * k) }]} />
               {o.paper === "blank" ? null : <View style={[st.ink, { top: b.height * 0.2, height: b.height * (o.paper === "receipt" ? 0.5 : 0.62) }]} />}
             </View>
@@ -63,7 +71,7 @@ export function KitchenScene({
         const coupon = o.art === COUPON_ART;
         const f = Math.max(6.5, b.height * 0.165);
         return (
-          <View key={`art-${i}`} style={[st.abs, b, on && st.picked, { transform: [...rot, ...(on ? [{ translateY: -b.height * 0.07 }, { scale: 1.14 }] : [])] }]}>
+          <View key={`art-${names[i]}`} style={[st.abs, b, on && st.picked, { transform: [...rot, ...(on ? [{ translateY: -b.height * 0.07 }, { scale: 1.14 }] : [])] }]}>
             <ArtImage art={o.art ?? null} style={st.fill} />
             {coupon ? (
               <Text
@@ -79,17 +87,16 @@ export function KitchenScene({
       {/* The tap layer: one area per thing (a small picture grows until a finger can hit it, never past the midline to its neighbour) */}
       {objs.map((o, i) => {
         const key = tapKey(o.tap);
-        seen[key] = (seen[key] ?? 0) + 1;
         const h = hits[i];
         return (
           <Pressable
-            key={`hit-${i}`}
+            key={`hit-${names[i]}`}
             onPress={() => onTap(o.tap)}
             style={[st.hit, { left: h.x, top: h.y, width: h.w, height: h.h }]}
             accessibilityRole="button"
             accessibilityLabel={o.label}
             accessibilityState={{ selected: key === pickedKey }}
-            testID={seen[key] === 1 ? `obj-${key}` : `obj-${key}-${seen[key]}`}
+            testID={`obj-${names[i]}`}
           />
         );
       })}

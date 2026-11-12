@@ -2,7 +2,7 @@
 
 [中文在下面](#厨房页)
 
-The kitchen as a page: one picture of the whole kitchen in which every thing can be tapped, and under it "the hand", where the thing you tapped is taken down and shown large with what you can do with it. It is the human's side of the kitchen: looking in the fridge, buying groceries, handing out coupons, putting dishes and potions on the menu, feeding. The role's side (cooking, eating, buying with coupons) goes through its tools, not through this page.
+The kitchen as a page: one picture of the whole kitchen in which every thing can be tapped, and under it "the hand", where the thing you tapped is taken down and shown large with what you can do with it. It is the human's side of the kitchen: looking in the fridge, buying groceries, handing out coupons, putting dishes and potions on the menu, feeding. The role's side (cooking, eating, buying with coupons) goes through its tools, not through this page. A pot that is on the stove right now is not on this page either: the cooking card in the chat shows it (see [`web/README.md`](../web/README.md)); its dish appears here once it is served.
 
 The page ships inside the Python package, already built. No node is needed to use it.
 
@@ -14,7 +14,7 @@ kitchenette serve
 
 then open <http://127.0.0.1:8765/page/> in a browser. It is laid out as a phone-width column; on a wide window it sits in the middle.
 
-`?who=<role>` opens a given role's kitchen, e.g. `http://127.0.0.1:8765/page/?who=mika`. It has to be a role the server knows: one that has been used before, or one listed under `[roles] allowed`. Without `?who=` the page opens the role you looked at last time in this browser, or the default role.
+`?who=<role>` opens a given role's kitchen, e.g. `http://127.0.0.1:8765/page/?who=mika`. It has to be a role the server knows: one that has been used before, or one listed under `[roles] allowed`. For a name the server does not know, the page opens the default role and says so in a line under the title (「没有「…」这个角色 · 这是…的厨房」; tap it to put it away). Without `?who=` the page opens the role you looked at last time in this browser, or the default role.
 
 To see it with something in it, without touching your own kitchen:
 
@@ -29,7 +29,7 @@ This starts a throwaway server (a temporary database, a free port, the fast-forw
 | Part | What you see | What you can do |
 |---|---|---|
 | Top | Whose kitchen it is; satiety (red when the role is hungry); "晕乎乎的 · 还有 …" while the role is dizzy from spoiled food. With more than one role, their names at the top right. | Tap a name to switch to that role's kitchen. |
-| The picture | The fridge filled from what is really in it (each thing drawn fresh, past its best or spoiled), coupons on the freezer door, snacks and staples on the shelves, the first three dishes on the counter, a strip of paper per dish under the shelf, notes pinned on the cork board. | Tap any thing to hold it. Tapping an empty spot of the fridge or the counter holds the most urgent thing in the fridge / shows the table. |
+| The picture | The fridge filled from what is really in it (each thing drawn fresh, past its best or spoiled), coupons on the freezer door (up to three), snacks and staples on the shelves, the first three dishes on the counter, a strip of paper per dish under the shelf (up to four), up to three notes pinned on the cork board. The picture has only so much room, see below. | Tap any thing to hold it. Tapping an empty spot of the fridge or the counter holds the most urgent thing in the fridge / shows the table. |
 | An ingredient in the hand | Name, how many, and per batch: fresh / past its best / spoiled, the day it keeps until, who bought it and when. Below: everything in the fridge, the most urgent first. | Tap another thing in the row to hold that instead. |
 | The coupon | How many coupons the role holds, out of how many; the last coupon note. | "发一张": hand out a coupon (dimmed at the cap). "给他买菜": open the grocery sheet. |
 | The tote on the fridge door / "给他买菜" | The catalog, by category. | Tick things (tap again to untick) and buy: they go into the fridge without a coupon. "添种类": add an ingredient kind of your own (name, category, whether it can be eaten as it is, how many in a pack, how long it keeps), and remove ones you added. A kind you added shows the first character of its name until the server has drawn a picture (only with an art provider, see [HOOKS.md](HOOKS.md)). |
@@ -41,7 +41,9 @@ This starts a throwaway server (a temporary database, a free port, the fast-forw
 | The receipt | Today's meals and which part of the day each was eaten in. | |
 | The cork board | The kitchen's recent notes (bought, tossed, spoiled, coupons, worms …), six to a page. | "更早的" / "新一些": page through them. |
 
-A question that cannot be taken back (feeding, crossing off, taking off) is asked on a slip of paper first.
+**What the picture has room for.** The fridge draws at most twelve kinds of ingredient, three to a shelf and three in the drawer, plus the milk in the door; several batches of one kind are drawn once. The counter shows the first three dishes and the shelf carries at most four strips. A kind you added yourself is not drawn in the picture until it has a picture of its own. Whatever does not fit is still there: the row at the bottom of the hand always lists everything in the fridge and everything on the menu, and each can be tapped there.
+
+**What asks first and what does not.** Three things are asked on a slip of paper before they happen, on a dish or a potion: "喂给他" (feed it), "只划掉" (cross it off) and "撤" (take it off). Everything else happens at the tap: handing out a coupon, buying groceries, feeding a snack, saving a snack's cap, adding an ingredient kind and removing one you added ("撤掉"), drawing a picture again, putting a dish or a potion up, and saving a change.
 
 When the server has **stamina** switched off, the page shows nothing about stamina: no restore amounts on snacks, no potion part on the "挂一道" sheet. When **satiety** is switched off, the satiety number is not shown. See `[stamina] enabled` and `[satiety] enabled` in [CONFIG.md](CONFIG.md).
 
@@ -49,12 +51,23 @@ When the server runs with the fast-forward clock (`[server] dev_clock = true`, f
 
 The picture has room for the five snacks of the default shelf and the four default staples. If you change the snack list or the staples in the settings, everything is still listed in the hand; only things with a bundled picture are drawn in the picture.
 
+## When the page reads again
+
+The role changes its kitchen through its tools while the page is open, so the page does not only read once:
+
+- when it opens, and when you switch to another role;
+- after you hand out a coupon, buy groceries or feed a dish (the fridge, satiety and today's meals are read again; the other things you do are shown directly);
+- every 30 seconds while the page is visible;
+- at once when it comes back to the front (the tab is switched back to, the phone is unlocked).
+
+While the page is hidden it reads nothing. A 30-second turn is skipped while you are in the middle of something (a sheet or a question is open, or a request is on its way), so nothing you are typing is touched; the next turn comes 30 seconds later. Something the role does therefore shows up here within about half a minute, without reloading.
+
 ## Tokens
 
 The files under `/page/` are public; the data behind them is not. When `[server] token` is set, the page needs the token to read anything.
 
-- **Opened on its own**, the page asks for the token once and keeps it in this browser's local storage. "换口令 →" at the bottom of the page forgets it.
-- **Embedded** in another page or an app, the host hands the token over in a message (below) and the page stores nothing.
+- **Opened on its own**, the page asks for the token once (the step says which one: the `token` under `[server]` in the server's settings) and keeps it in this browser's local storage. "换口令 →" at the bottom of the page forgets it.
+- **Embedded** in another page or an app, the host hands the token over in a message (below) and the page stores nothing. Until it has one, the frame says what it is waiting for: 「在等嵌入它的页面给口令…」, or 「口令不对 · 在等嵌入它的页面重新给」 after a token the server refused, or 「厨房没连上 · 在等嵌入它的页面重试」 when the server could not be reached.
 
 Either way the token is only ever sent as an `Authorization: Bearer` header. It is never part of an address, so it does not end up in the server's log, in the browser's history or in a referrer. Do not put it in a link yourself. Outside your own machine, serve over HTTPS (a reverse proxy or a tunnel in front of the server), or the token crosses the network in the clear.
 
@@ -107,11 +120,13 @@ Every message is `{ "v": 1, "id": "<any string>", "type": "<type>", "payload": {
 |---|---|---|---|
 | page → host | `ready` | `{v: 1}` | The page can take `init` now. Sent again after every reload: answer each one. |
 | page → host | `close` | | The person pressed "← 返回" (the link is only there when embedded). |
-| host → page | `init` | `{apiBase?, credential?, who?}` | `credential` = the token (leave it out when the server has none). `who` = the role to open. `apiBase` = the kitchen server's origin; leave it out when the page is served by that server. |
-| host → page | `role` | `{who}` | Show this role's kitchen. |
+| host → page | `init` | `{apiBase?, credential?, who?}` | `credential` = the token (leave it out when the server has none). `who` = the role to open; it has to be one the server lists. `apiBase` = the kitchen server's origin; leave it out when the page is served by that server. |
+| host → page | `role` | `{who}` | Show this role's kitchen. Refused for a role the server does not list. |
 | host → page | `logout` | | Forget the token and wait for a new `init`. |
 
 The page answers every host message with `{ "v": 1, "id": "<the same id>", "ok": true, "result": {…} }` or `{ …, "ok": false, "error": "<why>" }`. `init` is answered once the server has accepted the token; it fails with `the kitchen server refused the credential` or `the kitchen server cannot be reached`, and can be sent again.
+
+A role the server does not list is answered with `ok: false` and `unknown role "<name>": the kitchen server lists "a", "b"`. For `role` the kitchen stays on the role it was showing. For `init` the token was still accepted and the kitchen is open, on the default role (the error ends with `; showing "<default>"`). In both cases the page also says so in a line under the title.
 
 ### In an app's web view
 
@@ -173,7 +188,7 @@ The full account ships with the page: [`/page/ASSETS.md`](../web/page/public/ASS
 
 # 厨房页
 
-把厨房做成一个页面：一张画着整间厨房的图，图上每样东西都能点；图下面是「手边」，点了哪样，哪样就被拿下来放大，旁边写着能对它做什么。这是「人」这一侧的厨房：看冰箱、买菜、发券、往菜单上挂菜和药剂、投喂。他那一侧（做饭、吃、用券买菜）走的是工具，不经过这个页面。
+把厨房做成一个页面：一张画着整间厨房的图，图上每样东西都能点；图下面是「手边」，点了哪样，哪样就被拿下来放大，旁边写着能对它做什么。这是「人」这一侧的厨房：看冰箱、买菜、发券、往菜单上挂菜和药剂、投喂。小机那一侧（做饭、吃、用券买菜）走的是工具，不经过这个页面。小机正在火上的锅也不在这一页，在聊天里的做饭卡上（见 [`web/README.md`](../web/README.md)）；出锅之后那道菜才出现在这里。
 
 页面已经构建好，随 Python 包一起装上。用它不需要装 node。
 
@@ -185,7 +200,7 @@ kitchenette serve
 
 然后用浏览器打开 <http://127.0.0.1:8765/page/>。页面按手机宽度排成一列；窗口宽的时候它在正中间。
 
-地址后面加 `?who=<角色>` 可以直接打开某个角色的厨房，比如 `http://127.0.0.1:8765/page/?who=mika`。这个角色得是服务认识的：以前用过的，或者写在 `[roles] allowed` 里的。不加 `?who=` 的话，打开的是这个浏览器上次看的那个角色，没有就是默认角色。
+地址后面加 `?who=<角色>` 可以直接打开某个角色的厨房，比如 `http://127.0.0.1:8765/page/?who=mika`。这个角色得是服务认识的：以前用过的，或者写在 `[roles] allowed` 里的。写了服务不认识的名字，页面会打开默认角色的厨房，并在标题下面写一行说明（「没有「…」这个角色 · 这是…的厨房」，点一下收起）。不加 `?who=` 的话，打开的是这个浏览器上次看的那个角色，没有就是默认角色。
 
 想先看看里面有东西的样子、又不想动自己的厨房：
 
@@ -199,10 +214,10 @@ python examples/kitchen_page.py
 
 | 哪一块 | 看到什么 | 能做什么 |
 |---|---|---|
-| 顶上 | 这是谁的厨房；饱食度（他饿了会变红）；吃了坏掉的东西之后的「晕乎乎的 · 还有 …」。角色不止一个时，右上角有各人的名字。 | 点名字切到那个角色的厨房。 |
-| 画 | 冰箱按真实库存摆（每样按新鲜、不太新鲜、坏了画成不同的样子），冷冻门上的买菜券，搁板上的零食和常备，台面上的前三道菜，搁板下面一道菜一条的短册，软木板上钉着的纸条。 | 点哪样就拿哪样。点冰箱或台面的空处：拿冰箱里最该先用掉的那样 / 看桌上。 |
+| 顶上 | 这是哪个小机的厨房；饱食度（他饿了会变红）；吃了坏掉的东西之后的「晕乎乎的 · 还有 …」。角色不止一个时，右上角有各人的名字。 | 点名字切到那个角色的厨房。 |
+| 画 | 冰箱按真实库存摆（每样按新鲜、不太新鲜、坏了画成不同的样子），冷冻门上的买菜券（最多画三张），搁板上的零食和常备，台面上的前三道菜，搁板下面一道菜一条的短册（最多四条），软木板上钉着的纸条（最多三张）。画上的位置有限，见下面。 | 点哪样就拿哪样。点冰箱或台面的空处：拿冰箱里最该先用掉的那样 / 看桌上。 |
 | 手边的一样食材 | 名字、几个；每一批各是新鲜 / 不太新鲜 / 坏了、能放到哪天、谁买的、哪天买的。下面一排是冰箱里全部，最该先用掉的在前。 | 点那一排里的另一样，换成它。 |
-| 买菜券 | 他手里有几张、最多几张；最近一条和券有关的记录。 | 「发一张」：给他一张券（满了置灰）。「给他买菜」：打开买菜的单子。 |
+| 买菜券 | 小机手里有几张、最多几张；最近一条和券有关的记录。 | 「发一张」：给他一张券（满了置灰）。「给他买菜」：打开买菜的单子。 |
 | 冰箱门上的布袋 /「给他买菜」 | 按类别排的目录。 | 圈几样（再点取消）然后买：不扣券，直接放进冰箱。「添种类」：自己添一样食材（名字、哪一类、拿出来就能吃吗、一份几个、能放几天），也能撤掉自己添的。自己添的种类在服务端画出小图之前，先显示名字的头一个字（要接了画图函数才会画，见 [HOOKS.md](HOOKS.md)）。 |
 | 调料架 | 服务端列出的常备品。 | 没有：常备品用不完。 |
 | 一款零食 | 今天吃了几份 / 每日上限、几点重置、档位、一份回多少体力。 | 「喂一份」（咖啡要先选口味）。点 `−` / `+` 再点「存」：改这一款的每日上限。角色不止一个时：选喂给谁。 |
@@ -212,7 +227,9 @@ python examples/kitchen_page.py
 | 小票 | 今天吃的每一顿，各是在哪个时段吃的。 | |
 | 软木板 | 厨房最近的事（买了什么、扔了什么、什么坏了、券、虫子……），一页六条。 | 「更早的」/「新一些」：翻页。 |
 
-收不回来的动作（喂、划掉、撤）会先在一张小纸条上问一句。
+**画上摆得下多少。** 冰箱里最多画十二样食材：每层三样、抽屉里三样，另外门架上放牛奶；同一样食材有好几批也只画一份。台面上摆前三道菜，搁板下面最多挂四条短册。你自己添的种类在有自己的小图之前，画上没有它。摆不下的并没有丢：手边最底下那一排永远列着冰箱里的全部和菜单上的全部，每一样都能在那里点。
+
+**哪些会先问一句，哪些点了就做。** 对一道菜或一瓶药剂的三件事，会先在一张小纸条上问一句：「喂给他」「只划掉」「撤」。其余的都是点了就做：发券、买菜、喂零食、存零食的上限、添种类和撤掉自己添的种类、重画小图、挂一道菜或一瓶药剂、存改动。
 
 服务端把**体力**关掉的时候，页面上不出现任何和体力有关的东西：零食不显示回多少，「挂一道」的单子上没有药剂那一段。把**饱食度**关掉的时候，顶上不显示饱食度。对应 [CONFIG.md](CONFIG.md) 里的 `[stamina] enabled` 和 `[satiety] enabled`。
 
@@ -220,12 +237,23 @@ python examples/kitchen_page.py
 
 画上只有默认零食架的五款和默认的四样常备的位置。你在设置里改了零食或常备品之后，手边照样全都列出来；画上只画包里有图的那些。
 
+## 页面什么时候重新读
+
+页面开着的时候，小机会用工具改动他的厨房，所以页面不是只读一次：
+
+- 打开时，以及切到另一个角色时；
+- 你发了券、买了菜、喂了一道菜之后（冰箱、饱食度、今天吃了几顿会重读一次；其余的操作直接显示在页面上）；
+- 页面看得见的时候，每 30 秒一次；
+- 回到前台的那一刻（切回这个标签页、手机解锁）。
+
+页面在后台时什么都不读。你正做到一半的时候（单子或问句开着，或者有请求还在路上），那一次 30 秒的重读会跳过，不会动你正在填的东西；下一次在 30 秒之后。所以小机做了什么，不用刷新，大约半分钟之内就会出现在这里。
+
 ## 口令
 
 `/page/` 下面的文件谁都能取；它背后的数据不是。设了 `[server] token` 之后，页面要有口令才读得到东西。
 
-- **单独打开**时，页面问一次口令，存在这个浏览器的本地存储里。页面最底下的「换口令 →」会把它忘掉。
-- **嵌在别的页面或 App 里**时，由宿主用一条消息把口令递过来（见下），页面什么都不存。
+- **单独打开**时，页面问一次口令（那一步上写着要的是哪个：服务设置里 `[server]` 那一段的 `token`），存在这个浏览器的本地存储里。页面最底下的「换口令 →」会把它忘掉。
+- **嵌在别的页面或 App 里**时，由宿主用一条消息把口令递过来（见下），页面什么都不存。口令到手之前，框里会写着它在等什么：「在等嵌入它的页面给口令…」；宿主给的口令被服务拒绝之后是「口令不对 · 在等嵌入它的页面重新给」；连不上服务时是「厨房没连上 · 在等嵌入它的页面重试」。
 
 不管哪种，口令都只放在 `Authorization: Bearer` 请求头里发出去，从来不进地址，所以不会落进服务的日志、浏览器的历史记录或来源地址里。你自己也不要把它写进链接。出了自己这台电脑，请走 HTTPS（在服务前面放一个反向代理或隧道），否则口令是明文在网络上走的。
 
@@ -278,11 +306,13 @@ python examples/kitchen_page.py
 |---|---|---|---|
 | 页面 → 宿主 | `ready` | `{v: 1}` | 页面可以接 `init` 了。每次重新加载都会再发一次，每次都要回。 |
 | 页面 → 宿主 | `close` | | 对方点了「← 返回」（这个链接只在嵌入时才有）。 |
-| 宿主 → 页面 | `init` | `{apiBase?, credential?, who?}` | `credential` = 口令（服务没设口令就不写）。`who` = 打开哪个角色。`apiBase` = 厨房服务的来源；页面就是由那个服务提供的话不用写。 |
-| 宿主 → 页面 | `role` | `{who}` | 换成这个角色的厨房。 |
+| 宿主 → 页面 | `init` | `{apiBase?, credential?, who?}` | `credential` = 口令（服务没设口令就不写）。`who` = 打开哪个角色，得是服务列出来的。`apiBase` = 厨房服务的来源；页面就是由那个服务提供的话不用写。 |
+| 宿主 → 页面 | `role` | `{who}` | 换成这个角色的厨房。服务没列出的角色会被拒绝。 |
 | 宿主 → 页面 | `logout` | | 忘掉口令，等下一条 `init`。 |
 
 宿主发来的每条消息，页面都会回一条 `{ "v": 1, "id": "<同一个 id>", "ok": true, "result": {…} }` 或 `{ …, "ok": false, "error": "<原因>" }`。`init` 要等服务认了口令才回；失败时的原因是 `the kitchen server refused the credential`（口令不对）或 `the kitchen server cannot be reached`（连不上），可以再发一次。
+
+服务没列出的角色，回的是 `ok: false`，原因是 `unknown role "<名字>": the kitchen server lists "a", "b"`。`role` 被拒时，厨房停在原来那个角色上。`init` 里的角色不认识时，口令照样算数、厨房照样打开，只是开的是默认角色（原因的结尾多一句 `; showing "<默认角色>"`）。两种情况下，页面标题下面也会写一行说明。
 
 ### 放进 App 的内嵌网页窗口
 

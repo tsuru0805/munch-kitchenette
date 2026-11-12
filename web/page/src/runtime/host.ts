@@ -3,7 +3,7 @@
 //   page -> host   ready {v: 1}              the page can take `init` now
 //                  close                     the person pressed "back"
 //   host -> page   init {apiBase?, credential?, who?}
-//                  role {who}                show this role's kitchen
+//                  role {who}                show this role's kitchen (refused for a role the server does not list)
 //                  logout                    forget the credential, wait for a new `init`
 //
 // Every host message is answered with {id, ok: true, result} or {id, ok: false, error}.
@@ -82,7 +82,7 @@ export function checkInit(p: Record<string, unknown>): InitCheck {
 
 export interface HostHandlers {
   init: (i: { base: string; token: string; who: string | null }) => Promise<string | null>; // an error sentence, or null
-  role: (who: string) => void;
+  role: (who: string) => Promise<string | null>; // an error sentence (a role the server does not list), or null
   logout: () => void;
 }
 
@@ -136,8 +136,8 @@ export function startHost(handlers: HostHandlers): Host {
     if (m.type === "role") {
       const who = typeof m.payload.who === "string" ? m.payload.who : "";
       if (!who) return reply(false, { error: "role needs who" });
-      handlers.role(who);
-      return reply(true, { result: {} });
+      const err = await handlers.role(who);
+      return err ? reply(false, { error: err }) : reply(true, { result: {} });
     }
     if (m.type === "logout") {
       handlers.logout();

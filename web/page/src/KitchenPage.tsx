@@ -12,7 +12,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { BuySheet, type BuyResult } from "./kitchen/BuySheet";
 import {
-  FridgeHttpError, artAuth, buyItems, fetchFridge, fridgeErrText, inflightKey, sendCoupon, withInflight, type FridgeState,
+  FridgeHttpError, artAuth, buyItems, fetchFridge, fridgeErrText, inflightKey, isInflight, sendCoupon, withInflight, type FridgeState,
 } from "./kitchen/fridgeApi";
 import { Hand, type HandDish } from "./kitchen/Hand";
 import { HAND_TOP } from "./kitchen/handParts";
@@ -29,6 +29,7 @@ import {
 } from "./kitchen/potionApi";
 import { SnackHand } from "./kitchen/SnackHand";
 import { WriteSheet } from "./kitchen/WriteSheet";
+import { startAutoRefresh } from "./runtime/autoRefresh";
 import { usePageWidth } from "./runtime/layout";
 import { useStore } from "./runtime/store";
 import { nowMs as kitchenNow } from "./runtime/zone";
@@ -45,7 +46,7 @@ export function KitchenPage({ onBack, onForgetToken }: {
   /** set when a token kept in this browser is in use: forget it and ask again */
   onForgetToken?: () => void;
 }) {
-  const { toast: rawToast, confirm, role, roles, setRole, about, tick, reloadAll } = useStore();
+  const { toast: rawToast, confirm, confirming, unknownRole, dismissUnknownRole, role, roles, setRole, about, tick, reloadAll } = useStore();
   // The "put a dish up / change" sheet is a layer of its own and a toast is hidden behind it: while
   // the sheet is open, what the toast says is written on the sheet too
   const [sheetMsg, setSheetMsg] = useState("");
@@ -221,21 +222,18 @@ export function KitchenPage({ onBack, onForgetToken }: {
     reloadTable();
   }, [role, reloadTable]);
 
-  // Read everything again when asked to (time was fast-forwarded, the page came back to the front)
+  // Read everything again when asked to (time was fast-forwarded, a turn of the timer, the page came back to the front)
   const firstTick = useRef(tick);
   useEffect(() => {
     if (tick === firstTick.current) return;
     reloadFridge();
     reloadTable();
   }, [tick, reloadFridge, reloadTable]);
-  useEffect(() => {
-    if (typeof document === "undefined") return;
-    const onShow = () => {
-      if (document.visibilityState === "visible") reloadAll();
-    };
-    document.addEventListener("visibilitychange", onShow);
-    return () => document.removeEventListener("visibilitychange", onShow);
-  }, [reloadAll]);
+  // The role changes the kitchen through its tools while this page sits open: read again every 30
+  // seconds while the page is visible, and at once when it comes back to the front. A turn is skipped
+  // while a sheet or a question is open or a request is on its way, so nothing being typed is touched.
+  const idle = useRef<() => boolean>(() => true);
+  useEffect(() => startAutoRefresh({ refresh: reloadAll, idle: () => idle.current() }), [reloadAll]);
 
   const sp = fridge?.satiety ?? null;
   const dizzyLeftMs = fridge?.dizzy ? fridge.dizzy.untilMs - nowMs : 0;
@@ -590,6 +588,10 @@ export function KitchenPage({ onBack, onForgetToken }: {
     }
   };
 
+  idle.current = () =>
+    !buyOpen && !writeOpen && editingId === null && !confirming && !skipping && !actRef.current && !addDishRef.current
+    && !isInflight(inflightKey("coupon", role)) && !isInflight(inflightKey("buy", role)) && !isInflight(inflightKey("kind", "all"));
+
   return (
     <View style={kit.root}>
       <ScrollView style={kit.flex} contentContainerStyle={[kit.content, { width }]} keyboardShouldPersistTaps="handled">
@@ -633,6 +635,11 @@ export function KitchenPage({ onBack, onForgetToken }: {
             </View>
           ) : null}
         </View>
+        {unknownRole ? (
+          <Pressable onPress={dismissUnknownRole} accessibilityRole="button" accessibilityLabel="知道了" testID="role-note">
+            <Text style={kit.dizzy}>{`没有「${unknownRole}」这个角色 · 这是${role}的厨房`}</Text>
+          </Pressable>
+        ) : null}
         {dizzyLeftMs > 0 ? (
           <Text style={kit.dizzy} testID="dizzy-line">{`晕乎乎的 · 还有 ${fmtLeft(dizzyLeftMs)}`}</Text>
         ) : null}

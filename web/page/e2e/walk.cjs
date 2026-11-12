@@ -550,6 +550,49 @@ async function startKitchen() {
       await sees(`${ROLE}的厨房`);
     });
 
+    await run("an open page follows what happens elsewhere: read again every 30 seconds, never in the middle of typing", async () => {
+      // a second window with its clock in the test's hands, on the other role's kitchen
+      const p2 = await browser.newPage({ viewport: { width: 390, height: 844 } });
+      await p2.clock.install();
+      const t2 = (id) => p2.locator(`[data-testid="${id}"]`).first();
+      const says = (part) => until(async () => (await p2.locator('[data-testid^="hand-"]').first().innerText()).includes(part), `the second window's hand says "${part}"`);
+      const eggs = async () => (await fridge(OTHER)).items.filter((i) => i.item_id === "egg").reduce((n, i) => n + i.qty, 0);
+      let reads = 0;
+      p2.on("request", (r) => r.url().includes("/api/fridge?") && (reads += 1));
+      try {
+        await p2.goto(`${BASE}/page/?who=${encodeURIComponent(OTHER)}`, { waitUntil: "networkidle" });
+        await t2("row-item-egg").click();
+        const before = await eggs();
+        await says(`×${before}`);
+        // the kitchen changes behind the page's back, the way the role's own tools change it
+        await api("POST", "/api/fridge/buy", { who: OTHER, items: ["egg"] });
+        const after = await eggs();
+        check(after > before, "the server has more eggs now");
+        reads = 0;
+        await sleep(600);
+        check(reads === 0, "nothing is read between turns");
+        await says(`×${before}`);
+        await p2.clock.fastForward(31_000);
+        await says(`×${after}`);
+        check(reads === 1, `one read for the 30-second turn (saw ${reads})`);
+        // in the middle of typing on a sheet: the turns are skipped and what is typed stays
+        await t2("obj-write").click();
+        await t2("dish-name").fill("写到一半的菜");
+        await api("POST", "/api/fridge/buy", { who: OTHER, items: ["egg"] });
+        const later = await eggs();
+        reads = 0;
+        await p2.clock.fastForward(65_000);
+        await sleep(400);
+        check(reads === 0, `no read while the sheet is open (saw ${reads})`);
+        check((await t2("dish-name").inputValue()) === "写到一半的菜", "what was typed is untouched");
+        await t2("write-close").click();
+        await p2.clock.fastForward(31_000);
+        await says(`×${later}`);
+      } finally {
+        await p2.close();
+      }
+    });
+
     await run("loading, a failed read with retry, and a failed refresh with retry", async () => {
       let hold = true;
       await page.route("**/api/fridge?*", async (r) => {

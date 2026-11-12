@@ -15,6 +15,11 @@ export interface Store {
   toast: (msg: string) => void;
   /** ask before doing something that cannot be taken back */
   confirm: (ask: ConfirmAsk) => void;
+  /** a question is open right now */
+  confirming: boolean;
+  /** a role that was asked for (in the address, or by the embedding page) and that the server does not list; "" = none */
+  unknownRole: string;
+  dismissUnknownRole: () => void;
   /** goes up by one whenever everything should be read again (time was fast-forwarded, the page came back to the front) */
   tick: number;
   reloadAll: () => void;
@@ -31,8 +36,17 @@ export function useStore(): Store {
 const TOAST_MS = 2600;
 
 export function StoreProvider({
-  about, role, setRole, children,
-}: { about: About; role: string; setRole: (r: string) => void; children: ReactNode }) {
+  about, role, setRole, unknownRole = "", dismissUnknownRole = () => {}, onReload, children,
+}: {
+  about: About;
+  role: string;
+  setRole: (r: string) => void;
+  unknownRole?: string;
+  dismissUnknownRole?: () => void;
+  /** called whenever everything is read again, for what lives above this provider (the list of roles, the switches) */
+  onReload?: () => void;
+  children: ReactNode;
+}) {
   const [msg, setMsg] = useState("");
   const [on, setOn] = useState(false);
   const [ask, setAsk] = useState<ConfirmAsk | null>(null);
@@ -57,10 +71,14 @@ export function StoreProvider({
   }, [on, op]);
 
   const confirm = useCallback((a: ConfirmAsk) => setAsk(a), []);
-  const reloadAll = useCallback(() => setTick((n) => n + 1), []);
+  const reloadAll = useCallback(() => {
+    setTick((n) => n + 1);
+    onReload?.();
+  }, [onReload]);
+  const confirming = ask !== null;
   const value = useMemo<Store>(
-    () => ({ role, roles: about.roles, setRole, about, toast, confirm, tick, reloadAll }),
-    [role, about, setRole, toast, confirm, tick, reloadAll],
+    () => ({ role, roles: about.roles, setRole, about, toast, confirm, confirming, unknownRole, dismissUnknownRole, tick, reloadAll }),
+    [role, about, setRole, toast, confirm, confirming, unknownRole, dismissUnknownRole, tick, reloadAll],
   );
 
   return (

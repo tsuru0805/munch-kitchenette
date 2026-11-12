@@ -55,7 +55,23 @@ export function SnackHand({
 
   useEffect(() => {
     reload(viewer);
-  }, [viewer, reload, tick]);
+  }, [viewer, reload]);
+  // The page reads everything again from time to time: quietly here (no "loading" flash, and what is
+  // shown stays if the read fails), and not while a feed or a save is on its way.
+  const seenTick = useRef(tick);
+  useEffect(() => {
+    if (tick === seenTick.current) return;
+    seenTick.current = tick;
+    if (busyRef.current) return;
+    const my = ++seq.current;
+    fetchSnacks(viewer)
+      .then((st) => {
+        if (my === seq.current) setLoad({ kind: "ok", st });
+      })
+      .catch(() => {
+        if (my === seq.current) setLoad((cur) => (cur.kind === "ok" ? cur : { kind: "error" }));
+      });
+  }, [tick, viewer]);
   // another snack / another role to feed: an unsaved cap is not carried over
   useEffect(() => {
     setCapDraft(null);

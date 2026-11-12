@@ -8,6 +8,7 @@
 //   KITCHENETTE_PYTHON=<python that has kitchenette installed> node e2e/modes.cjs [--port 18821]
 //
 // Uses three ports from --port up: the kitchen, a host page that may embed it, one that may not.
+// MODES_SHOT=<dir> saves a screenshot of every open page there when a check fails.
 const { spawn } = require("node:child_process");
 const http = require("node:http");
 const fs = require("node:fs");
@@ -104,7 +105,8 @@ function hostServer(port) {
       await page.goto(`${KITCHEN}/page/`, { waitUntil: "networkidle" });
       await tid("token-gate").waitFor();
       check(!(await body()).includes("的厨房"), "nothing of the kitchen is shown before the token");
-      ok("a server with a token: the page asks for it");
+      check((await tid("token-hint").innerText()).includes("[server]") && (await tid("token-hint").innerText()).includes("token"), "the step says which token it wants");
+      ok("a server with a token: the page asks for it and says which token");
 
       await tid("token-input").fill("not-the-token");
       await tid("token-enter").click();
@@ -135,6 +137,23 @@ function hostServer(port) {
       await until(async () => (await body()).includes("小满的厨房"), "the kitchen opens again without asking");
       ok("the token is remembered in this browser");
 
+      // a role the server does not list, named in the address: the default role opens (not the one looked at
+      // last), and the page says so
+      await addSecondRole();
+      await page.reload({ waitUntil: "networkidle" });
+      await tid("role-阿树").click();
+      await until(async () => (await tid("title").innerText()) === "阿树的厨房", "the second role's kitchen");
+      await page.goto(`${KITCHEN}/page/?who=nobody`, { waitUntil: "networkidle" });
+      await until(async () => (await tid("role-note").count()) === 1, "a line about the unknown role");
+      check((await tid("role-note").innerText()) === "没有「nobody」这个角色 · 这是小满的厨房", "the line names the role asked for and the one shown");
+      check((await tid("title").innerText()) === "小满的厨房", "the default role is shown, not the one looked at last");
+      await tid("role-note").click();
+      check((await tid("role-note").count()) === 0, "tapping the line puts it away");
+      await page.goto(`${KITCHEN}/page/?who=${encodeURIComponent("阿树")}`, { waitUntil: "networkidle" });
+      await until(async () => (await tid("title").innerText()) === "阿树的厨房", "a listed role named in the address opens");
+      check((await tid("role-note").count()) === 0, "and nothing is said");
+      ok("?who= with a role the server does not list: the default role, and the page says so");
+
       check(!urls.some((u) => u.includes(TOKEN)), "the token is in no address the browser requested");
       check(!page.url().includes(TOKEN), "nor in the page's own address");
       await sleep(300);
@@ -162,7 +181,8 @@ function hostServer(port) {
       // the host answered with an empty credential: refused, and the page shows nothing of the kitchen
       await until(async () => (await hostLog()).includes("refused"), "an init without the right credential is refused");
       check((await frame.locator('[data-testid="title"]').count()) === 0, "no kitchen without the credential");
-      ok("embedded: the page waits for its host and refuses a wrong credential");
+      await until(async () => (await frame.locator('[data-testid="host-wait"]').innerText()) === "口令不对 · 在等嵌入它的页面重新给", "the frame itself says the token was refused");
+      ok("embedded: the page waits for its host, refuses a wrong credential, and says so inside the frame");
 
       await page.locator("#token").fill(TOKEN);
       await page.locator("#send").click();
@@ -181,20 +201,31 @@ function hostServer(port) {
       ok("embedded: the token is neither in the address nor stored");
 
       // the host can switch the role and take the token back
-      await addSecondRole();
       const send = (type, payload) => page.evaluate(([k, t, p]) => {
         document.getElementById("kitchen").contentWindow.postMessage({ v: 1, id: `x-${t}`, type: t, payload: p }, k);
       }, [KITCHEN, type, payload]);
       await send("logout", {});
-      await frame.locator('[data-testid="booting"]').waitFor();
+      await until(async () => (await frame.locator('[data-testid="host-wait"]').count()) && (await frame.locator('[data-testid="host-wait"]').innerText()) === "在等嵌入它的页面给口令…", "after logout the frame says it is waiting for the token");
       check((await frame.locator('[data-testid="title"]').count()) === 0, "after logout nothing of the kitchen is shown");
+      // an init naming a role the server does not list: the kitchen opens on the default role, the host is told
+      await page.locator("#who").fill("nobody");
+      await page.locator("#send").click();
+      await until(async () => (await hostLog()).includes('unknown role "nobody": the kitchen server lists "小满", "阿树"; showing "小满"'), "init with an unknown role is answered ok:false with the reason");
+      await until(async () => (await frame.locator('[data-testid="title"]').count()) && (await frame.locator('[data-testid="title"]').innerText()) === "小满的厨房", "the default role is shown");
+      check((await frame.locator('[data-testid="role-note"]').innerText()) === "没有「nobody」这个角色 · 这是小满的厨房", "and the frame says so too");
       await page.locator("#who").fill("阿树");
       await page.locator("#send").click(); // a new init, naming the role to open
       await until(async () => (await frame.locator('[data-testid="title"]').count()) && (await frame.locator('[data-testid="title"]').innerText()) === "阿树的厨房", "init with who opens that role");
       await send("role", { who: "小满" });
       await until(async () => (await frame.locator('[data-testid="title"]').innerText()) === "小满的厨房", "a role message switches the kitchen");
       await until(async () => (await hostLog()).includes("kitchen: ok (x-role)"), "and is answered");
-      ok("embedded: logout, a new init naming a role, and a role message");
+      // a role message for a role the server does not list: refused, the kitchen stays where it was
+      const refusals = (await hostLog()).split("refused (x-role)").length;
+      await send("role", { who: "nobody" });
+      await until(async () => (await hostLog()).split("refused (x-role)").length === refusals + 1, "a role message with an unknown role is answered ok:false");
+      check((await hostLog()).includes('refused (x-role): unknown role "nobody": the kitchen server lists "小满", "阿树"'), "with the reason");
+      check((await frame.locator('[data-testid="title"]').innerText()) === "小满的厨房", "the kitchen stays on the role it was showing");
+      ok("embedded: logout, an init and a role message naming an unknown role (refused with the reason), and valid ones");
 
       // a site that is not on the list may not frame the page at all
       const other = await ctx.newPage();
@@ -209,6 +240,9 @@ function hostServer(port) {
     }
     console.log(`\n${passed} checks passed`);
   } catch (e) {
+    if (process.env.MODES_SHOT) {
+      for (const [i, c] of browser.contexts().entries()) for (const [j, pg] of c.pages().entries()) await pg.screenshot({ path: `${process.env.MODES_SHOT}/modes_failed_${i}_${j}.png` }).catch(() => {});
+    }
     console.error(`\nFAILED after ${passed} checks: ${e.message}`);
     process.exitCode = 1;
   } finally {

@@ -35,6 +35,9 @@ Third-party material (each under its own license; not relicensed by this reposit
    https://github.com/indestructible-type/Bodoni
    - web/fonts/BodoniModa11pt-Regular.woff2 , web/fonts/BodoniModa28pt-Regular.woff2
      （子集 · subset）；许可全文 · license text: web/fonts/OFL-BodoniModa.txt
+   - 厨房页 · the kitchen page: web/page/public/fonts/ 与 src/kitchenette/page/fonts/ 下的
+     BodoniModa11pt-Regular.woff2 , BodoniModa28pt-Regular.woff2 , BodoniModa96pt-Regular.woff2
+     （子集 · subsets）；许可全文在同目录 · license text alongside: OFL-BodoniModa.txt
 
 3a. Noto Serif SC（思源宋体）—— SIL Open Font License 1.1
    https://github.com/notofonts/noto-cjk
@@ -42,6 +45,21 @@ Third-party material (each under its own license; not relicensed by this reposit
      NotoSerifSC-Bold.common.woff2 , NotoSerifSC-Bold.rare.woff2 （子集 · subsets）
      只在系统没有宋体时才被下载 · fetched only when the device has no Song typeface of its own
      许可全文 · license text: web/fonts/OFL-NotoSerifSC.txt
+   - 厨房页 · the kitchen page: web/page/public/fonts/ 与 src/kitchenette/page/fonts/ 下的
+     NotoSerifSC-Regular.common.woff2 , NotoSerifSC-Regular.rare.woff2 ,
+     NotoSerifSC-Light.common.woff2 , NotoSerifSC-Light.rare.woff2 （子集 · subsets）；
+     许可全文在同目录 · license text alongside: OFL-NotoSerifSC.txt
+
+3b. 打进厨房页脚本里的第三方代码（随本仓分发）
+    Third-party code bundled into the kitchen page's scripts (distributed here)
+   - src/kitchenette/page/_expo/static/js/web/*.js
+   - MIT: react , react-dom , scheduler , react-native-web , expo , expo-modules-core ,
+     expo-linear-gradient , @expo/cli , @react-native/js-polyfills ,
+     @react-native/normalize-colors , @babel/runtime , styleq , inline-style-prefixer ,
+     css-in-js-utils , postcss-value-parser , fbjs , invariant , memoize-one , nullthrows
+   - BSD-3-Clause: hyphenate-style-name
+   - 版本、版权行与每份许可全文 · versions, copyright lines and every license text:
+     src/kitchenette/page/THIRD-PARTY.txt
 
 4. 依赖包（不随本仓分发，安装时获取）· Dependencies (not distributed here; fetched on install)
    Python: fastapi (MIT) · uvicorn (BSD-3-Clause) · pydantic (MIT) · mcp (MIT) ·
@@ -49,3 +67,7 @@ Third-party material (each under its own license; not relicensed by this reposit
    测试 · tests: pytest (MIT) · httpx (BSD-3-Clause)
    web/ 的构建与测试 · building and testing web/: esbuild (MIT) · typescript (Apache-2.0) ·
            vitest (MIT) · @types/node (MIT)
+   web/page/ 的构建与测试 · building and testing web/page/: expo · react-native ·
+           react-native-web · expo-asset · @expo/metro-runtime · babel-preset-expo · jest ·
+           jest-expo · react-test-renderer · @types/* (all MIT) · typescript (Apache-2.0)
+   切字体 · subsetting fonts: fonttools (MIT) · brotli (MIT)

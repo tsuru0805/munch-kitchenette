@@ -114,7 +114,8 @@ kitchenette serve
 The server settles in at `http://127.0.0.1:8765`:
 
 - `http://127.0.0.1:8765/mcp` is for the model (MCP);
-- `http://127.0.0.1:8765/api/...` is for a page.
+- `http://127.0.0.1:8765/page/` is the kitchen page, for you;
+- `http://127.0.0.1:8765/api/...` is for a page of your own.
 
 Put something in the fridge first, then borrow the model's eyes for a look:
 
@@ -147,10 +148,31 @@ Tool descriptions, receipts and reminders are in Chinese and live in one file, [
 
 ---
 
+## 🪟 A kitchen page of your own
+
+Once installed, open `http://127.0.0.1:8765/page/` in a browser and step into the kitchen: one miniature-style picture of the whole room in which every thing can be tapped. The eggs in the fridge, the coupons on its door, the dishes on the counter, the snacks on the shelf, the cork board on the wall: whatever you tap is taken down and shown large under the picture, with what you can do with it. Look through the fridge, buy him groceries, hand out a coupon, put up a dish or a potion, feed him a bite.
+
+| Picking something up | Buying him groceries |
+|---|---|
+| <img src="docs/page/kitchen-page.png" width="320" alt="The kitchen page: an ingredient from the fridge has been taken down and shown large under the picture, with its freshness and date"> | <img src="docs/page/kitchen-page-buy.png" width="320" alt="The kitchen page: the shopping sheet, ingredients listed by category with small pictures"> |
+
+The page ships already built inside the package, so no node is needed; it can also be embedded in your own page with an `<iframe>` or in an app's web view.
+
+To see it with the shelves full:
+
+```sh
+python examples/kitchen_page.py
+```
+
+> It opens a throwaway kitchen (your own data is not touched) with the fast-forward clock on: tap "过一小时 / 过一天" (an hour / a day later) in the top left corner and watch food slowly go off and leftovers quietly grow worms.
+
+Opening it, what each part does, tokens, embedding and rebuilding: [`docs/PAGE.md`](docs/PAGE.md).
+
+---
+
 ## 🚧 Corners still under construction
 
-- **The kitchen page** (the page for the human: fridge, snack shelf, the table, shopping) is being redone and will be added when it is ready. Until then the human's side (buying groceries, handing out coupons, putting up dishes, feeding snacks) goes through the `/api` endpoints, see [`docs/API.md`](docs/API.md).
-- There is no hosted demo. Install it and run the fast-forward walk above, or open the example page in [`web/examples/`](web/examples/) to see the card.
+- There is no hosted demo. Install it and run the fast-forward walk above, wander around the kitchen page, or open the example page in [`web/examples/`](web/examples/) to see the card.
 
 ---
 
@@ -163,6 +185,7 @@ Tool descriptions, receipts and reminders are in Chinese and live in one file, [
 | [`docs/RULES.md`](docs/RULES.md) | Every rule of the kitchen |
 | [`docs/CONFIG.md`](docs/CONFIG.md) | Every setting |
 | [`docs/HOOKS.md`](docs/HOOKS.md) | Notifications, drawing pictures for new kinds, sleep debt |
+| [`docs/PAGE.md`](docs/PAGE.md) | The kitchen page: opening it, embedding it |
 | [`docs/API.md`](docs/API.md) | The endpoints a page uses |
 | [`docs/ANIMATION.md`](docs/ANIMATION.md) | Every segment of the cook, the image spec, using your own character |
 | [`web/README.md`](web/README.md) | Putting the card on your page |

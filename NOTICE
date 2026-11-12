@@ -1,0 +1,51 @@
+Required Notice: Copyright (c) 2026 tsuru0805 (晚晚)
+Required Notice: Commercial use requires a separate written license from tsuru0805. Contact https://github.com/tsuru0805.
+
+Unofficial fan work. Clawd is a character created by Anthropic for Claude Code. All rights in
+the Clawd character and in the names and marks "Clawd", "Claude", "Claude Code" and "Anthropic"
+belong to Anthropic, PBC. This repository is not made by, affiliated with, sponsored by or
+endorsed by Anthropic, and no license in it grants any right in Anthropic's characters, names
+or marks.
+
+第三方材料（各按原许可，不随本仓改授权）
+Third-party material (each under its own license; not relicensed by this repository)
+====================================================================================
+
+1. Clawd 小厨师的图 · The Clawd cook's artwork —— CC BY-NC-SA 4.0
+   https://creativecommons.org/licenses/by-nc-sa/4.0/
+   - assets/clawd/toque/ , assets/clawd/scarf/ , docs/animation/*.gif ,
+     clawd-engine-additions/outfits/
+   - 改编自 · adapted from clawds-new-clothes
+     https://github.com/CharlieLuinaris/clawds-new-clothes (commit 76e7572b, v1.1.0)
+     Copyright 2026 Charlie Luinaris
+     clawds-new-clothes · animation by Luin Luinaris · outfits by Charlie Luinaris ·
+     CC BY-NC-SA 4.0 · unofficial Clawd fan work
+   - 改了什么、许可全文、上游 NOTICE 原文 · what was changed, the full license text and the
+     upstream NOTICE: assets/clawd/ATTRIBUTION.md , assets/clawd/LICENSES/ ,
+     assets/clawd/UPSTREAM-NOTICE
+
+2. 接在上游引擎上的动作与导出工具 · Moves and export tools written for the upstream engine —— MIT
+   - clawd-engine-additions/states/ , clawd-engine-additions/tools/
+   - 各文件开头有 SPDX 标注；上游引擎的 MIT 许可原文见
+     clawd-engine-additions/LICENSES/UPSTREAM-LICENSE
+     Each file carries an SPDX header; the upstream engine's MIT license is reproduced in
+     clawd-engine-additions/LICENSES/UPSTREAM-LICENSE
+
+3. Bodoni Moda —— SIL Open Font License 1.1
+   https://github.com/indestructible-type/Bodoni
+   - web/fonts/BodoniModa11pt-Regular.woff2 , web/fonts/BodoniModa28pt-Regular.woff2
+     （子集 · subset）；许可全文 · license text: web/fonts/OFL-BodoniModa.txt
+
+3a. Noto Serif SC（思源宋体）—— SIL Open Font License 1.1
+   https://github.com/notofonts/noto-cjk
+   - web/fonts/NotoSerifSC-Regular.common.woff2 , NotoSerifSC-Regular.rare.woff2 ,
+     NotoSerifSC-Bold.common.woff2 , NotoSerifSC-Bold.rare.woff2 （子集 · subsets）
+     只在系统没有宋体时才被下载 · fetched only when the device has no Song typeface of its own
+     许可全文 · license text: web/fonts/OFL-NotoSerifSC.txt
+
+4. 依赖包（不随本仓分发，安装时获取）· Dependencies (not distributed here; fetched on install)
+   Python: fastapi (MIT) · uvicorn (BSD-3-Clause) · pydantic (MIT) · mcp (MIT) ·
+           starlette (BSD-3-Clause)
+   测试 · tests: pytest (MIT) · httpx (BSD-3-Clause)
+   web/ 的构建与测试 · building and testing web/: esbuild (MIT) · typescript (Apache-2.0) ·
+           vitest (MIT) · @types/node (MIT)

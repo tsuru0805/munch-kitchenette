@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+/dist/
+build/
+*.db
+*.db-wal
+*.db-shm
+/kitchenette.toml
+/art/
+.claude/settings.local.json

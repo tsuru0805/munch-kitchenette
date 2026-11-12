@@ -1,0 +1,12 @@
+# No sleep habit: the same value around the clock. Stamina only moves with
+# 不睡觉：全天同一个数。体力只随他做的事变化，其余时间回到这个水平。内置预设名：schedule = "no-sleep"。
+# what the role does (work costs, rest and food restore) and drifts back to
+# this level in between.
+
+[stamina]
+schedule = [
+  0.80, 0.80, 0.80, 0.80, 0.80, 0.80,
+  0.80, 0.80, 0.80, 0.80, 0.80, 0.80,
+  0.80, 0.80, 0.80, 0.80, 0.80, 0.80,
+  0.80, 0.80, 0.80, 0.80, 0.80, 0.80,
+]

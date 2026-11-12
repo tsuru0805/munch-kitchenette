@@ -1,0 +1,11 @@
+# 体力和饱食度各有一个开关。关掉一个，菜做得好不好只影响还开着的那个；
+# 两个都关，厨房就纯粹是玩：买菜、做饭、等、吃。
+# Stamina and satiety each have a switch. With one off, how a dish turns out
+# only affects the one still on. With both off the kitchen is just for fun:
+# buy, cook, wait, eat.
+
+[stamina]
+enabled = false
+
+[satiety]
+enabled = false

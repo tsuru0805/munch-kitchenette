@@ -1,0 +1,20 @@
+# Night owl: up until about 02:00, asleep 02:00-09:00.
+# 夜猫：熬到两点，两点到九点恢复。它也是内置预设，直接写 schedule = "night-owl" 就是这张表；
+# 这个文件是给你看「自己写一份」长什么样的。
+# This is the built-in default, also available as schedule = "night-owl";
+# it is here so you can see the shape and write your own. To use a schedule,
+# put its `schedule = [...]` line under the one [stamina] heading of your
+# kitchenette.toml (do not add a second [stamina]).
+#
+# One value per local hour, 0-23. Each is where stamina settles if nothing
+# else happens during that hour (0 = empty, 1 = full).
+
+[stamina]
+schedule = [
+  0.60, 0.55,                                 # 00-01  still up, running low
+  0.95, 0.95, 0.95, 0.95, 0.95, 0.95, 0.95,   # 02-08  asleep, recovering
+  0.90, 0.85, 0.85, 0.85, 0.85,               # 09-13
+  0.75, 0.75, 0.75, 0.75,                     # 14-17
+  0.70, 0.70, 0.70,                           # 18-20
+  0.65, 0.65, 0.65,                           # 21-23  evening, still has energy
+]

@@ -1,0 +1,19 @@
+# When leftovers grow worms, and when the role may be disturbed.
+# 剩菜几点长虫，以及什么时候不要吵他。
+
+[kitchen]
+worm_enabled = true
+# A dish still on the table grows worms once it has passed this local hour
+# AND has been sitting for at least this long.
+worm_day_hour = 4
+worm_min_age_hours = 6.0
+
+[notify]
+mode = "webhook"
+webhook_url = "http://127.0.0.1:9000/kitchen"
+# Hold webhook calls during these local-time windows; they go out afterwards.
+# A window may wrap past midnight. Leave empty for a role with no sleep habit:
+# it is told the moment something happens.
+quiet_hours = ["02:00-06:30"]
+# Also hold them while the role is reported asleep (PUT /api/sleep).
+respect_sleep = true

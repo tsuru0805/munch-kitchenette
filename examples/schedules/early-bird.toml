@@ -1,0 +1,12 @@
+# Early bird: winds down after 21:00, asleep by midnight, sharpest in the morning.
+# 早睡早起：晚上九点后犯困，零点前睡着，早上最精神。内置预设名：schedule = "early-bird"。
+
+[stamina]
+schedule = [
+  0.95, 0.95, 0.95, 0.95, 0.95, 0.95, 0.95,   # 00-06  asleep, recovering
+  0.95, 0.95,                                 # 07-08  morning peak
+  0.90, 0.85, 0.85, 0.85, 0.85,               # 09-13
+  0.75, 0.75, 0.75, 0.75,                     # 14-17
+  0.70, 0.70, 0.70,                           # 18-20
+  0.60, 0.55, 0.55,                           # 21-23  getting sleepy
+]

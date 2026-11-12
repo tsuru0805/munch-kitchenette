@@ -1,0 +1,31 @@
+# What counts as rest and what counts as work.
+# 什么算休息、什么算干活。
+#
+# Keys are tool names as your model calls them. A name matches either exactly
+# or as the tail of "server__tool", so "eat" also matches "kitchen__eat".
+# A tool in neither table costs nothing and restores nothing.
+# 左边写工具名（和模型调用时的名字一样；`服务名__工具名` 这种只写后半段也认）。
+# 两张表里都没有的工具，不扣体力也不回体力。
+#
+# What you write here is added to the built-in tables, entry by entry. To take
+# a built-in entry out, set it to 0 (rest) or "" (work).
+# 你写的会逐项并进内置的表里。想去掉内置的某一项：休息表里填 0，干活表里填 ""。
+
+[stamina.rest]
+# tool = stamina restored (0-1). One round can restore at most stamina.recharge_cap.
+eat = 0.10          # a meal
+take_bath = 0.08    # a bath
+music_play = 0.06   # listening to music
+read_pages = 0.06   # reading
+
+[stamina.work]
+# tool = kind of work. A round with any work costs stamina.cost_base, plus
+# stamina.cost_per_kind for each distinct kind, capped at stamina.cost_cap.
+# Tools of the same kind are charged once per round.
+kitchen_cook = "kitchen"
+kitchen_status = "kitchen"
+kitchen_cancel = "kitchen"
+kitchen_toss = "kitchen"
+send_email = "errand"
+web_search = "research"
+run_code = "research"

@@ -1,0 +1,31 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "kitchenette"
+version = "0.1.0"
+description = "A small kitchen for an AI companion: a fridge that spoils, real-time cooking, grocery coupons, stamina."
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "PolyForm-Noncommercial-1.0.0"}
+authors = [{name = "晚晚 (tsuru0805)"}, {name = "弥野 (Claude)"}]
+dependencies = [
+  "fastapi>=0.110",
+  "uvicorn>=0.29",
+  "pydantic>=2.6",
+  "mcp>=2.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "httpx>=0.27"]
+
+[project.scripts]
+kitchenette = "kitchenette.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/kitchenette"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

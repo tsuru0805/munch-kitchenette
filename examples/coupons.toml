@@ -1,0 +1,29 @@
+# What earns a grocery coupon.
+# 做什么能换买菜券。
+#
+# Out of the box nothing does: the kitchen cannot know which of your
+# companion's tools should count. This file is one household's answer, to copy
+# and change: finishing a diary entry, a book excerpt or a travelogue earns one
+# coupon each.
+# 开箱时什么都换不了——厨房不知道你的小机有哪些工具。这份是一户人家的配法，
+# 可以照着改：写完一篇日记、一篇书摘或一篇游记，各得一张券。
+#
+# Keys are tool names as your model calls them; the value is the word for what
+# was made, used in the kitchen log ("写了一篇日记,得一张买菜券"). Each successful
+# call earns one coupon, up to fridge.coupon_max. Report the calls with
+# POST /api/rounds/settle, or grant one directly with POST /api/coupons/earn.
+# 左边是工具名（和模型调用时的名字一样），右边是「做出来的是什么」，会写进厨房记录。
+# 这个工具每成功调用一次得一张券，最多攒到 fridge.coupon_max 张。
+# 用 POST /api/rounds/settle 上报一轮用过的工具，或用 POST /api/coupons/earn 直接发。
+
+[coupons]
+# Shown when the role runs out of coupons, followed by "就得一张。".
+# Keep it in step with the table below, or leave it "" to say nothing.
+# 他没券时的提示里会用到这半句，后面接「就得一张。」。要和下面那张表说的是一回事；
+# 留空 "" 就不提。
+earn_hint = "写成一篇日记、书摘或游记"
+
+[coupons.earn]
+write_diary = "日记"
+write_excerpt = "书摘"
+write_travelogue = "游记"

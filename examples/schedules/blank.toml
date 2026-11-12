@@ -1,0 +1,34 @@
+# Blank: fill in your own day. One value per local hour, 0 (empty) to 1 (full).
+# 空白：自己填。每小时一个数，0（空）到 1（满）。他睡觉或休息的钟点填高一点，
+# 通常很累的钟点填低一点。把填好的 schedule = [...] 这一项放进你 kitchenette.toml 的 [stamina] 段里
+# （不要再写第二个 [stamina] 标题）。
+# Higher during the hours the role sleeps or rests, lower when it is usually
+# worn out. Every slot starts at 0.70, the level a new role begins with.
+
+[stamina]
+schedule = [
+  0.70,  # 00
+  0.70,  # 01
+  0.70,  # 02
+  0.70,  # 03
+  0.70,  # 04
+  0.70,  # 05
+  0.70,  # 06
+  0.70,  # 07
+  0.70,  # 08
+  0.70,  # 09
+  0.70,  # 10
+  0.70,  # 11
+  0.70,  # 12
+  0.70,  # 13
+  0.70,  # 14
+  0.70,  # 15
+  0.70,  # 16
+  0.70,  # 17
+  0.70,  # 18
+  0.70,  # 19
+  0.70,  # 20
+  0.70,  # 21
+  0.70,  # 22
+  0.70,  # 23
+]

@@ -1,0 +1,71 @@
+# A starting point for your own settings. Copy to ./kitchenette.toml and edit.
+# Anything you leave out keeps its default; `kitchenette check` prints them all
+# in this same shape.
+# 你自己的设置可以从这份开始：复制成当前文件夹下的 kitchenette.toml 再改。
+# 没写的项保持默认；`kitchenette check` 会按同样的写法把全部设置打印出来。
+#
+# One rule of the format: each [section] may appear only once. Put every line
+# that belongs to a section under its one heading.
+# 这种文件有一条规矩：每个 [段名] 只能出现一次，同一段的内容都写在它下面。
+
+[server]
+host = "127.0.0.1"
+port = 8765
+token = ""                  # set one before exposing the server beyond localhost / 对外开放前请填一个口令
+db_path = "kitchenette.db"
+timezone = ""               # "" = this machine's own. Or a name: "Asia/Shanghai", "Europe/Berlin", "America/New_York"
+                            # 留空 = 用这台电脑的时区；也可以填 "Asia/Shanghai" 这样的名字
+timezone_label = ""         # shown before reset times, e.g. "北京时间 " / 写在清零时间前面的字，留空不显示
+cors_origins = []           # pages on other sites that may read /api, e.g. ["https://chat.example.com"]
+
+[roles]
+default = "companion"       # used when a tool call does not say who / 没说是谁的时候算谁
+allowed = []                # [] = any id; or list the ids you use / 留空 = 任何名字都行
+
+[words]
+human_name = "用户"          # how the texts refer to you / 厨房说话时怎么称呼你
+human_pronoun = "她"
+app_name = "App"            # what the texts call the place you act from / 句子里怎么称呼你操作的地方
+
+[inline]
+enabled = "auto"            # "auto" | true | false  (see docs/CONNECT.md / 见 docs/CONNECT.md)
+
+[fridge]
+coupon_max = 3              # coupons a role can hold / 买菜券最多攒几张
+buy_max_items = 5           # kinds one coupon buys / 一张券最多买几样
+clear_bad_after_days = 3.0  # spoiled food disappears after this long / 坏了之后再过几天自动消失
+burn_chance_meh = 0.20      # chance a pot with stale ingredients burns / 用了不太新鲜的食材时糊掉的可能
+
+# Change how long one category keeps (the others stay as they are):
+# 改某一类能放几天（没写的类别不变）：
+# [fridge.category_days]
+# leafy = 3
+#
+# Or one single item, by its id or its name:
+# 或者只改某一样（写它的 id，或加了引号的名字）：
+# [fridge.shelf_days]
+# egg = 10
+# "番茄" = 9
+
+[satiety]
+enabled = true
+decay_per_hour = 9.0
+hungry_below = 30.0
+dizzy_hours = 2.5
+
+[stamina]
+enabled = true
+schedule = "night-owl"      # "night-owl" | "early-bird" | "no-sleep", or 24 numbers (examples/schedules/)
+                            # 作息：填一个预设名，或者自己写 24 个数（样子见 examples/schedules/）
+tau_hours = 2.5
+recharge_cap = 0.25
+
+# What earns a grocery coupon. Nothing does until you say so; see examples/coupons.toml.
+# 做什么能换买菜券。不写就什么都换不了；写法见 examples/coupons.toml。
+# [coupons]
+# earn_hint = "写成一篇日记"
+# [coupons.earn]
+# write_diary = "日记"
+
+[notify]
+mode = "queue"              # queue | webhook | both | none

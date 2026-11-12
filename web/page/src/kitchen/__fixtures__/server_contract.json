@@ -1,0 +1,1293 @@
+{
+ "about": {
+  "limits": {
+   "buy_max_items": 5,
+   "coupon_max": 3,
+   "hungry_below": 30.0
+  },
+  "now": 1794493849.701099,
+  "roles": {
+   "default": "companion",
+   "list": [
+    "aster",
+    "companion"
+   ]
+  },
+  "switches": {
+   "art": false,
+   "dev_clock": false,
+   "satiety": true,
+   "stamina": true,
+   "worms": true
+  },
+  "timezone": "Asia/Tokyo",
+  "timezone_label": "",
+  "version": "0.1.0",
+  "words": {
+   "app_name": "App",
+   "human_name": "用户",
+   "human_pronoun": "她"
+  }
+ },
+ "about_off": {
+  "limits": {
+   "buy_max_items": 5,
+   "coupon_max": 3,
+   "hungry_below": 30.0
+  },
+  "now": 1794493849.708489,
+  "roles": {
+   "default": "companion",
+   "list": [
+    "aster",
+    "companion"
+   ]
+  },
+  "switches": {
+   "art": false,
+   "dev_clock": true,
+   "satiety": false,
+   "stamina": false,
+   "worms": true
+  },
+  "timezone": "Asia/Tokyo",
+  "timezone_label": "",
+  "version": "0.1.0",
+  "words": {
+   "app_name": "App",
+   "human_name": "用户",
+   "human_pronoun": "她"
+  }
+ },
+ "catalog": [
+  {
+   "category": "veg",
+   "category_label": "蔬菜",
+   "custom": false,
+   "id": "tomato",
+   "name": "番茄",
+   "pack_qty": 3,
+   "raw_edible": true,
+   "shelf_days": 5.0
+  },
+  {
+   "category": "veg",
+   "category_label": "蔬菜",
+   "custom": false,
+   "id": "cucumber",
+   "name": "黄瓜",
+   "pack_qty": 2,
+   "raw_edible": true,
+   "shelf_days": 5.0
+  },
+  {
+   "category": "leafy",
+   "category_label": "叶菜",
+   "custom": false,
+   "id": "spinach",
+   "name": "菠菜",
+   "pack_qty": 1,
+   "raw_edible": false,
+   "shelf_days": 2.0
+  },
+  {
+   "category": "leafy",
+   "category_label": "叶菜",
+   "custom": false,
+   "id": "shungiku",
+   "name": "茼蒿",
+   "pack_qty": 1,
+   "raw_edible": false,
+   "shelf_days": 2.0
+  },
+  {
+   "category": "leafy",
+   "category_label": "叶菜",
+   "custom": false,
+   "id": "scallion",
+   "name": "小葱",
+   "pack_qty": 1,
+   "raw_edible": false,
+   "shelf_days": 2.0
+  },
+  {
+   "category": "leafy",
+   "category_label": "叶菜",
+   "custom": false,
+   "id": "lettuce",
+   "name": "生菜",
+   "pack_qty": 1,
+   "raw_edible": false,
+   "shelf_days": 2.0
+  },
+  {
+   "category": "root",
+   "category_label": "根茎",
+   "custom": false,
+   "id": "carrot",
+   "name": "胡萝卜",
+   "pack_qty": 2,
+   "raw_edible": false,
+   "shelf_days": 7.0
+  },
+  {
+   "category": "root",
+   "category_label": "根茎",
+   "custom": false,
+   "id": "potato",
+   "name": "土豆",
+   "pack_qty": 2,
+   "raw_edible": false,
+   "shelf_days": 7.0
+  },
+  {
+   "category": "root",
+   "category_label": "根茎",
+   "custom": false,
+   "id": "onion",
+   "name": "洋葱",
+   "pack_qty": 2,
+   "raw_edible": false,
+   "shelf_days": 7.0
+  },
+  {
+   "category": "veg",
+   "category_label": "蔬菜",
+   "custom": false,
+   "id": "pepper",
+   "name": "青椒",
+   "pack_qty": 2,
+   "raw_edible": false,
+   "shelf_days": 5.0
+  },
+  {
+   "category": "veg",
+   "category_label": "蔬菜",
+   "custom": false,
+   "id": "eggplant",
+   "name": "茄子",
+   "pack_qty": 2,
+   "raw_edible": false,
+   "shelf_days": 5.0
+  },
+  {
+   "category": "veg",
+   "category_label": "蔬菜",
+   "custom": false,
+   "id": "mushroom",
+   "name": "蘑菇",
+   "pack_qty": 1,
+   "raw_edible": false,
+   "shelf_days": 5.0
+  },
+  {
+   "category": "veg",
+   "category_label": "蔬菜",
+   "custom": false,
+   "id": "cabbage",
+   "name": "白菜",
+   "pack_qty": 1,
+   "raw_edible": false,
+   "shelf_days": 5.0
+  },
+  {
+   "category": "dairy",
+   "category_label": "蛋奶豆",
+   "custom": false,
+   "id": "egg",
+   "name": "鸡蛋",
+   "pack_qty": 6,
+   "raw_edible": false,
+   "shelf_days": 5.0
+  },
+  {
+   "category": "dairy",
+   "category_label": "蛋奶豆",
+   "custom": false,
+   "id": "milk",
+   "name": "牛奶",
+   "pack_qty": 1,
+   "raw_edible": true,
+   "shelf_days": 5.0
+  },
+  {
+   "category": "dairy",
+   "category_label": "蛋奶豆",
+   "custom": false,
+   "id": "tofu",
+   "name": "豆腐",
+   "pack_qty": 1,
+   "raw_edible": false,
+   "shelf_days": 5.0
+  },
+  {
+   "category": "dairy",
+   "category_label": "蛋奶豆",
+   "custom": false,
+   "id": "butter",
+   "name": "黄油",
+   "pack_qty": 1,
+   "raw_edible": false,
+   "shelf_days": 5.0
+  },
+  {
+   "category": "dairy",
+   "category_label": "蛋奶豆",
+   "custom": false,
+   "id": "cheese",
+   "name": "奶酪",
+   "pack_qty": 1,
+   "raw_edible": true,
+   "shelf_days": 5.0
+  },
+  {
+   "category": "meat",
+   "category_label": "肉和海鲜",
+   "custom": false,
+   "id": "beef",
+   "name": "牛肉",
+   "pack_qty": 1,
+   "raw_edible": false,
+   "shelf_days": 3.0
+  },
+  {
+   "category": "meat",
+   "category_label": "肉和海鲜",
+   "custom": false,
+   "id": "pork",
+   "name": "猪肉",
+   "pack_qty": 1,
+   "raw_edible": false,
+   "shelf_days": 3.0
+  },
+  {
+   "category": "meat",
+   "category_label": "肉和海鲜",
+   "custom": false,
+   "id": "chicken",
+   "name": "鸡腿",
+   "pack_qty": 1,
+   "raw_edible": false,
+   "shelf_days": 3.0
+  },
+  {
+   "category": "meat",
+   "category_label": "肉和海鲜",
+   "custom": false,
+   "id": "shrimp",
+   "name": "虾",
+   "pack_qty": 1,
+   "raw_edible": false,
+   "shelf_days": 3.0
+  },
+  {
+   "category": "meat",
+   "category_label": "肉和海鲜",
+   "custom": false,
+   "id": "salmon",
+   "name": "三文鱼",
+   "pack_qty": 1,
+   "raw_edible": false,
+   "shelf_days": 3.0
+  },
+  {
+   "category": "staple_food",
+   "category_label": "主食",
+   "custom": false,
+   "id": "udon",
+   "name": "乌冬面",
+   "pack_qty": 1,
+   "raw_edible": false,
+   "shelf_days": 5.0
+  },
+  {
+   "category": "fruit",
+   "category_label": "水果",
+   "custom": false,
+   "id": "strawberry",
+   "name": "草莓",
+   "pack_qty": 1,
+   "raw_edible": true,
+   "shelf_days": 3.0
+  },
+  {
+   "category": "fruit",
+   "category_label": "水果",
+   "custom": false,
+   "id": "apple",
+   "name": "苹果",
+   "pack_qty": 2,
+   "raw_edible": true,
+   "shelf_days": 7.0
+  },
+  {
+   "category": "fruit",
+   "category_label": "水果",
+   "custom": false,
+   "id": "lemon",
+   "name": "柠檬",
+   "pack_qty": 1,
+   "raw_edible": false,
+   "shelf_days": 7.0
+  },
+  {
+   "category": "staple_food",
+   "category_label": "主食",
+   "custom": false,
+   "id": "noodles",
+   "name": "面条",
+   "pack_qty": 1,
+   "raw_edible": false,
+   "shelf_days": 5.0
+  },
+  {
+   "category": "dairy",
+   "category_label": "蛋奶豆",
+   "custom": false,
+   "id": "miso",
+   "name": "味噌",
+   "pack_qty": 1,
+   "raw_edible": false,
+   "shelf_days": 30.0
+  },
+  {
+   "category": "root",
+   "category_label": "根茎",
+   "custom": false,
+   "id": "daikon",
+   "name": "白萝卜",
+   "pack_qty": 1,
+   "raw_edible": false,
+   "shelf_days": 7.0
+  },
+  {
+   "category": "veg",
+   "category_label": "蔬菜",
+   "custom": false,
+   "id": "broccoli",
+   "name": "西蓝花",
+   "pack_qty": 1,
+   "raw_edible": false,
+   "shelf_days": 5.0
+  },
+  {
+   "category": "veg",
+   "category_label": "蔬菜",
+   "custom": false,
+   "id": "beansprout",
+   "name": "豆芽",
+   "pack_qty": 1,
+   "raw_edible": false,
+   "shelf_days": 2.0
+  },
+  {
+   "category": "meat",
+   "category_label": "肉和海鲜",
+   "custom": false,
+   "id": "pork_slice",
+   "name": "猪肉薄切",
+   "pack_qty": 1,
+   "raw_edible": false,
+   "shelf_days": 3.0
+  }
+ ],
+ "catalog_kinds": [
+  {
+   "category": "veg",
+   "category_label": "蔬菜",
+   "custom": false,
+   "id": "tomato",
+   "name": "番茄",
+   "pack_qty": 3,
+   "raw_edible": true,
+   "shelf_days": 5.0
+  },
+  {
+   "category": "veg",
+   "category_label": "蔬菜",
+   "custom": false,
+   "id": "cucumber",
+   "name": "黄瓜",
+   "pack_qty": 2,
+   "raw_edible": true,
+   "shelf_days": 5.0
+  },
+  {
+   "category": "leafy",
+   "category_label": "叶菜",
+   "custom": false,
+   "id": "spinach",
+   "name": "菠菜",
+   "pack_qty": 1,
+   "raw_edible": false,
+   "shelf_days": 2.0
+  },
+  {
+   "category": "leafy",
+   "category_label": "叶菜",
+   "custom": false,
+   "id": "shungiku",
+   "name": "茼蒿",
+   "pack_qty": 1,
+   "raw_edible": false,
+   "shelf_days": 2.0
+  },
+  {
+   "category": "leafy",
+   "category_label": "叶菜",
+   "custom": false,
+   "id": "scallion",
+   "name": "小葱",
+   "pack_qty": 1,
+   "raw_edible": false,
+   "shelf_days": 2.0
+  },
+  {
+   "category": "leafy",
+   "category_label": "叶菜",
+   "custom": false,
+   "id": "lettuce",
+   "name": "生菜",
+   "pack_qty": 1,
+   "raw_edible": false,
+   "shelf_days": 2.0
+  },
+  {
+   "category": "root",
+   "category_label": "根茎",
+   "custom": false,
+   "id": "carrot",
+   "name": "胡萝卜",
+   "pack_qty": 2,
+   "raw_edible": false,
+   "shelf_days": 7.0
+  },
+  {
+   "category": "root",
+   "category_label": "根茎",
+   "custom": false,
+   "id": "potato",
+   "name": "土豆",
+   "pack_qty": 2,
+   "raw_edible": false,
+   "shelf_days": 7.0
+  },
+  {
+   "category": "root",
+   "category_label": "根茎",
+   "custom": false,
+   "id": "onion",
+   "name": "洋葱",
+   "pack_qty": 2,
+   "raw_edible": false,
+   "shelf_days": 7.0
+  },
+  {
+   "category": "veg",
+   "category_label": "蔬菜",
+   "custom": false,
+   "id": "pepper",
+   "name": "青椒",
+   "pack_qty": 2,
+   "raw_edible": false,
+   "shelf_days": 5.0
+  },
+  {
+   "category": "veg",
+   "category_label": "蔬菜",
+   "custom": false,
+   "id": "eggplant",
+   "name": "茄子",
+   "pack_qty": 2,
+   "raw_edible": false,
+   "shelf_days": 5.0
+  },
+  {
+   "category": "veg",
+   "category_label": "蔬菜",
+   "custom": false,
+   "id": "mushroom",
+   "name": "蘑菇",
+   "pack_qty": 1,
+   "raw_edible": false,
+   "shelf_days": 5.0
+  },
+  {
+   "category": "veg",
+   "category_label": "蔬菜",
+   "custom": false,
+   "id": "cabbage",
+   "name": "白菜",
+   "pack_qty": 1,
+   "raw_edible": false,
+   "shelf_days": 5.0
+  },
+  {
+   "category": "dairy",
+   "category_label": "蛋奶豆",
+   "custom": false,
+   "id": "egg",
+   "name": "鸡蛋",
+   "pack_qty": 6,
+   "raw_edible": false,
+   "shelf_days": 5.0
+  },
+  {
+   "category": "dairy",
+   "category_label": "蛋奶豆",
+   "custom": false,
+   "id": "milk",
+   "name": "牛奶",
+   "pack_qty": 1,
+   "raw_edible": true,
+   "shelf_days": 5.0
+  },
+  {
+   "category": "dairy",
+   "category_label": "蛋奶豆",
+   "custom": false,
+   "id": "tofu",
+   "name": "豆腐",
+   "pack_qty": 1,
+   "raw_edible": false,
+   "shelf_days": 5.0
+  },
+  {
+   "category": "dairy",
+   "category_label": "蛋奶豆",
+   "custom": false,
+   "id": "butter",
+   "name": "黄油",
+   "pack_qty": 1,
+   "raw_edible": false,
+   "shelf_days": 5.0
+  },
+  {
+   "category": "dairy",
+   "category_label": "蛋奶豆",
+   "custom": false,
+   "id": "cheese",
+   "name": "奶酪",
+   "pack_qty": 1,
+   "raw_edible": true,
+   "shelf_days": 5.0
+  },
+  {
+   "category": "meat",
+   "category_label": "肉和海鲜",
+   "custom": false,
+   "id": "beef",
+   "name": "牛肉",
+   "pack_qty": 1,
+   "raw_edible": false,
+   "shelf_days": 3.0
+  },
+  {
+   "category": "meat",
+   "category_label": "肉和海鲜",
+   "custom": false,
+   "id": "pork",
+   "name": "猪肉",
+   "pack_qty": 1,
+   "raw_edible": false,
+   "shelf_days": 3.0
+  },
+  {
+   "category": "meat",
+   "category_label": "肉和海鲜",
+   "custom": false,
+   "id": "chicken",
+   "name": "鸡腿",
+   "pack_qty": 1,
+   "raw_edible": false,
+   "shelf_days": 3.0
+  },
+  {
+   "category": "meat",
+   "category_label": "肉和海鲜",
+   "custom": false,
+   "id": "shrimp",
+   "name": "虾",
+   "pack_qty": 1,
+   "raw_edible": false,
+   "shelf_days": 3.0
+  },
+  {
+   "category": "meat",
+   "category_label": "肉和海鲜",
+   "custom": false,
+   "id": "salmon",
+   "name": "三文鱼",
+   "pack_qty": 1,
+   "raw_edible": false,
+   "shelf_days": 3.0
+  },
+  {
+   "category": "staple_food",
+   "category_label": "主食",
+   "custom": false,
+   "id": "udon",
+   "name": "乌冬面",
+   "pack_qty": 1,
+   "raw_edible": false,
+   "shelf_days": 5.0
+  },
+  {
+   "category": "fruit",
+   "category_label": "水果",
+   "custom": false,
+   "id": "strawberry",
+   "name": "草莓",
+   "pack_qty": 1,
+   "raw_edible": true,
+   "shelf_days": 3.0
+  },
+  {
+   "category": "fruit",
+   "category_label": "水果",
+   "custom": false,
+   "id": "apple",
+   "name": "苹果",
+   "pack_qty": 2,
+   "raw_edible": true,
+   "shelf_days": 7.0
+  },
+  {
+   "category": "fruit",
+   "category_label": "水果",
+   "custom": false,
+   "id": "lemon",
+   "name": "柠檬",
+   "pack_qty": 1,
+   "raw_edible": false,
+   "shelf_days": 7.0
+  },
+  {
+   "category": "staple_food",
+   "category_label": "主食",
+   "custom": false,
+   "id": "noodles",
+   "name": "面条",
+   "pack_qty": 1,
+   "raw_edible": false,
+   "shelf_days": 5.0
+  },
+  {
+   "category": "dairy",
+   "category_label": "蛋奶豆",
+   "custom": false,
+   "id": "miso",
+   "name": "味噌",
+   "pack_qty": 1,
+   "raw_edible": false,
+   "shelf_days": 30.0
+  },
+  {
+   "category": "root",
+   "category_label": "根茎",
+   "custom": false,
+   "id": "daikon",
+   "name": "白萝卜",
+   "pack_qty": 1,
+   "raw_edible": false,
+   "shelf_days": 7.0
+  },
+  {
+   "category": "veg",
+   "category_label": "蔬菜",
+   "custom": false,
+   "id": "broccoli",
+   "name": "西蓝花",
+   "pack_qty": 1,
+   "raw_edible": false,
+   "shelf_days": 5.0
+  },
+  {
+   "category": "veg",
+   "category_label": "蔬菜",
+   "custom": false,
+   "id": "beansprout",
+   "name": "豆芽",
+   "pack_qty": 1,
+   "raw_edible": false,
+   "shelf_days": 2.0
+  },
+  {
+   "category": "meat",
+   "category_label": "肉和海鲜",
+   "custom": false,
+   "id": "pork_slice",
+   "name": "猪肉薄切",
+   "pack_qty": 1,
+   "raw_edible": false,
+   "shelf_days": 3.0
+  },
+  {
+   "art": {
+    "err": "",
+    "sizes": {},
+    "state": "none",
+    "v": 0
+   },
+   "category": "fruit",
+   "category_label": "水果",
+   "custom": true,
+   "id": "u_a7dadc9971",
+   "name": "柿子",
+   "pack_qty": 1,
+   "raw_edible": true,
+   "shelf_days": 7.0
+  }
+ ],
+ "fridge": {
+  "coupons": {
+   "count": 1,
+   "max": 3
+  },
+  "dizzy": {
+   "dish": "坏汤",
+   "since": 1794493249.66642,
+   "until": 1794502249.66642
+  },
+  "items": [
+   {
+    "batch_id": "864dbc0942364d71a21a146c945b283b",
+    "bought_at": 1794493249.660898,
+    "by": "her",
+    "category": "leafy",
+    "expires_at": 1794666049.660898,
+    "freshness": "fresh",
+    "item_id": "spinach",
+    "name": "菠菜",
+    "qty": 1,
+    "wormed": false
+   },
+   {
+    "batch_id": "2cd7a6d1e7be43ed9ece1fc662be757c",
+    "bought_at": 1794493249.660898,
+    "by": "her",
+    "category": "dairy",
+    "expires_at": 1794925249.660898,
+    "freshness": "fresh",
+    "item_id": "egg",
+    "name": "鸡蛋",
+    "qty": 6,
+    "wormed": false
+   },
+   {
+    "batch_id": "b5fd225535f341cea5da6d6ca3b6301c",
+    "bought_at": 1794493249.660898,
+    "by": "her",
+    "category": "staple_food",
+    "expires_at": 1794925249.660898,
+    "freshness": "fresh",
+    "item_id": "udon",
+    "name": "乌冬面",
+    "qty": 1,
+    "wormed": false
+   }
+  ],
+  "log": [
+   {
+    "at": 1794493249.66642,
+    "kind": "dizzy",
+    "text": "吃了坏掉的坏汤,晕乎乎的"
+   },
+   {
+    "at": 1794493249.665788,
+    "kind": "coupon",
+    "text": "用户给了一张买菜券"
+   },
+   {
+    "at": 1794493249.660898,
+    "kind": "bought",
+    "text": "用户买了菠菜×1、鸡蛋×6、乌冬面×1"
+   }
+  ],
+  "now": 1794493249.676576,
+  "satiety": {
+   "enabled": true,
+   "updated_at": 1794493249.66642,
+   "value": 60.0
+  },
+  "staples": [
+   "米",
+   "油",
+   "盐",
+   "酱油"
+  ],
+  "text": "冰箱:鸡蛋×6(11-12买的)、菠菜×1、乌冬面×1。米油盐酱油常备。\n买菜券 1/3 张。\n能买的:叶菜 菠菜/茼蒿/小葱/生菜;蔬菜 番茄/黄瓜/青椒/茄子/蘑菇/白菜/西蓝花/豆芽;根茎 胡萝卜/土豆/洋葱/白萝卜;蛋奶豆 鸡蛋/牛奶/豆腐/黄油/奶酪/味噌;肉和海鲜 牛肉/猪肉/鸡腿/虾/三文鱼/猪肉薄切;主食 乌冬面/面条;水果 草莓/苹果/柠檬。\n你还有点晕乎乎的,01:50 前后缓过来。\n饱食度 60%。",
+  "who": "aster"
+ },
+ "fridge_kinds": {
+  "coupons": {
+   "count": 1,
+   "max": 3
+  },
+  "dizzy": {
+   "dish": "坏汤",
+   "since": 1794493249.66642,
+   "until": 1794502249.66642
+  },
+  "items": [
+   {
+    "batch_id": "864dbc0942364d71a21a146c945b283b",
+    "bought_at": 1794493249.660898,
+    "by": "her",
+    "category": "leafy",
+    "expires_at": 1794666049.660898,
+    "freshness": "fresh",
+    "item_id": "spinach",
+    "name": "菠菜",
+    "qty": 1,
+    "wormed": false
+   },
+   {
+    "batch_id": "2cd7a6d1e7be43ed9ece1fc662be757c",
+    "bought_at": 1794493249.660898,
+    "by": "her",
+    "category": "dairy",
+    "expires_at": 1794925249.660898,
+    "freshness": "fresh",
+    "item_id": "egg",
+    "name": "鸡蛋",
+    "qty": 5,
+    "wormed": false
+   },
+   {
+    "batch_id": "b5fd225535f341cea5da6d6ca3b6301c",
+    "bought_at": 1794493249.660898,
+    "by": "her",
+    "category": "staple_food",
+    "expires_at": 1794925249.660898,
+    "freshness": "fresh",
+    "item_id": "udon",
+    "name": "乌冬面",
+    "qty": 1,
+    "wormed": false
+   },
+   {
+    "art": {
+     "err": "",
+     "sizes": {},
+     "state": "none",
+     "v": 0
+    },
+    "batch_id": "d9b2021b173b4e9f829a86a94656bb8c",
+    "bought_at": 1794493849.70399,
+    "by": "her",
+    "category": "fruit",
+    "expires_at": 1795098649.70399,
+    "freshness": "fresh",
+    "item_id": "u_a7dadc9971",
+    "name": "柿子",
+    "qty": 1,
+    "wormed": false
+   }
+  ],
+  "log": [
+   {
+    "at": 1794493849.70399,
+    "kind": "bought",
+    "text": "用户买了柿子×1"
+   },
+   {
+    "at": 1794493249.66642,
+    "kind": "dizzy",
+    "text": "吃了坏掉的坏汤,晕乎乎的"
+   },
+   {
+    "at": 1794493249.665788,
+    "kind": "coupon",
+    "text": "用户给了一张买菜券"
+   },
+   {
+    "at": 1794493249.660898,
+    "kind": "bought",
+    "text": "用户买了菠菜×1、鸡蛋×6、乌冬面×1"
+   }
+  ],
+  "now": 1794493849.7065449,
+  "satiety": {
+   "enabled": true,
+   "updated_at": 1794493849.692214,
+   "value": 98.5
+  },
+  "staples": [
+   "米",
+   "油",
+   "盐",
+   "酱油"
+  ],
+  "text": "冰箱:鸡蛋×5(11-12买的)、菠菜×1、乌冬面×1、柿子×1。米油盐酱油常备。\n买菜券 1/3 张。\n能买的:叶菜 菠菜/茼蒿/小葱/生菜;蔬菜 番茄/黄瓜/青椒/茄子/蘑菇/白菜/西蓝花/豆芽;根茎 胡萝卜/土豆/洋葱/白萝卜;蛋奶豆 鸡蛋/牛奶/豆腐/黄油/奶酪/味噌;肉和海鲜 牛肉/猪肉/鸡腿/虾/三文鱼/猪肉薄切;主食 乌冬面/面条;水果 草莓/苹果/柠檬/柿子。\n你还有点晕乎乎的,01:50 前后缓过来。\n饱食度 98%。",
+  "who": "aster"
+ },
+ "fridge_off": {
+  "coupons": {
+   "count": 1,
+   "max": 3
+  },
+  "dizzy": {
+   "dish": "坏汤",
+   "since": 1794493249.66642,
+   "until": 1794502249.66642
+  },
+  "items": [
+   {
+    "batch_id": "864dbc0942364d71a21a146c945b283b",
+    "bought_at": 1794493249.660898,
+    "by": "her",
+    "category": "leafy",
+    "expires_at": 1794666049.660898,
+    "freshness": "fresh",
+    "item_id": "spinach",
+    "name": "菠菜",
+    "qty": 1,
+    "wormed": false
+   },
+   {
+    "batch_id": "2cd7a6d1e7be43ed9ece1fc662be757c",
+    "bought_at": 1794493249.660898,
+    "by": "her",
+    "category": "dairy",
+    "expires_at": 1794925249.660898,
+    "freshness": "fresh",
+    "item_id": "egg",
+    "name": "鸡蛋",
+    "qty": 5,
+    "wormed": false
+   },
+   {
+    "batch_id": "b5fd225535f341cea5da6d6ca3b6301c",
+    "bought_at": 1794493249.660898,
+    "by": "her",
+    "category": "staple_food",
+    "expires_at": 1794925249.660898,
+    "freshness": "fresh",
+    "item_id": "udon",
+    "name": "乌冬面",
+    "qty": 1,
+    "wormed": false
+   },
+   {
+    "art": {
+     "err": "",
+     "sizes": {},
+     "state": "none",
+     "v": 0
+    },
+    "batch_id": "d9b2021b173b4e9f829a86a94656bb8c",
+    "bought_at": 1794493849.70399,
+    "by": "her",
+    "category": "fruit",
+    "expires_at": 1795098649.70399,
+    "freshness": "fresh",
+    "item_id": "u_a7dadc9971",
+    "name": "柿子",
+    "qty": 1,
+    "wormed": false
+   }
+  ],
+  "log": [
+   {
+    "at": 1794493849.70399,
+    "kind": "bought",
+    "text": "用户买了柿子×1"
+   },
+   {
+    "at": 1794493249.66642,
+    "kind": "dizzy",
+    "text": "吃了坏掉的坏汤,晕乎乎的"
+   },
+   {
+    "at": 1794493249.665788,
+    "kind": "coupon",
+    "text": "用户给了一张买菜券"
+   },
+   {
+    "at": 1794493249.660898,
+    "kind": "bought",
+    "text": "用户买了菠菜×1、鸡蛋×6、乌冬面×1"
+   }
+  ],
+  "now": 1794493849.709915,
+  "satiety": {
+   "enabled": false,
+   "updated_at": 1794493849.692214,
+   "value": 98.5
+  },
+  "staples": [
+   "米",
+   "油",
+   "盐",
+   "酱油"
+  ],
+  "text": "冰箱:鸡蛋×5(11-12买的)、菠菜×1、乌冬面×1、柿子×1。米油盐酱油常备。\n买菜券 1/3 张。\n能买的:叶菜 菠菜/茼蒿/小葱/生菜;蔬菜 番茄/黄瓜/青椒/茄子/蘑菇/白菜/西蓝花/豆芽;根茎 胡萝卜/土豆/洋葱/白萝卜;蛋奶豆 鸡蛋/牛奶/豆腐/黄油/奶酪/味噌;肉和海鲜 牛肉/猪肉/鸡腿/虾/三文鱼/猪肉薄切;主食 乌冬面/面条;水果 草莓/苹果/柠檬/柿子。\n你还有点晕乎乎的,01:50 前后缓过来。",
+  "who": "aster"
+ },
+ "kitchen": {
+  "cooking": [],
+  "now": 1794493849.690561,
+  "recent": [
+   {
+    "cancelled_at": null,
+    "created_at": 1794493249.6813738,
+    "dish": "煎蛋",
+    "duration_seconds": 300,
+    "eaten_at": null,
+    "id": "41a2699947e042deacbbcf300ed219ca",
+    "ingredients": [
+     {
+      "freshness": "fresh",
+      "name": "鸡蛋",
+      "qty": 1
+     }
+    ],
+    "menu_added_at": 1794493849.6862872,
+    "menu_row_id": "8e49816ec4184a35a8d07ffa88abf9f6",
+    "method": "fry",
+    "note": "",
+    "outcome": "great",
+    "remaining_seconds": 0,
+    "served_at": 1794493549.6813738,
+    "started_at": 1794493249.6813738,
+    "status": "served",
+    "who": "aster",
+    "woke_at": 1794493849.6879842,
+    "worm_state": null,
+    "wormed_at": null
+   }
+  ],
+  "timezone": "Asia/Tokyo"
+ },
+ "meals": {
+  "meals": [
+   {
+    "at": 1794493849.692214,
+    "id": "c10c891d5a9740c79525c68fdbabd21b",
+    "meal": "茄汁滑蛋",
+    "note": null
+   }
+  ],
+  "now": 1794493849.6953511,
+  "since": 1794409200.0,
+  "who": "aster"
+ },
+ "potion_row_note": "回 30% 体力 · 困了就喝",
+ "potions": {
+  "enabled": true,
+  "items": [
+   {
+    "created_at": 1794493849.696176,
+    "memo": "困了就喝",
+    "menu_row_id": "95dae5cb15274bb499b678f26de60845",
+    "note": "回 30% 体力 · 困了就喝",
+    "pct": 30,
+    "state": "pending",
+    "used_at": null,
+    "used_by": null,
+    "who": "aster"
+   }
+  ],
+  "memo_max": 60,
+  "memo_sep": " · ",
+  "name": "精力补充药剂",
+  "note_fmt": "回 {pct}% 体力",
+  "pct_min": 1
+ },
+ "potions_off": {
+  "enabled": false,
+  "items": [
+   {
+    "created_at": 1794493849.696176,
+    "memo": "困了就喝",
+    "menu_row_id": "95dae5cb15274bb499b678f26de60845",
+    "note": "回 30% 体力 · 困了就喝",
+    "pct": 30,
+    "state": "pending",
+    "used_at": null,
+    "used_by": null,
+    "who": "aster"
+   }
+  ],
+  "memo_max": 60,
+  "memo_sep": " · ",
+  "name": "精力补充药剂",
+  "note_fmt": "回 {pct}% 体力",
+  "pct_min": 1
+ },
+ "snacks": {
+  "cap_max": 20,
+  "cap_min": 0,
+  "day": "2026-11-12",
+  "energy_enabled": true,
+  "recent": [],
+  "resets_at": 1794510000.0,
+  "snacks": [
+   {
+    "cap": 3,
+    "default_cap": 3,
+    "eaten": 0,
+    "gain": null,
+    "id": "coffee",
+    "name": "咖啡",
+    "tier": "mid",
+    "tier_label": "中档",
+    "variants": [
+     {
+      "gain": 0.08,
+      "id": "espresso",
+      "name": "浓缩"
+     },
+     {
+      "gain": 0.06,
+      "id": "americano",
+      "name": "美式"
+     },
+     {
+      "gain": 0.05,
+      "id": "latte",
+      "name": "拿铁"
+     },
+     {
+      "gain": 0.04,
+      "id": "mocha",
+      "name": "摩卡"
+     }
+    ]
+   },
+   {
+    "cap": 2,
+    "default_cap": 2,
+    "eaten": 0,
+    "gain": 0.15,
+    "id": "jelly",
+    "name": "即时元气果冻",
+    "tier": "high",
+    "tier_label": "高档",
+    "variants": []
+   },
+   {
+    "cap": 3,
+    "default_cap": 3,
+    "eaten": 0,
+    "gain": 0.04,
+    "id": "pudding",
+    "name": "布丁",
+    "tier": "low",
+    "tier_label": "低档",
+    "variants": []
+   },
+   {
+    "cap": 4,
+    "default_cap": 4,
+    "eaten": 0,
+    "gain": 0.03,
+    "id": "chocolate",
+    "name": "黑巧克力",
+    "tier": "low",
+    "tier_label": "低档",
+    "variants": []
+   },
+   {
+    "cap": 5,
+    "default_cap": 5,
+    "eaten": 0,
+    "gain": 0.02,
+    "id": "cookie",
+    "name": "曲奇",
+    "tier": "low",
+    "tier_label": "低档",
+    "variants": []
+   }
+  ],
+  "who": "aster"
+ },
+ "snacks_off": {
+  "cap_max": 20,
+  "cap_min": 0,
+  "day": "2026-11-12",
+  "energy_enabled": false,
+  "recent": [],
+  "resets_at": 1794510000.0,
+  "snacks": [
+   {
+    "cap": 3,
+    "default_cap": 3,
+    "eaten": 0,
+    "gain": null,
+    "id": "coffee",
+    "name": "咖啡",
+    "tier": "mid",
+    "tier_label": "中档",
+    "variants": [
+     {
+      "gain": 0.08,
+      "id": "espresso",
+      "name": "浓缩"
+     },
+     {
+      "gain": 0.06,
+      "id": "americano",
+      "name": "美式"
+     },
+     {
+      "gain": 0.05,
+      "id": "latte",
+      "name": "拿铁"
+     },
+     {
+      "gain": 0.04,
+      "id": "mocha",
+      "name": "摩卡"
+     }
+    ]
+   },
+   {
+    "cap": 2,
+    "default_cap": 2,
+    "eaten": 0,
+    "gain": 0.15,
+    "id": "jelly",
+    "name": "即时元气果冻",
+    "tier": "high",
+    "tier_label": "高档",
+    "variants": []
+   },
+   {
+    "cap": 3,
+    "default_cap": 3,
+    "eaten": 0,
+    "gain": 0.04,
+    "id": "pudding",
+    "name": "布丁",
+    "tier": "low",
+    "tier_label": "低档",
+    "variants": []
+   },
+   {
+    "cap": 4,
+    "default_cap": 4,
+    "eaten": 0,
+    "gain": 0.03,
+    "id": "chocolate",
+    "name": "黑巧克力",
+    "tier": "low",
+    "tier_label": "低档",
+    "variants": []
+   },
+   {
+    "cap": 5,
+    "default_cap": 5,
+    "eaten": 0,
+    "gain": 0.02,
+    "id": "cookie",
+    "name": "曲奇",
+    "tier": "low",
+    "tier_label": "低档",
+    "variants": []
+   }
+  ],
+  "who": "aster"
+ }
+}

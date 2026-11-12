@@ -1,8 +1,10 @@
-"""The HTTP server: REST under /api for a kitchen page, MCP at /mcp for the model.
+"""The HTTP server: REST under /api for a kitchen page, MCP at /mcp for the model, and the
+kitchen page itself (the built web app, static files) under /page/.
 
-Both live in one process and one port. When ``server.token`` is set, every
+All live in one process and one port. When ``server.token`` is set, every
 request to /api (except /api/health) and /mcp must carry
-``Authorization: Bearer <token>``.
+``Authorization: Bearer <token>``. The files under /page/ are public: the page asks for the
+token itself and sends it as that header, never in an address.
 
 Role ids are passed as ``who``. ``viewer`` is accepted as an alias everywhere.
 """
@@ -12,10 +14,12 @@ import asyncio
 import contextlib
 import hmac
 import logging
+import mimetypes
+from pathlib import Path
 
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from pydantic import AliasChoices, BaseModel, Field
 
 from . import (__version__, art, clock, config, fridge, inline, kitchen, menu, notify, potion, roles,
@@ -118,6 +122,33 @@ class ClockIn(BaseModel):
     reset: bool = False
 
 
+# The kitchen page: the web build that ships inside the package (rebuilt from web/page/).
+PAGE_DIR = Path(__file__).with_name("page")
+PAGE_MISSING = ("The kitchen page is not in this install. Build it from web/page/ (npm install && npm run build); "
+                "see docs/PAGE.md. / 这份安装里没有厨房页。请在 web/page/ 里构建（npm install && npm run build），"
+                "见 docs/PAGE.md。")
+
+
+def _origin_list(values: list[str]) -> list[str]:
+    """Origins as browsers compare them: no trailing slash, and nothing that is not scheme://host[:port]."""
+    out = []
+    for v in values:
+        o = (v or "").strip().rstrip("/")
+        if o and "://" in o and not any(c in o for c in " ;,'\"*") and "/" not in o.split("://", 1)[1]:
+            out.append(o)
+    return out
+
+
+def _page_headers(rel: str) -> dict[str, str]:
+    """Who may frame the page, and how long a file may be cached. Files under _expo/ and assets/
+    carry a hash of their content in the name, so they never change; the rest is checked each time."""
+    frames = " ".join(["'self'", *_origin_list(config.get().server_embed_origins)])
+    hashed = rel.startswith(("_expo/", "assets/"))
+    return {"Content-Security-Policy": f"frame-ancestors {frames}",
+            "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer",
+            "Cache-Control": "public, max-age=31536000, immutable" if hashed else "no-cache"}
+
+
 def _role(who: str | None, viewer: str | None = None) -> str:
     try:
         return roles.resolve(who or viewer)
@@ -178,8 +209,8 @@ def create_app(*, scheduler: bool = True, with_mcp: bool = True) -> FastAPI:
     app = FastAPI(title="kitchenette", version=__version__, lifespan=lifespan)
     origins = [o.rstrip("/") for o in config.get().server_cors_origins if o]
     if origins:
-        # A cooking card on someone else's page fetches /api from the browser; without this the
-        # browser refuses to hand it the answer. Nothing is allowed unless it is listed.
+        # A cooking card or a kitchen page on someone else's site fetches /api from the browser;
+        # without this the browser refuses to hand it the answer. Nothing is allowed unless it is listed.
         app.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=["*"],
                            allow_headers=["Authorization", "Content-Type"])
     guarded = [Depends(auth)]
@@ -192,6 +223,24 @@ def create_app(*, scheduler: bool = True, with_mcp: bool = True) -> FastAPI:
     def roles_list():
         return {"default": config.get().roles_default,
                 "roles": sorted(set(roles.known()) | {config.get().roles_default})}
+
+    @app.get("/api/about", dependencies=guarded)
+    def about():
+        """What a page needs to know before it draws anything: who lives here, which parts of the
+        kitchen are switched on, and the words the settings use for the human. Read-only."""
+        cfg = config.get()
+        listed = [r for r in cfg.roles_allowed if roles.valid(r)]
+        return {"version": __version__, "now": clock.now(),
+                "timezone": cfg.server_timezone, "timezone_label": cfg.server_timezone_label,
+                "roles": {"default": cfg.roles_default,
+                          "list": sorted(set(roles.known()) | set(listed) | {cfg.roles_default})},
+                "switches": {"stamina": bool(cfg.stamina_enabled), "satiety": bool(cfg.satiety_enabled),
+                             "worms": bool(cfg.kitchen_worm_enabled), "dev_clock": bool(cfg.server_dev_clock),
+                             "art": art.enabled()},
+                "words": {"human_name": cfg.words_human_name, "human_pronoun": cfg.words_human_pronoun,
+                          "app_name": cfg.words_app_name},
+                "limits": {"coupon_max": cfg.fridge_coupon_max, "buy_max_items": cfg.fridge_buy_max_items,
+                           "hungry_below": cfg.satiety_hungry_below}}
 
     # ── kitchen ─────────────────────────────────────────────────────────
     @app.get("/api/kitchen", dependencies=guarded)
@@ -432,12 +481,17 @@ def create_app(*, scheduler: bool = True, with_mcp: bool = True) -> FastAPI:
             _potion_fail(e)
         row = got["row"]
         if got["outcome"] == "potion":
-            notify.emit(row["for_who"], notify.KIND_POTION_FED, got["text"], key=f"menu.fed:{row_id}")
+            note = notify.emit(row["for_who"], notify.KIND_POTION_FED, got["text"], key=f"menu.fed:{row_id}")
         else:
-            notify.emit(row["for_who"], notify.KIND_MENU_FED,
-                        payload={"dish": row["dish"], "note": row["note"] or ""}, key=f"menu.fed:{row_id}")
+            note = notify.emit(row["for_who"], notify.KIND_MENU_FED,
+                               payload={"dish": row["dish"], "note": row["note"] or ""}, key=f"menu.fed:{row_id}")
         background.add_task(notify.flush)
-        return {"ok": True, "row": row, "outcome": got["outcome"], "text": got["reply"]}
+        return {"ok": True, "row": row, "outcome": got["outcome"], "text": got["reply"], "notified": note is not None}
+
+    @app.get("/api/meals", dependencies=guarded)
+    def meals_list(who: str | None = None, viewer: str | None = None, since: float | None = None):
+        """The meals a role has had since `since` (epoch seconds); left out = today."""
+        return menu.meals_since(_role(who, viewer), since)
 
     # ── body: stamina, satiety, per-turn lines ──────────────────────────
     @app.get("/api/stamina", dependencies=guarded)
@@ -504,6 +558,24 @@ def create_app(*, scheduler: bool = True, with_mcp: bool = True) -> FastAPI:
             clock.reset()
         scan = service.fast_forward(body.advance_seconds)
         return {"offset": clock.offset(), "now": clock.now(), "scan": scan}
+
+    # ── the kitchen page (static files; no token: the page sends it itself) ─────
+    @app.get("/page", include_in_schema=False)
+    def page_root():
+        return RedirectResponse("/page/", status_code=307)
+
+    @app.get("/page/{rel:path}", include_in_schema=False)
+    def page_file(rel: str = ""):
+        if not (PAGE_DIR / "index.html").is_file():
+            raise HTTPException(404, PAGE_MISSING)
+        rel = rel or "index.html"
+        target = (PAGE_DIR / rel).resolve()
+        if PAGE_DIR.resolve() not in target.parents or not target.is_file():
+            raise HTTPException(404, "Not found")
+        kind = mimetypes.guess_type(target.name)[0] or "application/octet-stream"
+        if target.suffix == ".woff2":
+            kind = "font/woff2"
+        return FileResponse(str(target), media_type=kind, headers=_page_headers(rel))
 
     if mcp_server is not None:
         from . import mcp_server as mcp_mod

@@ -129,6 +129,9 @@ class Settings:
     # Origins of pages on other sites that may call /api from a browser, e.g.
     # ["https://chat.example.com"]. Empty = only pages served from this server's own origin.
     server_cors_origins: list[str] = field(default_factory=list)
+    # Origins of pages on other sites that may show the kitchen page (/page/) in an <iframe>,
+    # e.g. ["https://chat.example.com"]. Empty = only pages of this server's own origin.
+    server_embed_origins: list[str] = field(default_factory=list)
 
     # ── [roles] ─────────────────────────────────────────────────────────
     roles_default: str = "companion"          # used when a tool call omits `who`
@@ -322,7 +325,7 @@ _TABLE_RANGES: dict[str, tuple[float | None, float | None]] = {
     "stamina_rest": (0, 1), "stamina_outcome_delta": (-1, 1),
 }
 _TEXT_TABLES = ("stamina_work", "coupons_earn")
-_TEXT_LISTS = ("server_cors_origins", "roles_allowed", "fridge_staples", "fridge_staple_aliases",
+_TEXT_LISTS = ("server_cors_origins", "server_embed_origins", "roles_allowed", "fridge_staples", "fridge_staple_aliases",
                "fridge_raw_edible", "fridge_hidden_freshness", "notify_quiet_hours")
 _QUIET_RE = re.compile(r"^([01]?\d|2[0-3]):[0-5]\d-([01]?\d|2[0-3]):[0-5]\d$")
 

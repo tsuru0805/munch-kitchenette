@@ -3,6 +3,9 @@
 Base path `/api`. JSON in, JSON out. When `server.token` is set every endpoint
 except `/api/health` needs `Authorization: Bearer <token>`.
 
+The kitchen page that uses these endpoints is served by the same server at
+`/page/` (static files, no token; see [PAGE.md](PAGE.md)).
+
 A role is named with `who` (query string for GET, body field otherwise);
 `viewer` is accepted as an alias. Left out, it is `roles.default`. Times are
 epoch seconds unless noted. Error responses are `{"detail": …}`. The detail
@@ -89,7 +92,8 @@ id for dishes the role cooked.
 | `POST /api/menu` `{dish, by, for_who, note?}` | 201 with the row. When `by` is not the role itself the role is told (`menu.posted`). |
 | `PATCH /api/menu/{id}` `{eaten_at?, note?, dish?, if_pending?}` | `if_pending: true` refuses (409) a row already eaten. |
 | `DELETE /api/menu/{id}` | |
-| `POST /api/menu/{id}/feed` | The human feeds the dish to its role: marks it eaten, settles the meal, tells the role (`menu.fed`). 409 if already eaten. |
+| `POST /api/menu/{id}/feed` | The human feeds the dish to its role: marks it eaten, settles the meal, tells the role (`menu.fed`). `{ok, row, outcome, text, notified}`; `notified` is false when no note was written for the role (`notify.mode = "none"`). 409 if already eaten. |
+| `GET /api/meals?who=&since=` | The meals a role has had since `since` (epoch seconds), oldest first: `{now, who, since, meals: [{id, meal, note, at}]}`. Without `since`: today, from midnight in `server.timezone`. Snacks and potions are not meals. |
 
 ## Snacks
 
@@ -139,6 +143,7 @@ Errors are `{"detail": {"message", "code", "rows"}}` with 409 for `used`,
 |---|---|
 | `GET /api/health` | `{ok, version, now}`. No token needed. |
 | `GET /api/roles` | `{default, roles}`: roles that exist so far. |
+| `GET /api/about` | What a page needs before it draws anything; read-only. `{version, now, timezone, timezone_label, roles: {default, list}, switches: {stamina, satiety, worms, dev_clock, art}, words: {human_name, human_pronoun, app_name}, limits: {coupon_max, buy_max_items, hungry_below}}`. `roles.list` is the roles that exist so far plus `roles.allowed` and the default. `switches` say which parts are on: a page hides stamina when `stamina` is false, satiety when `satiety` is false, and offers fast-forward only when `dev_clock` is true; `art` is whether an art provider is configured. |
 | `POST /api/scan` | Run the periodic scan now. |
 | `POST /api/dev/clock` `{advance_seconds?, reset?}` | Only with `server.dev_clock`. Walks time forward, scanning as it goes. It moves the clock of the whole server, for every role in the database: never use it on a kitchen in use. |
 
@@ -147,6 +152,8 @@ Errors are `{"detail": {"message", "code", "rows"}}` with 409 for `used`,
 # 中文：页面用的接口（REST）
 
 所有地址都以 `/api` 开头，收发都是 JSON。设了 `server.token` 之后，除了 `/api/health`，每个请求都要带 `Authorization: Bearer <token>`。
+
+用这些接口的厨房页由同一个服务在 `/page/` 提供（静态文件，不需要 token；见 [PAGE.md](PAGE.md)）。
 
 角色用 `who` 指定（GET 写在地址的查询参数里，其他写在请求体里）；写成 `viewer` 也认。不写就是默认角色。时间没特别说明的都是「从 1970 年起的秒数」。出错时返回 `{"detail": …}`。`detail` 是一句写给页面使用者看的中文，可以直接显示（「没有这一行。」「这道菜已经吃掉了。」「口令不对,或者没带口令。」）；药剂的接口、以及零食吃到当日上限时，它是一个对象，其中的 `message` 是那句话。唯一的例外是请求本身的形状不对（缺字段、类型不对）：这时返回的是 FastAPI 标准的 422 列表，那是给写程序的人看的。
 
@@ -220,7 +227,8 @@ Errors are `{"detail": {"message", "code", "rows"}}` with 409 for `used`,
 | `POST /api/menu` `{dish, by, for_who, note?}` | 挂一道菜，成功返回 201。挂的人不是他自己时会告诉他。 |
 | `PATCH /api/menu/{id}` `{eaten_at?, note?, dish?, if_pending?}` | 改。带 `if_pending: true` 时，已经吃掉的行会被拒绝（409）。 |
 | `DELETE /api/menu/{id}` | 撤菜。 |
-| `POST /api/menu/{id}/feed` | 你把这道菜喂给他：划掉、算一顿、告诉他。已经吃过返回 409。 |
+| `POST /api/menu/{id}/feed` | 你把这道菜喂给他：划掉、算一顿、告诉他。返回 `{ok, row, outcome, text, notified}`；`notified` 为 false 表示没有给他留话（`notify.mode = "none"` 时）。已经吃过返回 409。 |
+| `GET /api/meals?who=&since=` | 他从 `since`（秒数）起吃过的饭，早的在前：`{now, who, since, meals: [{id, meal, note, at}]}`。不写 `since` 就是今天（按 `server.timezone` 的零点起算）。零食和药剂不算一顿饭。 |
 
 ## 零食
 
@@ -269,5 +277,6 @@ Errors are `{"detail": {"message", "code", "rows"}}` with 409 for `used`,
 |---|---|
 | `GET /api/health` | 活着没有。不需要 token。 |
 | `GET /api/roles` | 目前有哪些角色。 |
+| `GET /api/about` | 页面画东西之前要知道的事，只读：`{version, now, timezone, timezone_label, roles: {default, list}, switches: {stamina, satiety, worms, dev_clock, art}, words: {human_name, human_pronoun, app_name}, limits: {coupon_max, buy_max_items, hungry_below}}`。`roles.list` 是目前有的角色加上 `roles.allowed` 和默认角色。`switches` 说明哪些部分开着：`stamina` 为 false 时页面不显示体力，`satiety` 为 false 时不显示饱食度，`dev_clock` 为 true 时才出现快进；`art` 表示有没有接画图函数。 |
 | `POST /api/scan` | 立刻做一次定时检查。 |
 | `POST /api/dev/clock` `{advance_seconds?, reset?}` | 只有打开 `server.dev_clock` 才有：让时间往前走，途中照常检查。它拨的是整台服务的钟，库里所有角色一起跳——正在用的厨房别用。 |

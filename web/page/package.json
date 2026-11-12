@@ -1,0 +1,45 @@
+{
+  "name": "kitchenette-page",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "start": "expo start --web",
+    "build": "rm -rf dist && expo export -p web --output-dir dist --source-maps && node scripts/postbuild.mjs dist ../../src/kitchenette/page",
+    "fonts": "python3 scripts/subset_fonts.py",
+    "test": "jest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@expo/metro-runtime": "6.1.2",
+    "expo": "54.0.35",
+    "expo-asset": "12.0.13",
+    "expo-linear-gradient": "15.0.8",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-web": "0.21.2"
+  },
+  "devDependencies": {
+    "@types/jest": "29.5.14",
+    "@types/react": "19.1.17",
+    "@types/react-test-renderer": "^19.3.1",
+    "babel-preset-expo": "^54.0.12",
+    "jest": "29.7.0",
+    "jest-expo": "54.0.17",
+    "react-test-renderer": "19.1.0",
+    "typescript": "5.9.3"
+  },
+  "jest": {
+    "preset": "jest-expo",
+    "testMatch": [
+      "<rootDir>/src/**/*.test.ts",
+      "<rootDir>/src/**/*.test.tsx"
+    ],
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/dist/"
+    ],
+    "testTimeout": 30000
+  }
+}

@@ -1,0 +1,341 @@
+# The kitchen page
+
+[中文在下面](#厨房页)
+
+The kitchen as a page: one picture of the whole kitchen in which every thing can be tapped, and under it "the hand", where the thing you tapped is taken down and shown large with what you can do with it. It is the human's side of the kitchen: looking in the fridge, buying groceries, handing out coupons, putting dishes and potions on the menu, feeding. The role's side (cooking, eating, buying with coupons) goes through its tools, not through this page.
+
+The page ships inside the Python package, already built. No node is needed to use it.
+
+## Open it
+
+```bash
+kitchenette serve
+```
+
+then open <http://127.0.0.1:8765/page/> in a browser. It is laid out as a phone-width column; on a wide window it sits in the middle.
+
+`?who=<role>` opens a given role's kitchen, e.g. `http://127.0.0.1:8765/page/?who=mika`. It has to be a role the server knows: one that has been used before, or one listed under `[roles] allowed`. Without `?who=` the page opens the role you looked at last time in this browser, or the default role.
+
+To see it with something in it, without touching your own kitchen:
+
+```bash
+python examples/kitchen_page.py
+```
+
+This starts a throwaway server (a temporary database, a free port, the fast-forward clock on), stocks it (a fridge with food in every state, coupons, dishes and a potion on the menu, a meal eaten, notes on the cork board, a second role) and prints the page's address. Ctrl-C stops it and deletes the database. `--token something` makes that server ask for a token, to see the token step.
+
+## What each part does
+
+| Part | What you see | What you can do |
+|---|---|---|
+| Top | Whose kitchen it is; satiety (red when the role is hungry); "晕乎乎的 · 还有 …" while the role is dizzy from spoiled food. With more than one role, their names at the top right. | Tap a name to switch to that role's kitchen. |
+| The picture | The fridge filled from what is really in it (each thing drawn fresh, past its best or spoiled), coupons on the freezer door, snacks and staples on the shelves, the first three dishes on the counter, a strip of paper per dish under the shelf, notes pinned on the cork board. | Tap any thing to hold it. Tapping an empty spot of the fridge or the counter holds the most urgent thing in the fridge / shows the table. |
+| An ingredient in the hand | Name, how many, and per batch: fresh / past its best / spoiled, the day it keeps until, who bought it and when. Below: everything in the fridge, the most urgent first. | Tap another thing in the row to hold that instead. |
+| The coupon | How many coupons the role holds, out of how many; the last coupon note. | "发一张": hand out a coupon (dimmed at the cap). "给他买菜": open the grocery sheet. |
+| The tote on the fridge door / "给他买菜" | The catalog, by category. | Tick things (tap again to untick) and buy: they go into the fridge without a coupon. "添种类": add an ingredient kind of your own (name, category, whether it can be eaten as it is, how many in a pack, how long it keeps), and remove ones you added. A kind you added shows the first character of its name until the server has drawn a picture (only with an art provider, see [HOOKS.md](HOOKS.md)). |
+| Staples | The staples the server lists. | Nothing: staples never run out. |
+| A snack | Eaten today out of the daily cap, when the count resets, its tier, and what a serving restores. | "喂一份": feed one (coffee needs a flavour first). `−` / `+` then "存": change this snack's daily cap. With more than one role: choose whom to feed. |
+| A dish | Name, how it turned out (很好 / 糊了 / 坏了), its note. Below: everything on the menu, and how many meals today. | "喂给他": feed it (it is crossed off, counts as a meal, and the role is told). "只划掉": cross it off without a meal. "改": change the name and note. "撤": take it off. |
+| A potion | How much stamina it restores, its memo. | The same four actions; feeding adds the stamina at once and is not a meal. |
+| The dashed strip / "挂一道" | A sheet with two parts. | Put a dish on the menu (name, note). Hang a potion (amount, memo). |
+| The receipt | Today's meals and which part of the day each was eaten in. | |
+| The cork board | The kitchen's recent notes (bought, tossed, spoiled, coupons, worms …), six to a page. | "更早的" / "新一些": page through them. |
+
+A question that cannot be taken back (feeding, crossing off, taking off) is asked on a slip of paper first.
+
+When the server has **stamina** switched off, the page shows nothing about stamina: no restore amounts on snacks, no potion part on the "挂一道" sheet. When **satiety** is switched off, the satiety number is not shown. See `[stamina] enabled` and `[satiety] enabled` in [CONFIG.md](CONFIG.md).
+
+When the server runs with the fast-forward clock (`[server] dev_clock = true`, for demos only), a very small "过一小时 / 过一天" appears in the top left corner. It moves the clock of the whole server. On a server without it, it is not there.
+
+The picture has room for the five snacks of the default shelf and the four default staples. If you change the snack list or the staples in the settings, everything is still listed in the hand; only things with a bundled picture are drawn in the picture.
+
+## Tokens
+
+The files under `/page/` are public; the data behind them is not. When `[server] token` is set, the page needs the token to read anything.
+
+- **Opened on its own**, the page asks for the token once and keeps it in this browser's local storage. "换口令 →" at the bottom of the page forgets it.
+- **Embedded** in another page or an app, the host hands the token over in a message (below) and the page stores nothing.
+
+Either way the token is only ever sent as an `Authorization: Bearer` header. It is never part of an address, so it does not end up in the server's log, in the browser's history or in a referrer. Do not put it in a link yourself. Outside your own machine, serve over HTTPS (a reverse proxy or a tunnel in front of the server), or the token crosses the network in the clear.
+
+## Embedding
+
+### In an `<iframe>`
+
+1. On the kitchen server, list the origin of the page that will frame it:
+
+   ```toml
+   [server]
+   embed_origins = ["https://chat.example.com"]
+   ```
+
+   Without this the browser refuses to show the kitchen page in a frame on another site (the server sends `Content-Security-Policy: frame-ancestors 'self'` plus what you list). An origin is `scheme://host[:port]`, nothing after it.
+
+2. Frame it with `?host=<your page's origin>`:
+
+   ```html
+   <iframe id="kitchen" src="https://kitchen.example.com/page/?host=https%3A%2F%2Fchat.example.com"
+           style="width: 390px; height: 780px; border: 0"></iframe>
+   ```
+
+   The kitchen page talks to that one origin only. Where the browser can tell who the real parent is (Chrome, Safari), a `?host=` that does not match it is ignored. A framed page without `?host=` talks to nobody and behaves as if opened on its own (it asks for the token itself).
+
+3. When the page says `ready`, answer with `init`:
+
+   ```js
+   const KITCHEN = "https://kitchen.example.com";
+   const frame = document.getElementById("kitchen");
+   window.addEventListener("message", (e) => {
+     if (e.origin !== KITCHEN || e.source !== frame.contentWindow) return;   // accept from the kitchen only
+     if (e.data.type === "ready") {
+       frame.contentWindow.postMessage(
+         { v: 1, id: "1", type: "init", payload: { credential: "<the token>", who: "mika" } },
+         KITCHEN,                                                             // never "*"
+       );
+     }
+     if (e.data.type === "close") { /* the person pressed "← 返回": hide the frame */ }
+   });
+   ```
+
+A complete host page is in [`examples/page_embed.html`](../examples/page_embed.html).
+
+### Messages
+
+Every message is `{ "v": 1, "id": "<any string>", "type": "<type>", "payload": { … } }`.
+
+| Direction | `type` | `payload` | |
+|---|---|---|---|
+| page → host | `ready` | `{v: 1}` | The page can take `init` now. Sent again after every reload: answer each one. |
+| page → host | `close` | | The person pressed "← 返回" (the link is only there when embedded). |
+| host → page | `init` | `{apiBase?, credential?, who?}` | `credential` = the token (leave it out when the server has none). `who` = the role to open. `apiBase` = the kitchen server's origin; leave it out when the page is served by that server. |
+| host → page | `role` | `{who}` | Show this role's kitchen. |
+| host → page | `logout` | | Forget the token and wait for a new `init`. |
+
+The page answers every host message with `{ "v": 1, "id": "<the same id>", "ok": true, "result": {…} }` or `{ …, "ok": false, "error": "<why>" }`. `init` is answered once the server has accepted the token; it fails with `the kitchen server refused the credential` or `the kitchen server cannot be reached`, and can be sent again.
+
+### In an app's web view
+
+The page uses a native bridge instead of `postMessage` when it finds one of these as it loads (or when its address carries `?embed=native`):
+
+| Platform | Page → app | App → page |
+|---|---|---|
+| iOS `WKWebView` | `window.webkit.messageHandlers.kitchenette.postMessage(json)` | `evaluateJavaScript("window.kitchenette && window.kitchenette.receive(" + json + ")")` |
+| react-native-webview | `window.ReactNativeWebView.postMessage(json)` | `injectJavaScript("window.kitchenette && window.kitchenette.receive(" + json + ")")` |
+| Android `WebView` | `window.KitchenetteHost.postMessage(json)` (from `addJavascriptInterface(obj, "KitchenetteHost")`) | `evaluateJavascript("window.kitchenette && window.kitchenette.receive(" + json + ")", null)` |
+
+The messages are the same; from the page they arrive as JSON strings. Register the bridge before the page loads, send `init` only after `ready`, and keep the web view on the kitchen's origin so the bridge is not exposed to other sites. A web view is not a frame: `embed_origins` does not apply to it.
+
+### Hosting the page's files somewhere else
+
+The build can also be served from another place than the kitchen server (a static host, your own app's bundle). Three things then change:
+
+- Build it for the path it will be served under: `KITCHENETTE_PAGE_BASE=/my/path npm run build` (see "Rebuilding"), and copy `web/page/dist/`.
+- Tell the page where the kitchen is: `?api=https://kitchen.example.com` in its address when opened on its own, or `apiBase` in `init` when embedded.
+- On the kitchen server, let that site read `/api` from a browser: `[server] cors_origins = ["https://where-the-page-is.example.com"]`.
+
+## Rebuilding
+
+The source is in `web/page/` (React Native components run in the browser through Expo's web export). You only need this to change the page.
+
+```bash
+cd web/page
+npm install
+npm run build        # exports to web/page/dist/ and copies it to src/kitchenette/page/
+```
+
+`src/kitchenette/page/` is what the Python package ships and what `/page/` serves; commit it together with the source change.
+
+```bash
+npm test             # the page's unit tests
+npm run typecheck
+npm start            # a dev server with hot reload; pass ?api=http://127.0.0.1:8765 and list its origin in cors_origins
+```
+
+Two scripts drive the built page in a headless browser against real servers they start themselves (a temporary database each). They need [Playwright](https://playwright.dev), which is not a dependency of this package:
+
+```bash
+# from web/page/, with the repository installed in the Python you name
+PW_DIR=/path/to/node_modules KITCHENETTE_PYTHON=python3 node e2e/walk.cjs     # every thing that can be tapped
+PW_DIR=/path/to/node_modules KITCHENETTE_PYTHON=python3 node e2e/modes.cjs    # the token step, switches off, embedding
+```
+
+Other scripts in `web/page/scripts/`: `gen-art.mjs` (the picture table, after adding or replacing a picture), `subset_fonts.py` (the font files), `contract_fixture.py` (the server answers the unit tests read).
+
+## Pictures, fonts, third-party code
+
+- **Pictures** (`web/page/assets/kitchen/`, 121 files): the authors' own material, made with ChatGPT's image generation under the authors' own subscription and cut out by script; the red pen circle is drawn by code. Nothing from a third party.
+- **Fonts**: Noto Serif SC (weights 400 and 300) and Bodoni Moda (three optical sizes), both under the SIL Open Font License 1.1, cut down and shipped as WOFF2 with the license texts. A copy of Noto Serif SC or Source Han Serif SC installed on the device is used first, and then nothing is downloaded.
+- **Code in the script bundle**: React, React DOM, React Native for Web, Expo and a few small packages, all MIT except one BSD-3-Clause. The list with every license text is generated at build time.
+
+The full account ships with the page: [`/page/ASSETS.md`](../web/page/public/ASSETS.md) and `/page/THIRD-PARTY.txt` (in the repository: `src/kitchenette/page/THIRD-PARTY.txt`).
+
+---
+
+# 厨房页
+
+把厨房做成一个页面：一张画着整间厨房的图，图上每样东西都能点；图下面是「手边」，点了哪样，哪样就被拿下来放大，旁边写着能对它做什么。这是「人」这一侧的厨房：看冰箱、买菜、发券、往菜单上挂菜和药剂、投喂。他那一侧（做饭、吃、用券买菜）走的是工具，不经过这个页面。
+
+页面已经构建好，随 Python 包一起装上。用它不需要装 node。
+
+## 打开
+
+```bash
+kitchenette serve
+```
+
+然后用浏览器打开 <http://127.0.0.1:8765/page/>。页面按手机宽度排成一列；窗口宽的时候它在正中间。
+
+地址后面加 `?who=<角色>` 可以直接打开某个角色的厨房，比如 `http://127.0.0.1:8765/page/?who=mika`。这个角色得是服务认识的：以前用过的，或者写在 `[roles] allowed` 里的。不加 `?who=` 的话，打开的是这个浏览器上次看的那个角色，没有就是默认角色。
+
+想先看看里面有东西的样子、又不想动自己的厨房：
+
+```bash
+python examples/kitchen_page.py
+```
+
+它会起一个用完就扔的服务（临时的库、空闲的端口、开着快进钟），先放好东西（各种新鲜度的一冰箱食材、买菜券、菜单上的菜和一瓶药剂、吃过的一顿、软木板上的纸条、第二个角色），然后打印页面地址。按 Ctrl-C 停掉并删掉临时库。加 `--token 随便什么` 可以让这个服务要口令，用来看页面问口令的那一步。
+
+## 每一块能做什么
+
+| 哪一块 | 看到什么 | 能做什么 |
+|---|---|---|
+| 顶上 | 这是谁的厨房；饱食度（他饿了会变红）；吃了坏掉的东西之后的「晕乎乎的 · 还有 …」。角色不止一个时，右上角有各人的名字。 | 点名字切到那个角色的厨房。 |
+| 画 | 冰箱按真实库存摆（每样按新鲜、不太新鲜、坏了画成不同的样子），冷冻门上的买菜券，搁板上的零食和常备，台面上的前三道菜，搁板下面一道菜一条的短册，软木板上钉着的纸条。 | 点哪样就拿哪样。点冰箱或台面的空处：拿冰箱里最该先用掉的那样 / 看桌上。 |
+| 手边的一样食材 | 名字、几个；每一批各是新鲜 / 不太新鲜 / 坏了、能放到哪天、谁买的、哪天买的。下面一排是冰箱里全部，最该先用掉的在前。 | 点那一排里的另一样，换成它。 |
+| 买菜券 | 他手里有几张、最多几张；最近一条和券有关的记录。 | 「发一张」：给他一张券（满了置灰）。「给他买菜」：打开买菜的单子。 |
+| 冰箱门上的布袋 /「给他买菜」 | 按类别排的目录。 | 圈几样（再点取消）然后买：不扣券，直接放进冰箱。「添种类」：自己添一样食材（名字、哪一类、拿出来就能吃吗、一份几个、能放几天），也能撤掉自己添的。自己添的种类在服务端画出小图之前，先显示名字的头一个字（要接了画图函数才会画，见 [HOOKS.md](HOOKS.md)）。 |
+| 调料架 | 服务端列出的常备品。 | 没有：常备品用不完。 |
+| 一款零食 | 今天吃了几份 / 每日上限、几点重置、档位、一份回多少体力。 | 「喂一份」（咖啡要先选口味）。点 `−` / `+` 再点「存」：改这一款的每日上限。角色不止一个时：选喂给谁。 |
+| 一道菜 | 菜名、出锅结果（很好 / 糊了 / 坏了）、备注。下面是菜单上的全部，以及今天吃了几顿。 | 「喂给他」：喂掉（划掉、算一顿、会告诉他）。「只划掉」：划掉但不算一顿。「改」：改菜名和备注。「撤」：从菜单上拿掉。 |
+| 一瓶药剂 | 回多少体力、备注。 | 同样四个动作；喂下去当场加体力，不算一顿饭。 |
+| 虚线的那条短册 /「挂一道」 | 一张单子，分两段。 | 挂一道菜（菜名、备注）。挂一瓶药剂（回多少、备注）。 |
+| 小票 | 今天吃的每一顿，各是在哪个时段吃的。 | |
+| 软木板 | 厨房最近的事（买了什么、扔了什么、什么坏了、券、虫子……），一页六条。 | 「更早的」/「新一些」：翻页。 |
+
+收不回来的动作（喂、划掉、撤）会先在一张小纸条上问一句。
+
+服务端把**体力**关掉的时候，页面上不出现任何和体力有关的东西：零食不显示回多少，「挂一道」的单子上没有药剂那一段。把**饱食度**关掉的时候，顶上不显示饱食度。对应 [CONFIG.md](CONFIG.md) 里的 `[stamina] enabled` 和 `[satiety] enabled`。
+
+服务开着快进钟的时候（`[server] dev_clock = true`，只给演示用），页面左上角会出现一个很小的「过一小时 / 过一天」。它拨的是整台服务的钟。没开快进钟的服务上，这个东西不存在。
+
+画上只有默认零食架的五款和默认的四样常备的位置。你在设置里改了零食或常备品之后，手边照样全都列出来；画上只画包里有图的那些。
+
+## 口令
+
+`/page/` 下面的文件谁都能取；它背后的数据不是。设了 `[server] token` 之后，页面要有口令才读得到东西。
+
+- **单独打开**时，页面问一次口令，存在这个浏览器的本地存储里。页面最底下的「换口令 →」会把它忘掉。
+- **嵌在别的页面或 App 里**时，由宿主用一条消息把口令递过来（见下），页面什么都不存。
+
+不管哪种，口令都只放在 `Authorization: Bearer` 请求头里发出去，从来不进地址，所以不会落进服务的日志、浏览器的历史记录或来源地址里。你自己也不要把它写进链接。出了自己这台电脑，请走 HTTPS（在服务前面放一个反向代理或隧道），否则口令是明文在网络上走的。
+
+## 嵌进别的页面
+
+### 用 `<iframe>`
+
+1. 在厨房服务的设置里，写上要嵌它的那个页面的来源：
+
+   ```toml
+   [server]
+   embed_origins = ["https://chat.example.com"]
+   ```
+
+   不写的话，浏览器不让别的网站把厨房页放进框里（服务发出的是 `Content-Security-Policy: frame-ancestors 'self'`，再加上你列的那些）。来源就是 `协议://主机[:端口]`，后面什么都不带。
+
+2. 框的地址带上 `?host=<你那个页面的来源>`：
+
+   ```html
+   <iframe id="kitchen" src="https://kitchen.example.com/page/?host=https%3A%2F%2Fchat.example.com"
+           style="width: 390px; height: 780px; border: 0"></iframe>
+   ```
+
+   厨房页只跟这一个来源说话。浏览器能认出真正的父页面是谁的时候（Chrome、Safari），`?host=` 和它对不上就不算数。不带 `?host=` 的话，框里的页面谁也不理，当成单独打开（自己问口令）。
+
+3. 页面说 `ready` 之后，回它一条 `init`：
+
+   ```js
+   const KITCHEN = "https://kitchen.example.com";
+   const frame = document.getElementById("kitchen");
+   window.addEventListener("message", (e) => {
+     if (e.origin !== KITCHEN || e.source !== frame.contentWindow) return;   // 只收厨房发来的
+     if (e.data.type === "ready") {
+       frame.contentWindow.postMessage(
+         { v: 1, id: "1", type: "init", payload: { credential: "<口令>", who: "mika" } },
+         KITCHEN,                                                             // 不要写 "*"
+       );
+     }
+     if (e.data.type === "close") { /* 对方点了「← 返回」：把框收起来 */ }
+   });
+   ```
+
+完整的宿主页面例子在 [`examples/page_embed.html`](../examples/page_embed.html)。
+
+### 消息
+
+每条消息都是 `{ "v": 1, "id": "<随便一个字符串>", "type": "<类型>", "payload": { … } }`。
+
+| 方向 | `type` | `payload` | 说明 |
+|---|---|---|---|
+| 页面 → 宿主 | `ready` | `{v: 1}` | 页面可以接 `init` 了。每次重新加载都会再发一次，每次都要回。 |
+| 页面 → 宿主 | `close` | | 对方点了「← 返回」（这个链接只在嵌入时才有）。 |
+| 宿主 → 页面 | `init` | `{apiBase?, credential?, who?}` | `credential` = 口令（服务没设口令就不写）。`who` = 打开哪个角色。`apiBase` = 厨房服务的来源；页面就是由那个服务提供的话不用写。 |
+| 宿主 → 页面 | `role` | `{who}` | 换成这个角色的厨房。 |
+| 宿主 → 页面 | `logout` | | 忘掉口令，等下一条 `init`。 |
+
+宿主发来的每条消息，页面都会回一条 `{ "v": 1, "id": "<同一个 id>", "ok": true, "result": {…} }` 或 `{ …, "ok": false, "error": "<原因>" }`。`init` 要等服务认了口令才回；失败时的原因是 `the kitchen server refused the credential`（口令不对）或 `the kitchen server cannot be reached`（连不上），可以再发一次。
+
+### 放进 App 的内嵌网页窗口
+
+页面加载时如果发现下面任何一个（或者地址带 `?embed=native`），就改用原生桥，不用 `postMessage`：
+
+| 平台 | 页面 → App | App → 页面 |
+|---|---|---|
+| iOS `WKWebView` | `window.webkit.messageHandlers.kitchenette.postMessage(json)` | `evaluateJavaScript("window.kitchenette && window.kitchenette.receive(" + json + ")")` |
+| react-native-webview | `window.ReactNativeWebView.postMessage(json)` | `injectJavaScript("window.kitchenette && window.kitchenette.receive(" + json + ")")` |
+| Android `WebView` | `window.KitchenetteHost.postMessage(json)`（来自 `addJavascriptInterface(obj, "KitchenetteHost")`） | `evaluateJavascript("window.kitchenette && window.kitchenette.receive(" + json + ")", null)` |
+
+消息是同一套；页面发出来的是 JSON 字符串。桥要在页面加载之前注册好，`init` 要等收到 `ready` 之后再发，网页窗口不要离开厨房的来源（别让桥暴露给别的网站）。内嵌网页窗口不是框，`embed_origins` 管不到它。
+
+### 把页面文件放在别处
+
+构建好的页面也可以不由厨房服务提供，而是放在别的地方（静态托管、你自己 App 的包里）。这时有三件事要改：
+
+- 按它将来所在的路径构建：`KITCHENETTE_PAGE_BASE=/my/path npm run build`（见「重新构建」），然后拷走 `web/page/dist/`。
+- 告诉页面厨房在哪：单独打开时在地址上加 `?api=https://kitchen.example.com`；嵌入时在 `init` 里写 `apiBase`。
+- 在厨房服务上允许那个网站从浏览器里读 `/api`：`[server] cors_origins = ["https://where-the-page-is.example.com"]`。
+
+## 重新构建
+
+源码在 `web/page/`（React Native 组件，经 Expo 的网页导出在浏览器里跑）。只有要改页面时才需要这一节。
+
+```bash
+cd web/page
+npm install
+npm run build        # 导出到 web/page/dist/，并拷到 src/kitchenette/page/
+```
+
+`src/kitchenette/page/` 就是 Python 包带着的、`/page/` 提供的那一份；改了源码要把它一起提交。
+
+```bash
+npm test             # 页面的单元测试
+npm run typecheck
+npm start            # 带热更新的开发服务；地址上加 ?api=http://127.0.0.1:8765，并把它的来源写进 cors_origins
+```
+
+另有两个脚本，用无头浏览器对着它们自己起的真服务（各用一个临时库）把构建好的页面点一遍。它们需要 [Playwright](https://playwright.dev)，那不是这个包的依赖：
+
+```bash
+# 在 web/page/ 下运行；KITCHENETTE_PYTHON 指向装了本仓库的那个 Python
+PW_DIR=/path/to/node_modules KITCHENETTE_PYTHON=python3 node e2e/walk.cjs     # 能点的东西全点一遍
+PW_DIR=/path/to/node_modules KITCHENETTE_PYTHON=python3 node e2e/modes.cjs    # 口令、关掉开关、嵌入
+```
+
+`web/page/scripts/` 里的其他脚本：`gen-art.mjs`（图片登记表，添了或换了图之后跑）、`subset_fonts.py`（切字体文件）、`contract_fixture.py`（单元测试读的那份服务端回包）。
+
+## 图、字体、第三方代码
+
+- **图**（`web/page/assets/kitchen/`，121 个文件）：作者自己的素材，用 ChatGPT 的出图功能（作者自己的订阅）画的，再用脚本抠图；红笔圈是代码画的。没有任何第三方的图。
+- **字体**：思源宋体（Noto Serif SC，400 和 300 两个字重）和 Bodoni Moda（三个光学尺寸），都是 SIL Open Font License 1.1；切小之后以 WOFF2 随包带，许可全文一起带。设备上装了思源宋体（Noto Serif SC / Source Han Serif SC）就先用设备上的，什么都不下载。
+- **脚本包里的代码**：React、React DOM、React Native for Web、Expo 和几个小包，除一个是 BSD-3-Clause 外都是 MIT。清单和每一份许可全文在构建时生成。
+
+完整的说明跟着页面一起走：[`/page/ASSETS.md`](../web/page/public/ASSETS.md) 和 `/page/THIRD-PARTY.txt`（在仓库里是 `src/kitchenette/page/THIRD-PARTY.txt`）。

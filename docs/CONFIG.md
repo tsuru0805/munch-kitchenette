@@ -44,6 +44,7 @@ defaults.
 | `scan_interval_seconds` | `60` | How often pots are served, worms grow and notes are pushed. |
 | `dev_clock` | `false` | Enables `POST /api/dev/clock` to fast-forward time. For demos only: it moves the clock of the whole server, so every role in the database jumps ahead. Never on a kitchen in use. |
 | `cors_origins` | `[]` | Addresses of pages on other sites that may read `/api` from a browser, e.g. `["https://chat.example.com"]`. Needed when the cooking card sits on a page that is not served by this server. Empty = no other site may. |
+| `embed_origins` | `[]` | Addresses of pages on other sites that may show the kitchen page (`/page/`) in an `<iframe>`, e.g. `["https://chat.example.com"]`. Empty = only pages of this server's own address may. See [PAGE.md](PAGE.md). |
 
 ## `[roles]`
 
@@ -283,6 +284,7 @@ human_name = "阿青"
 | `scan_interval_seconds` | `60` | 每隔多少秒检查一次：有没有锅到点、剩菜长没长虫、有没有话要推出去。 |
 | `dev_clock` | `false` | 打开后可以让时间快进，只给演示和试玩用：它拨的是整台服务的钟，库里所有角色会一起往前跳。正在用的厨房千万别开。 |
 | `cors_origins` | `[]` | 允许哪些别的网站上的页面从浏览器里读 `/api`，写成 `["https://chat.example.com"]` 这样的地址列表。做饭卡放在不是这个服务自己提供的页面上时要填，不填浏览器会拦住。留空表示别的网站都不行。 |
+| `embed_origins` | `[]` | 允许哪些别的网站上的页面用 `<iframe>` 把厨房页（`/page/`）嵌进去，写成 `["https://chat.example.com"]` 这样的地址列表。留空表示只有这个服务自己地址上的页面可以嵌。见 [PAGE.md](PAGE.md)。 |
 
 ## `[roles]` 角色
 

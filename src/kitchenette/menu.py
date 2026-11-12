@@ -247,6 +247,22 @@ def _meal_stats(who: str, now: float) -> tuple[str, int, int]:
     return gap, int(today) + 1, int(week) + 1
 
 
+def meals_since(who: str, since: float | None = None, now: float | None = None) -> dict:
+    """The meals a role has had since a moment, oldest first. since=None means "today": from
+    midnight in the configured zone. Snacks and potions are not meals."""
+    roles.check(who)
+    now = now or _now()
+    if since is None:
+        since = clock.local(now).replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+    conn = _conn()
+    try:
+        rows = conn.execute("SELECT id, meal, note, at FROM meals WHERE who=? AND at>=? AND at<=?"
+                            " ORDER BY at, rowid", (who, float(since), now)).fetchall()
+    finally:
+        conn.close()
+    return {"now": now, "who": who, "since": float(since), "meals": [dict(r) for r in rows]}
+
+
 def _record_meal(who: str, meal: str, note: str | None, now: float) -> None:
     conn = _conn()
     try:

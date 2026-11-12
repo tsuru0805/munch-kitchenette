@@ -17,6 +17,8 @@ timezone = ""               # "" = this machine's own. Or a name: "Asia/Shanghai
                             # 留空 = 用这台电脑的时区；也可以填 "Asia/Shanghai" 这样的名字
 timezone_label = ""         # shown before reset times, e.g. "北京时间 " / 写在清零时间前面的字，留空不显示
 cors_origins = []           # pages on other sites that may read /api, e.g. ["https://chat.example.com"]
+embed_origins = []          # pages on other sites that may show the kitchen page (/page/) in an <iframe>
+                            # 允许哪些别的网站用 <iframe> 嵌厨房页，如 ["https://chat.example.com"]
 
 [roles]
 default = "companion"       # used when a tool call does not say who / 没说是谁的时候算谁

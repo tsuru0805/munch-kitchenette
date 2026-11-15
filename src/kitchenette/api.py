@@ -445,7 +445,12 @@ def create_app(*, scheduler: bool = True, with_mcp: bool = True) -> FastAPI:
     @app.post("/api/menu", status_code=201, dependencies=guarded)
     def menu_add(body: MenuIn, background: BackgroundTasks):
         try:
-            row = menu.add(body.dish, body.by, body.for_who, body.note)
+            if body.by and body.by == body.for_who and roles.valid(body.for_who):
+                # a role putting up its own dish: the serving pass may be checking for the same one
+                with kitchen.due_lock(body.for_who):
+                    row = menu.add(body.dish, body.by, body.for_who, body.note)
+            else:
+                row = menu.add(body.dish, body.by, body.for_who, body.note)
         except menu.MenuError as e:
             _menu_fail(e)
         if row["by"] != row["for_who"]:

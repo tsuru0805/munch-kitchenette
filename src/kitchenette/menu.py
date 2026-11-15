@@ -299,8 +299,15 @@ def eat(who: str, meal: str, note: str = "", *, key: str | None = None, now: flo
     """Eat one meal and return the receipt. Raises EatRefused when nothing could be eaten.
 
     key makes the body settlement idempotent (give the same key when retrying the same bite).
+    Runs under the role's after-serving lock, so a pot coming due at the same moment is either on
+    the menu before the meal is matched or already marked eaten before the serving pass looks.
     """
     roles.check(who)
+    with kitchen.due_lock(who):
+        return _eat_locked(who, meal, note, key=key, now=now)
+
+
+def _eat_locked(who: str, meal: str, note: str, *, key: str | None, now: float | None) -> str:
     meal = (meal or "").strip()
     if not meal:
         raise EatRefused(t("eat_empty"))

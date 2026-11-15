@@ -52,6 +52,10 @@ WORM_DEFAULT_SNACK = "pudding"
 
 # Opening a pot is "check for a same-name pot, take ingredients, create the pot": serialised per role.
 _COOK_LOCKS: dict[str, threading.Lock] = {}
+# The after-serving steps are "is the dish on the menu? if not, add it; mark the pot": serialised
+# per role too, or two reads arriving together both see "not yet" and add the dish twice. Eating, and
+# the role putting a dish on its own menu, take the same lock (see menu.eat, POST /api/menu).
+_DUE_LOCKS: dict[str, threading.Lock] = {}
 _LOCKS_GUARD = threading.Lock()
 
 
@@ -74,6 +78,11 @@ def _conn() -> sqlite3.Connection:
 def _cook_lock(who: str) -> threading.Lock:
     with _LOCKS_GUARD:
         return _COOK_LOCKS.setdefault(who, threading.Lock())
+
+
+def due_lock(who: str) -> threading.Lock:
+    with _LOCKS_GUARD:
+        return _DUE_LOCKS.setdefault(who, threading.Lock())
 
 
 # ── settling (on read) ──────────────────────────────────────────────────
@@ -591,8 +600,17 @@ def process_due(*, find_menu, add_menu, wake, float_event, in_quiet: bool, busy,
 
     Two ways to tell the role, one per pot: if the human is talking, do not take a turn, queue the
     note; otherwise wake. Idempotency: the menu is read back before adding (a timed-out add may
-    have landed); a wake is at most once (only WAKE_NOT_SENT is retried).
+    have landed); a wake is at most once (only WAKE_NOT_SENT is retried). Calls for the same role
+    run one at a time (the periodic scan and every read call this), so a dish is added once.
     """
+    with due_lock(who):
+        return _process_due_locked(find_menu=find_menu, add_menu=add_menu, wake=wake,
+                                   float_event=float_event, in_quiet=in_quiet, busy=busy,
+                                   who=who, round_running=round_running)
+
+
+def _process_due_locked(*, find_menu, add_menu, wake, float_event, in_quiet: bool, busy,
+                        who: str, round_running) -> dict:
     out = {"menu_added": 0, "menu_failed": 0, "woke": 0, "floated": 0, "deferred": ""}
     due = due_work(who)
     if not due:

@@ -234,6 +234,63 @@ def test_wake_message_wording(clock):
     assert "下锅的『汤』出锅了(共 10 分钟)。火候刚好。已挂到你的菜单上。" in msg
 
 
+def test_reads_arriving_together_put_the_dish_on_the_menu_once(clock, monkeypatch):
+    """The page fires several reads at once, and each serves what is due: they must not both find
+    "not on the menu yet" and add the dish twice."""
+    import threading
+    import time
+    from kitchenette import menu
+    _cook(minutes=15)
+    clock["now"] += 15 * 60 + 1
+    real_find = menu.find_for_session
+
+    def slow_find(s):          # widen the gap between "look" and "add"
+        r = real_find(s)
+        time.sleep(0.2)
+        return r
+    monkeypatch.setattr(menu, "find_for_session", slow_find)
+    readers = [threading.Thread(target=service.serve_due, args=(A,)) for _ in range(3)]
+    for r in readers:
+        r.start()
+    for r in readers:
+        r.join()
+    rows = [r for r in menu.list_rows(for_who=A, pending=True) if r["dish"] == "番茄炒蛋"]
+    assert len(rows) == 1
+    assert _rows()[0]["menu_row_id"] == str(rows[0]["id"])
+
+
+def _waits_for_due_lock(who, fn) -> None:
+    """fn must not finish while the role's after-serving lock is held, and must finish after."""
+    import threading
+    done = threading.Event()
+
+    def run():
+        fn()
+        done.set()
+    with kitchen.due_lock(who):
+        th = threading.Thread(target=run)
+        th.start()
+        assert not done.wait(0.2)
+    th.join(5)
+    assert done.is_set()
+
+
+def test_eating_waits_for_a_serving_pass(clock):
+    """A pot coming due while the role eats: the meal is matched either after the dish reached the
+    menu, or the pot is marked eaten before the serving pass looks; never both at once."""
+    from kitchenette import menu
+    menu.add("番茄炒蛋", A, A)
+    _waits_for_due_lock(A, lambda: menu.eat(A, "番茄炒蛋"))
+
+
+def test_a_role_putting_up_its_own_dish_waits_for_a_serving_pass(clock):
+    client = TestClient(create_app(scheduler=False, with_mcp=False))
+    got = {}
+    _waits_for_due_lock(A, lambda: got.update(r=client.post(
+        "/api/menu", json={"dish": "番茄炒蛋", "by": A, "for_who": A})))
+    assert got["r"].status_code == 201
+
+
 def test_menu_post_timeout_reads_back_no_double_post(clock):
     _cook("汤", 10)
     clock["now"] += 600

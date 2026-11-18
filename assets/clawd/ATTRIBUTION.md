@@ -27,6 +27,8 @@ The body, the face and the way he moves are upstream's. On top of the upstream e
 - **51 cooking moves**, 45 frames each: washing hands, chopping, and for each of seven methods (stir-fry, pan-fry, deep-fry, boil, steam, bake, mix) seven moves (the main action, wiping the brow, looking up, caught by the steam, tasting, serving, burning it), with the pots, pans and food they need.
 - **The export**: each move in each outfit as an animated WebP (the engine's 300 px canvas scaled ×2 with nearest-neighbour and placed on a 720 × 720 transparent canvas so that the counter line is at y = 560; frame delays 70 / 60 / 70 ms as upstream; lossless), the last frame of every serve and fail move as a PNG, and `base.png`, the first frame of upstream's `idle` move in each outfit.
 
+- **The repository's share image** (the picture shown when the repository link is shared; it is not stored in this repository): ten small cooks with different expressions. On the upstream face only the eyes were redrawn, and a mouth, a blush and small floating marks (a heart, sparkles, a sweat drop, a puff of smoke, "z") were added, on the same pixel grid and in the same colours; the body, the outfits and the hats are untouched. It is adapted material under the same CC BY-NC-SA 4.0 and carries the credit line.
+
 The source files for these additions are in [`../../clawd-engine-additions/`](../../clawd-engine-additions/), with instructions for putting them back into the upstream engine and exporting again.
 
 ## License of the files in this folder
@@ -58,6 +60,8 @@ When you share or remix, please keep this line:
 - **两套衣服**，换下信差制服（礼帽、马甲、皮包、怀表都摘掉）：`toque` 高筒厨师帽 + 白色双排扣厨师服 + 红领巾；`scarf` 蓝底白点头巾 + 米色大围裙 + 粉色爱心口袋。
 - **51 支下厨动作**，每支 45 帧：洗手、切菜，以及七种做法（炒、煎、炸、煮、蒸、烤、拌）各七支（主动作、擦汗、抬头看、被热气熏到、尝味、端上来、糊了），连同用到的锅碗和菜。
 - **导出**：每支动作 × 每套衣服一张动态 WebP（引擎 300 像素画布最近邻放大 2 倍，贴在 720 × 720 透明画布上，台面线在 y = 560；每帧延时沿用上游的 70 / 60 / 70 毫秒；无损），端上来和糊了的最后一帧各一张 PNG，以及 `base.png`（上游 `idle` 动作的第一帧穿上这两套衣服）。
+
+- **仓库的分享图**（分享仓库链接时显示的那张图，不存放在本仓里）：十只表情各不相同的小厨师。只在上游原来的脸上重画了眼睛，加了嘴、腮红和头顶的小符号（爱心、星星、汗滴、一团烟、「z」），用的是原来的像素格和原来的颜色；身子、衣服、帽子没有动。它同样是改编件，按相同的 CC BY-NC-SA 4.0 提供，图上带着署名行。
 
 这些新增内容的源文件在 [`../../clawd-engine-additions/`](../../clawd-engine-additions/)，里面写了怎么放回上游引擎重新导出。
 

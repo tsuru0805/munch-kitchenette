@@ -1,5 +1,31 @@
 # What the upgrade changed
 
+<a id="upgrade-steps"></a>
+### Already installed the previous version? How to upgrade
+
+**Run these**, in the directory you cloned into:
+
+```sh
+git pull
+source .venv/bin/activate          # your own environment; Windows: .venv\Scripts\activate
+pip install .                      # installed with -e before? do it the same way again: pip install -e .
+```
+
+Then stop the `kitchenette serve` that is running (Ctrl-C in its window, or however you keep it running) and start it again.
+
+**What happens by itself:**
+
+- The database is the one you have. On start the kitchen only adds the new tables and the few new columns; nothing already in it is deleted or changed.
+- The ten things that are on by default are on as soon as it starts. To leave one out, set it to `false` under `[play]` in `kitchenette.toml` (names in [`examples/play.toml`](../examples/play.toml)).
+- The kitchen page has the new picture. A page that was already open in a browser needs one refresh.
+
+**What you do by hand, only if it applies to you:**
+
+- If you copied the kitchen's rules into your model's prompt by hand, take the new ones from `GET /api/play/teaching` and paste them in. If the model reaches the kitchen through the tools in the normal way, there is nothing to do: those sentences come with the cooking tool's description.
+- The vendor is off by default. To turn it on, set `vendor = true` under `[play]` and restart; then give it money: your own wallet (`[vendor] wallet_url`), or the built-in ledger — once the vendor is on, the page shows a 零花钱 (pocket money) tab to give from. See [the wallet paragraph](#wallet-en) below.
+
+### What it adds
+
 The upgrade adds seventeen things, each with a switch of its own under `[play]` (ten on, seven off by default; see [`examples/play.toml`](../examples/play.toml)). A switch that is off means the thing is not installed: its markers are plain text, nothing teaches it, the page hides it, and asking for it directly answers that it is off. Turning one off deletes nothing. After installing the upgrade, the ten that are on by default are on straight away. With all seventeen off, the tools, sentences and receipts the role reads are word for word what they were before (the tests from before the upgrade run that way); the REST answers only gain a few fields (for example `features` in `GET /api/about`) and a few new endpoints.
 
 | | Before | Now |
@@ -13,11 +39,36 @@ The upgrade adds seventeen things, each with a switch of its own under `[play]` 
 | Tools | cook / status / cancel / toss | One more: `kitchen_recipes` (read only) |
 | Markers | buy / eat / snack / toss | More, for the things switched on |
 
+<a id="wallet-en"></a>
 The four optional hooks — a wallet, a small model playing the vendor, a weather reader and a dish-picture drawer — are described in the Chinese half below (the table "四个可以不配的口子"); each has a fallback when left empty: the built-in ledger, fixed lines, hour-and-season only, placeholders. The wallet is either your own pocket-money system over HTTP (`[vendor] wallet_url`, plus `wallet_token` sent as a bearer token; the four endpoints it needs are in "接你自家的钱包" below) or a `"package.module:name"` object (`wallet_provider`); the others are `"package.module:name"` settings. Without a wallet the built-in ledger starts at 0 and only the human puts money in, from the page; the role is told each time. The recipes come from HowToCook (Unlicense), commit `58c1b9a`; `tools/build_recipe_index.py` rebuilds the index byte for byte.
 
 ---
 
 # 中文：这次升级改了什么
+
+<a id="upgrade-steps-zh"></a>
+### 已经装过上一版，怎么升级
+
+**照着敲**，在你当初 clone 下来的那个目录里：
+
+```sh
+git pull
+source .venv/bin/activate          # 你自己的环境；Windows 用: .venv\Scripts\activate
+pip install .                      # 当初用 -e 装的，就照原样再装一遍：pip install -e .
+```
+
+然后把正在跑的 `kitchenette serve` 停掉（在它的窗口里按 Ctrl-C，或者用你平时让它常驻的那种方式停），再启动一次。
+
+**会自己发生的：**
+
+- 数据库还是原来那个。启动时只加新的表和几个新的列，原有的数据一条不删、一条不改。
+- 默认开着的十样，一启动就开着。哪样不想要，就在 `kitchenette.toml` 的 `[play]` 里把它改成 `false`（名字见 [`examples/play.toml`](../examples/play.toml)）。
+- 网页厨房换成了新画面。浏览器里本来就开着的旧页面，刷新一下。
+
+**要自己动手的（用不上的跳过）：**
+
+- 如果你是把厨房的规则说明手动复制进小机提示词里的，从 `GET /api/play/teaching` 取新的那段，贴进去。走正常工具调用的不用管：这些话跟着开锅工具的说明一起过去。
+- 流动小贩默认关着。要开，把 `[play]` 里的 `vendor` 改成 `true`，重启。他要有钱才买得了东西：接你们自家的钱包（`[vendor] wallet_url`），或者用自带的小账本——开了以后页面上会多出「零花钱」，从那里给。见下面[「接你自家的钱包」](#your-own-wallet)。
 
 ### 升级前后对比
 
@@ -53,6 +104,7 @@ The four optional hooks — a wallet, a small model playing the vendor, a weathe
 | 天气 | `[recipes] weather_provider` | 推荐只看钟点和季节；冰淇淋车下雨也可能来 | `read() -> {"rain": bool 或 None, "temp_c": 数 或 None}` |
 | 图鉴的图 | `[art] dish_provider` | 每页用占位图 | `draw(name, ingredients, method) -> PNG 字节`。厨房每分钟的那一拍画一张，画坏了记下原因；重画是新一版，旧图留着。 |
 
+<a id="your-own-wallet"></a>
 #### 接你自家的钱包
 
 `[vendor] wallet_url` 填你们自家零花钱系统的地址（`wallet_token` 填口令，会以 `Authorization: Bearer …` 发过去），厨房就只从那里扣钱、退钱、查余额，不用自带小账本。那边要有这四个口子：

@@ -2,7 +2,7 @@
 
 [中文](README.md)
 
-> 🆕 **Installed the previous version?** [See what this update adds →](docs/UPGRADE.md)
+> 🆕 **Installed the previous version?** [What this update adds, and how to upgrade →](docs/UPGRADE.md#upgrade-steps)
 
 **Build your AI companion a little kitchen of his own, one that smells of real cooking. ✨**
 

@@ -30,7 +30,7 @@ Check it:
 
 ```sh
 curl http://127.0.0.1:8765/api/health
-# {"ok":true,"version":"0.1.0","now":...}
+# {"ok":true,"version":"0.2.0","now":...}
 ```
 
 Put something in the fridge and look at it the way the model will:
@@ -176,7 +176,7 @@ kitchenette serve
 
 ```sh
 curl http://127.0.0.1:8765/api/health
-# {"ok":true,"version":"0.1.0","now":...}
+# {"ok":true,"version":"0.2.0","now":...}
 ```
 
 往冰箱里放点东西，再用模型的视角看一眼厨房：

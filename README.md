@@ -2,7 +2,7 @@
 
 [English](README.en.md)
 
-> 🆕 **装过上一版？** [看这次加了什么 →](docs/UPGRADE.md)
+> 🆕 **装过上一版？** [看这次加了什么、怎么升级 →](docs/UPGRADE.md#upgrade-steps-zh)
 
 **为你的小机，搭建一间充满烟火气的专属小厨房吧！✨**
 

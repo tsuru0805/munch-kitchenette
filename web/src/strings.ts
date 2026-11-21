@@ -21,6 +21,9 @@ export interface CardStrings {
   ariaCooking: (dish: string, remaining: string) => string;
   ariaServed: (dish: string, served: string) => string;
   ariaCancelled: (dish: string) => string;
+  /** The settled lines under a served pot (when the backend sends a settlement) */
+  settleTier: (tier: string, toNext: number | null) => string;
+  settleSmooth: string;
   /** The one line shown when the card was asked to fetch a pot and could not (status = HTTP status, if any) */
   loadFailed: (kind: KitchenErrorKind, status: number | null) => string;
 }
@@ -41,6 +44,8 @@ const zh: CardStrings = {
   ariaCooking: (dish, remaining) => `${dish},在火上,还剩 ${remaining}`,
   ariaServed: (dish, served) => `${dish},${served}`,
   ariaCancelled: (dish) => `${dish},关火了`,
+  settleTier: (tier, toNext) => (toNext ? `${tier} · 再做 ${toNext} 次升档` : tier),
+  settleSmooth: "一路顺利",
   loadFailed: (kind, status) =>
     `取不到这一锅：${
       {
@@ -78,6 +83,8 @@ const en: CardStrings = {
   ariaCooking: (dish, remaining) => `${dish}, on the stove, ${remaining} left`,
   ariaServed: (dish, served) => `${dish}, ${served}`,
   ariaCancelled: (dish) => `${dish}, heat off`,
+  settleTier: (tier, toNext) => (toNext ? `${tier} · ${toNext} more to the next` : tier),
+  settleSmooth: "no mishaps",
   loadFailed: (kind, status) =>
     `Can't load this pot: ${
       {

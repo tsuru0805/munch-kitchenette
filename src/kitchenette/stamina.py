@@ -108,6 +108,21 @@ def pulse(who: str, delta: float, now: float | None = None, rule: str = "") -> f
         conn.close()
 
 
+def pulse_in_tx(conn, who: str, delta: float, now: float, rule: str = "") -> float | None:
+    """pulse() inside the caller's transaction (the bonus lands together with whatever earned it).
+    None when stamina is off."""
+    if not enabled():
+        return None
+    f = sleep.factor(who, now)
+    r = _row(conn, who, now)
+    v = _clamp(integrate(float(r["value"]), float(r["updated_at"]), now, f) + delta)
+    conn.execute("UPDATE stamina SET value=?, updated_at=? WHERE who=?", (v, now, who))
+    if delta:
+        conn.execute("INSERT INTO stamina_log (who, at, delta, value, rule) VALUES (?,?,?,?,?)",
+                     (who, now, delta, v, rule))
+    return v
+
+
 def _lookup(table: dict, name: str):
     """Match a tool by its bare name or as the tail of "server__tool"."""
     bare = (name or "").split("__")[-1]

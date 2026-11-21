@@ -1,5 +1,5 @@
 // Reading a pot from the backend: what the answer carries, and what each kind of failure is called.
-import { KitchenFetchError, _resetApiCache, apiProbe, fetchKitchen, parseAnswer } from "./api";
+import { KitchenFetchError, _resetApiCache, apiProbe, fetchKitchen, parseAnswer, parseSettlement } from "./api";
 
 const pot = { id: "ck_1", dish: "soup", duration_seconds: 600, started_at: 1_800_000_000, status: "served", outcome: "great" };
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -19,17 +19,17 @@ async function failure(run: () => Promise<unknown>): Promise<KitchenFetchError> 
 }
 
 test("the answer: the pot and the server's time zone ('' when it has none or does not say)", () => {
-  expect(parseAnswer({ now: 1, session: pot, timezone: "Asia/Tokyo" })).toEqual({ session: pot, timezone: "Asia/Tokyo" });
-  expect(parseAnswer({ now: 1, session: pot, timezone: "" })).toEqual({ session: pot, timezone: "" });
-  expect(parseAnswer({ now: 1, session: pot })).toEqual({ session: pot, timezone: "" });
-  expect(parseAnswer({ session: null, timezone: 9 })).toEqual({ session: null, timezone: "" });
-  expect(parseAnswer(null)).toEqual({ session: null, timezone: "" });
+  expect(parseAnswer({ now: 1, session: pot, timezone: "Asia/Tokyo" })).toEqual({ session: pot, timezone: "Asia/Tokyo", settlement: null });
+  expect(parseAnswer({ now: 1, session: pot, timezone: "" })).toEqual({ session: pot, timezone: "", settlement: null });
+  expect(parseAnswer({ now: 1, session: pot })).toEqual({ session: pot, timezone: "", settlement: null });
+  expect(parseAnswer({ session: null, timezone: 9 })).toEqual({ session: null, timezone: "", settlement: null });
+  expect(parseAnswer(null)).toEqual({ session: null, timezone: "", settlement: null });
 });
 
 test("a good answer is asked for with the bearer token and comes back whole", async () => {
   const fetchMock = vi.fn(async () => json(200, { now: 1, session: pot, timezone: "Europe/Paris" }));
   vi.stubGlobal("fetch", fetchMock);
-  expect(await fetchKitchen("https://k.example/", "ck 1", "tok")).toEqual({ session: pot, timezone: "Europe/Paris" });
+  expect(await fetchKitchen("https://k.example/", "ck 1", "tok")).toEqual({ session: pot, timezone: "Europe/Paris", settlement: null });
   expect(fetchMock).toHaveBeenCalledWith("https://k.example/api/kitchen?session_id=ck%201", { headers: { Authorization: "Bearer tok" } });
   const probe = await apiProbe("https://k.example", "tok")("ck_1", true);
   expect(probe).toMatchObject({ status: "served", outcome: "great", timezone: "Europe/Paris" });
@@ -61,4 +61,20 @@ test("no readable answer: 'blocked' when the server does answer a request the pa
   }));
   const down = await failure(() => fetchKitchen("https://k.example", "ck_1"));
   expect([down.kind, down.status]).toEqual(["unreachable", null]);
+});
+
+describe("the settled card", () => {
+  it("is read only when the answer says it has one", () => {
+    expect(parseSettlement(null)).toBeNull();
+    expect(parseSettlement({ has: false, why: "legacy" })).toBeNull();
+    const s = parseSettlement({
+      has: true, outcome: "great", link: "follow", proficiency: { tier: "拿手", n: 3, to_next: 5 },
+      mishap: { state: "none", text: "一路顺利" }, stamps: [{ key: "follow", text: "照谱做成" }],
+    })!;
+    expect(s.proficiency).toEqual({ tier: "拿手", n: 3, toNext: 5 });
+    expect(s.mishap).toEqual({ state: "none", text: "一路顺利" });
+    expect(s.stamps).toEqual(["照谱做成"]);
+    expect(parseAnswer({ session: null, timezone: "", settlement: { has: true, proficiency: null, mishap: null, stamps: [] } }).settlement)
+      .toEqual({ outcome: "", link: "free", proficiency: null, mishap: null, icon: "", stamps: [] });
+  });
 });

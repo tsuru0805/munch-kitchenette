@@ -24,8 +24,10 @@ TOOL_EAT = "eat"
 TOOL_MENU = "read_menu"
 TOOL_SNACK = "snack_eat"
 TOOL_NOTES = "kitchen_notes"
+TOOL_BROWSE = "kitchen_recipes"      # the upgrade's one new tool (only listed while something it reads is on)
 
-NAMES = (TOOL_COOK, TOOL_STATUS, TOOL_CANCEL, TOOL_TOSS, TOOL_BUY, TOOL_EAT, TOOL_MENU, TOOL_SNACK, TOOL_NOTES)
+NAMES = (TOOL_COOK, TOOL_STATUS, TOOL_CANCEL, TOOL_TOSS, TOOL_BUY, TOOL_EAT, TOOL_MENU, TOOL_SNACK, TOOL_NOTES,
+         TOOL_BROWSE)
 
 
 @dataclass
@@ -78,6 +80,10 @@ def _buy(who: str, args: dict, key: str) -> ToolResult:
     items = args.get("items")
     text = " ".join(str(x) for x in items) if isinstance(items, list) else str(items or "")
     try:
+        from . import playkit
+        by_recipe = playkit.buy_by_recipe(who, text, key=key)
+        if by_recipe is not None:
+            return ToolResult(by_recipe)
         return ToolResult(fridge.buy_self(who, text, key=key))
     except fridge.FridgeError as fe:
         return ToolResult(fe.text, True)
@@ -107,7 +113,16 @@ def _eat(who: str, args: dict, key: str) -> ToolResult:
 def _snack(who: str, args: dict, key: str, told: bool) -> ToolResult:
     hit, why = snacks.resolve_name(str(args.get("name") or ""))
     if hit is None:
-        return ToolResult(why, True)
+        from . import playkit, vendor
+        name = str(args.get("name") or "").strip()
+        try:
+            jar = playkit.snack_fallback(who, name, key=key)
+        except Exception:  # noqa: BLE001
+            log.warning("jar treat failed", exc_info=True)
+            jar = {"ok": False, "text": t("snack_store_failed")}
+        if jar is not None:
+            return ToolResult(jar["text"], not jar["ok"])
+        return ToolResult(vendor.snack_hint(name) or why, True)
     try:
         r = snacks.eat(who, hit[0], hit[1] or None, snacks.BY_SELF, rid=key, told=told)
     except Exception:  # noqa: BLE001
@@ -137,9 +152,12 @@ def call(name: str, args: dict | None = None, who: str | None = None, *,
         return ToolResult(t("role_bad", got=repr(given)), True)
     key = key or uuid.uuid4().hex[:16]
     service.serve_due(who)      # whatever came due is on the menu, with its note, before the role looks
-    if name in (TOOL_COOK, TOOL_STATUS, TOOL_CANCEL):
+    if name in (TOOL_COOK, TOOL_STATUS, TOOL_CANCEL, TOOL_BROWSE):
         cards: list[dict] = []
-        text, is_error = kitchen.local_tools(cards, who)[name](args)
+        fn = kitchen.local_tools(cards, who).get(name)
+        if fn is None:
+            return ToolResult(f"unknown tool: {name}", True)
+        text, is_error = fn(args)
         res = ToolResult(text, is_error, cards)
     elif name == TOOL_TOSS:
         res = _toss(who, args, key)

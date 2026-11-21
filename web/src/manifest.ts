@@ -22,6 +22,22 @@ export function requiredSegments(): string[] {
   return segs;
 }
 
+/**
+ * The chores, played by the kitchen page (not by this card): buying from the vendor, washing plates by
+ * hand, loading the dishwasher. Optional for a pack of your own: without them the page simply shows no
+ * cook in those panels. `_last` = the still last frame of a clip that plays once.
+ */
+export const CHORE_SEGMENTS = [
+  "vendor_call", "vendor_pay", "vendor_take", "vendor_take_last", "vendor_carry",
+  "dish_sleeve", "dish_soap", "dish_scrub", "dish_rinse", "dish_shake", "dish_dry", "dish_stack", "dish_break", "dish_break_last",
+  "machine_load", "machine_close", "machine_start", "machine_run", "machine_done", "machine_done_last",
+] as const;
+
+/** Chore keys a registry is missing (empty = the page can show every chore) */
+export function missingChoreKeys(manifest: SpriteManifest): string[] {
+  return manifest.outfits.flatMap((o) => CHORE_SEGMENTS.map((s) => assetKey(o, s))).filter((k) => manifest.files[k] === undefined);
+}
+
 /** Keys a registry is missing. Empty = complete. */
 export function missingKeys(manifest: SpriteManifest): string[] {
   const missing: string[] = [];

@@ -19,7 +19,7 @@ describe("what can be tapped in the picture", () => {
     expect(keys.filter((x) => x === "staple")).toHaveLength(2);
     expect(keys.some((x) => x.startsWith("dish-"))).toBe(false);
   });
-  test("dishes: one strip each (four at most) + a bowl on the counter for the first three; the empty strip comes after the last one and stays clear of the cork board", () => {
+  test("dishes: one strip each (four at most) + a bowl on the counter for the first three; the empty strip comes after the last one, under the shelf, below the cork board", () => {
     const dishes = ["a", "b", "c", "d", "e", "f"].map((x) => ({ key: x, name: `菜${x}`, outcome: null }));
     const objs = scene({ dishes });
     const strips = objs.filter((o) => o.paper === "strip");
@@ -28,7 +28,17 @@ describe("what can be tapped in the picture", () => {
     const blank = objs.find((o) => o.paper === "blank")!;
     expect(blank.box.x).toBeGreaterThan(strips[3].box.x);
     const cork = objs.find((o) => o.paper === "cork")!;
-    expect(blank.box.x + blank.box.w).toBeLessThanOrEqual(cork.box.x);
+    expect(blank.box.y).toBeGreaterThanOrEqual(cork.box.y + cork.box.h);   // the cork board hangs above the lower shelf, the strips under it
+    expect(blank.box.x + blank.box.w).toBeLessThanOrEqual(1015);           // the lower shelf ends at the window
+  });
+  test("the things of the plays in the picture: only those switched on; the flowers only with a bunch on the sill; each opens its sheet", () => {
+    expect(scene().some((o) => o.scenery)).toBe(false);
+    const all = scene({ scenery: { flower: true, jars: true, plates: true } });
+    const sc = all.filter((o) => o.scenery);
+    expect(sc.map((o) => tapKey(o.tap))).toEqual(["sheet-vendor", "sheet-jars", "sheet-jars", "sheet-jars", "sheet-plates", "sheet-plates"]);
+    expect(scene({ scenery: { flower: false, jars: true, plates: false } }).filter((o) => o.scenery).map((o) => tapKey(o.tap))).toEqual(["sheet-jars", "sheet-jars", "sheet-jars"]);
+    // they lie right above the ground zones: everything else (a dish in front of the jars) is drawn and tapped over them
+    expect(all.findIndex((o) => o.scenery)).toBe(2);
   });
   test("no coupons: none in the picture (handing one out starts from the row under the picture)", () => {
     expect(scene({ coupons: 0 }).some((o) => o.tap.k === "coupon")).toBe(false);
@@ -65,6 +75,10 @@ describe("tap areas", () => {
     ["a full fridge (wide ingredients side by side, milk in the door rack)", { items: ["cucumber", "potato", "onion", "egg", "tofu", "salmon", "spinach", "scallion", "lettuce", "milk", "carrot", "tomato"].map((x) => it(x, { category: x === "milk" || x === "egg" || x === "tofu" ? "dairy" : x === "salmon" ? "meat" : x === "spinach" || x === "scallion" || x === "lettuce" ? "leafy" : "veg" })), coupons: 3 }],
     ["six dishes + three coupons", { dishes: ["a", "b", "c", "d", "e", "f"].map((x) => ({ key: x, name: `菜${x}`, outcome: null })), coupons: 3 }],
     ["an empty fridge", { items: [], coupons: 0, staples: [] }],
+    ["every play on: flowers, jars, sink and rack, with three dishes in front of the jars and all four staples", {
+      scenery: { flower: true, jars: true, plates: true }, staples: ["油", "酱油", "盐", "米"],
+      dishes: ["a", "b", "c", "d"].map((x) => ({ key: x, name: `菜${x}`, outcome: null })),
+    }],
   ])("%s: the tap areas of any two different things do not overlap (ground zones aside)", (_n, over) => {
     const o3 = scene(over as Parameters<typeof scene>[0]);
     const h3 = hitBoxes(o3, K);

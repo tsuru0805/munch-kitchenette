@@ -1,32 +1,84 @@
-// The picture: the empty kitchen with cut-out pictures placed in fixed slots according to the data
-// (the slots are in sceneSlots.ts). Every thing in it can be tapped on its own (which things, where,
+// The picture: the empty kitchen in the light of the hour (day / dusk / night), the cut-out pieces of
+// that same light put back where they belong (the flowers on the sill, the jars, the rack, the sink:
+// which ones = sceneLight.ts), then cut-out pictures placed in fixed slots according to the data (the
+// slots are in sceneSlots.ts). When the hour moves to another light, the old picture fades out over
+// the new one; nothing is laid over the picture to fake a light. Every thing in it can be tapped on its own (which things, where,
 // and how large a tap area: the pure functions in pick.ts); the one being held is drawn a little
 // larger. The words 「买菜券」 are printed on the coupon here. Under the lower shelf hang the
 // "meals today" receipt and one strip per dish on the menu (too small for lettering at this scale:
 // a strip only says a dish is up); the last, dashed one = put a dish up.
-// Nothing moves here: the picture is still.
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
-import { BG_KITCHEN } from "./art.generated";
+// Apart from that fade, nothing moves here: the picture is still.
+import { useEffect, useRef, useState } from "react";
+import { Animated, Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { COUPON_ART, COUPON_TEXT } from "./couponArt";
 import { ArtImage } from "./panelParts";
 import { KC, KF, shadow } from "./kitchenTheme";
 import { hitBoxes, tapKey, type Pick, type SceneObj, type Tap } from "./pick";
+import { SCENE_BASE, SCENE_PIECES, type Light } from "./sceneArt.generated";
 import { NOTE_SLOTS, SCENE_SRC, noteCount } from "./sceneSlots";
+
+/** How long one light takes to fade into the next (ms) */
+export const LIGHT_FADE_MS = 1600;
+
+/** One light of the kitchen: its picture and its pieces */
+function LightLayer({ light, pieces, width }: { light: Light; pieces: string[]; width: number }) {
+  const k = width / SCENE_SRC;
+  return (
+    <View style={[st.layer, { width, height: width }]} testID={`scene-light-${light}`}>
+      <Image source={SCENE_BASE[light]} style={{ width, height: width }} resizeMode="cover" accessible={false} />
+      {pieces.map((key) => {
+        const p = SCENE_PIECES[key];
+        return p ? (
+          <Image
+            key={key}
+            testID={`scene-piece-${key}`}
+            source={p.src}
+            accessible={false}
+            resizeMode="stretch"
+            style={[st.abs, { left: p.x * k, top: p.y * k, width: p.w * k, height: p.h * k }]}
+          />
+        ) : null;
+      })}
+    </View>
+  );
+}
 
 export function KitchenScene({
   width,
+  light,
+  pieces,
   objs,
   pick,
   logCount,
   onTap,
 }: {
   width: number;
+  light: Light;
+  pieces: string[];
   objs: SceneObj[];
   pick: Pick | null;
   logCount: number;
   onTap: (t: Tap) => void;
 }) {
   const k = width / SCENE_SRC;
+  // the light that is fading out (on top of the new one), until the fade is over
+  const [leaving, setLeaving] = useState<{ light: Light; pieces: string[] } | null>(null);
+  const shown = useRef({ light, pieces });
+  const fade = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const was = shown.current;   // what was on screen before this light (the effect below has not run yet)
+    if (was.light === light) return;
+    setLeaving(was);
+    fade.setValue(1);
+    const run = Animated.timing(fade, { toValue: 0, duration: LIGHT_FADE_MS, useNativeDriver: false });
+    run.start(({ finished }) => {
+      if (finished) setLeaving(null);
+    });
+    return () => run.stop();
+  }, [light, fade]);
+  useEffect(() => {
+    shown.current = { light, pieces };
+  });
   const pickedKey = pick ? tapKey(pick) : "";
   const hits = hitBoxes(objs, k);
   // One name per thing, the same from one render to the next whatever else comes or goes around it
@@ -40,11 +92,16 @@ export function KitchenScene({
   });
   return (
     <View style={{ width, height: width, overflow: "hidden" }} testID="kitchen-scene">
-      <Image source={BG_KITCHEN} style={{ width, height: width }} resizeMode="cover" accessible={false} />
+      <LightLayer light={light} pieces={pieces} width={width} />
+      {leaving && leaving.light !== light ? (
+        <Animated.View style={[st.layer, { opacity: fade }]} pointerEvents="none">
+          <LightLayer light={leaving.light} pieces={leaving.pieces} width={width} />
+        </Animated.View>
+      ) : null}
       {objs.map((o, i) => {
         const b = { left: o.box.x * k, top: o.box.y * k, width: o.box.w * k, height: o.box.h * k };
         const on = tapKey(o.tap) === pickedKey;
-        if (o.zone) return null;
+        if (o.zone || o.scenery) return null;
         if (o.paper === "cork") {
           return NOTE_SLOTS.slice(0, noteCount(logCount)).map((s, n) => (
             <View
@@ -106,6 +163,7 @@ export function KitchenScene({
 
 const st = StyleSheet.create({
   abs: { position: "absolute", pointerEvents: "none" },
+  layer: { position: "absolute", left: 0, top: 0, pointerEvents: "none" },
   hit: { position: "absolute" },
   fill: { width: "100%", height: "100%" },
   // the shadow follows the outline of the cut-out, not its box

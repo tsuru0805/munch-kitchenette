@@ -29,7 +29,7 @@ This starts a throwaway server (a temporary database, a free port, the fast-forw
 | Part | What you see | What you can do |
 |---|---|---|
 | Top | Whose kitchen it is; satiety (red when the role is hungry); "晕乎乎的 · 还有 …" while the role is dizzy from spoiled food. With more than one role, their names at the top right. | Tap a name to switch to that role's kitchen. |
-| The picture | The fridge filled from what is really in it (each thing drawn fresh, past its best or spoiled), coupons on the freezer door (up to three), snacks and staples on the shelves, the first three dishes on the counter, a strip of paper per dish under the shelf (up to four), up to three notes pinned on the cork board. The picture has only so much room, see below. | Tap any thing to hold it. Tapping an empty spot of the fridge or the counter holds the most urgent thing in the fridge / shows the table. |
+| The picture | The kitchen in the light of the hour (day 6:00–17:00, dusk 17:00–19:00, night the rest, by the kitchen's clock; one fades into the next). The fridge filled from what is really in it (each thing drawn fresh, past its best or spoiled), coupons on the freezer door (up to three), snacks on the upper shelf and staples on the lower one, the first three dishes on the counter, a strip of paper per dish under the shelf (up to four), up to three notes pinned on the cork board. With the plays on: the bunch of flowers on the window sill (vendor), the three jars on the counter (jars), plates in the sink and on the drying rack (plates). The picture has only so much room, see below. | Tap any thing to hold it. Tapping an empty spot of the fridge or the counter holds the most urgent thing in the fridge / shows the table. The flowers, a jar, the sink or the rack open their page of the upgrade's sheet. |
 | An ingredient in the hand | Name, how many, and per batch: fresh / past its best / spoiled, the day it keeps until, who bought it and when. Below: everything in the fridge, the most urgent first. | Tap another thing in the row to hold that instead. |
 | The coupon | How many coupons the role holds, out of how many; the last coupon note. | "发一张": hand out a coupon (dimmed at the cap). "给他买菜": open the grocery sheet. |
 | The tote on the fridge door / "给他买菜" | The catalog, by category. | Tick things (tap again to untick) and buy: they go into the fridge without a coupon. "添种类": add an ingredient kind of your own (name, category, whether it can be eaten as it is, how many in a pack, how long it keeps), and remove ones you added. A kind you added shows the first character of its name until the server has drawn a picture (only with an art provider, see [HOOKS.md](HOOKS.md)). |
@@ -40,10 +40,16 @@ This starts a throwaway server (a temporary database, a free port, the fast-forw
 | The dashed strip / "挂一道" | A sheet with two parts. | Put a dish on the menu (name, note). Hang a potion (amount, memo). |
 | The receipt | Today's meals and which part of the day each was eaten in. | |
 | The cork board | The kitchen's recent notes (bought, tossed, spoiled, coupons, worms …), six to a page. | "更早的" / "新一些": page through them. |
+| The row under the hand (the upgrade) | One word per entrance that is switched on: 食谱 · 图鉴 · 成就 · 小贩 · 零花钱 · 盘子 · 罐子. Nothing when all of them are off. | Tap one: a sheet drops from the top with a tab per entrance (see below). |
+| The line at the top while a vendor is downstairs | "楼下有卖糖葫芦的 · 还待 20 分钟 →" | Tap it: the vendor tab. |
 
 **What the picture has room for.** The fridge draws at most twelve kinds of ingredient, three to a shelf and three in the drawer, plus the milk in the door; several batches of one kind are drawn once. The counter shows the first three dishes and the shelf carries at most four strips. A kind you added yourself is not drawn in the picture until it has a picture of its own. Whatever does not fit is still there: the row at the bottom of the hand always lists everything in the fridge and everything on the menu, and each can be tapped there.
 
 **What asks first and what does not.** Three things are asked on a slip of paper before they happen, on a dish or a potion: "喂给他" (feed it), "只划掉" (cross it off) and "撤" (take it off). Everything else happens at the tap: handing out a coupon, buying groceries, feeding a snack, saving a snack's cap, adding an ingredient kind and removing one you added ("撤掉"), drawing a picture again, putting a dish or a potion up, and saving a change.
+
+**The upgrade's sheet.** 食谱: today's picks as the role reads them, searching the public recipes, "想吃这个" to order one (with orders on), the orders and withdrawing one, the role's own book (with its tasting notes), a page's code, and taking someone else's code (previewed first, then "收下"). 图鉴: one row per dish made (made / made well / eaten, the best result, the ingredients, the role's sentence), your comment on each; the recipes collected but not made yet. 成就: all of them, earned or not (the role only ever reads the earned ones). 小贩: what the vendor downstairs has, prices and what is left, "替他买" (free for the role), what the role spent today, its pocket money and giving some, the flower on the sill, and the role's requests for a new kind of flower to agree to or not. 零花钱: how much the role has and, with the built-in ledger, giving some — as much as you decide, whenever you like; the role is told on its next turn (with your own wallet configured, the money is given there). 盘子: the plates by state, "让他自己刷" on or off, how many to wash at a time. The 小贩 and 盘子 tabs have a small panel at the top with the cook doing the chore: at the window buying from the vendor, washing up step by step (and the plate he drops, once its time is up and it turned out broken), loading the dishwasher; with "reduce motion" on, a still frame (see [ANIMATION.md](ANIMATION.md#chores-on-the-kitchen-page)). 罐子: the three jars, what came out of them, feeding one serving, the daily cap. An entrance not opened yet on this device carries a small red 「新」 until it is opened once (kept in the browser's localStorage). None of this is drawn onto the picture; what the picture shows of the plays is the things themselves (the flowers, the jars, the plates), drawn in the same light.
+
+**The plays in the picture.** The flowers: one bunch at a time, the kind (six with pictures: rose, sunflower, tulip, bellflower, chamomile, narcissus) and how it looks (fresh / droopy / wilted); a kind without a picture (a new kind you agreed to) leaves the sill empty in the picture (nothing to tap there either) and is listed on the vendor page. A jar: empty, fruit (sealed with sugar or honey) or pickles (salt). The sink: none, a few (1–3), piled up (4 and more), foam while he is washing. The rack: the plates of the last washing, as they come out and for three hours after. A play that is switched off draws nothing of its own (the sill stays empty; the sink and the rack are part of the room and stay empty).
 
 When the server has **stamina** switched off, the page shows nothing about stamina: no restore amounts on snacks, no potion part on the "挂一道" sheet. When **satiety** is switched off, the satiety number is not shown. See `[stamina] enabled` and `[satiety] enabled` in [CONFIG.md](CONFIG.md).
 
@@ -174,11 +180,11 @@ PW_DIR=/path/to/node_modules KITCHENETTE_PYTHON=python3 node e2e/walk.cjs     # 
 PW_DIR=/path/to/node_modules KITCHENETTE_PYTHON=python3 node e2e/modes.cjs    # the token step, switches off, embedding
 ```
 
-Other scripts in `web/page/scripts/`: `gen-art.mjs` (the picture table, after adding or replacing a picture), `subset_fonts.py` (the font files), `contract_fixture.py` (the server answers the unit tests read).
+Other scripts in `web/page/scripts/`: `gen-art.mjs` (the picture table, after adding or replacing a picture), `gen-scene.mjs` (the kitchen in three lights and its pieces, read from the online demo `docs/play/`; run it after the demo was rebuilt), `gen-chores.mjs` (the cook's chore clips, used from `assets/clawd/`; run it after the sprite pack changed), `subset_fonts.py` (the font files), `contract_fixture.py` (the server answers the unit tests read).
 
 ## Pictures, fonts, third-party code
 
-- **Pictures** (`web/page/assets/kitchen/`, 121 files): the authors' own material, made with ChatGPT's image generation under the authors' own subscription and cut out by script; the red pen circle is drawn by code. Nothing from a third party.
+- **Pictures** (`web/page/assets/kitchen/`, 120 files, and the 105 of `docs/play/img/` that the page uses from there): the authors' own material, made with ChatGPT's image generation under the authors' own subscription and cut out by script; the red pen circle is drawn by code. Nothing from a third party.
 - **Fonts**: Noto Serif SC (weights 400 and 300) and Bodoni Moda (three optical sizes), both under the SIL Open Font License 1.1, cut down and shipped as WOFF2 with the license texts. A copy of Noto Serif SC or Source Han Serif SC installed on the device is used first, and then nothing is downloaded.
 - **Code in the script bundle**: React, React DOM, React Native for Web, Expo and a few small packages, all MIT except one BSD-3-Clause. The list with every license text is generated at build time.
 
@@ -215,7 +221,7 @@ python examples/kitchen_page.py
 | 哪一块 | 看到什么 | 能做什么 |
 |---|---|---|
 | 顶上 | 这是哪个小机的厨房；饱食度（他饿了会变红）；吃了坏掉的东西之后的「晕乎乎的 · 还有 …」。角色不止一个时，右上角有各人的名字。 | 点名字切到那个角色的厨房。 |
-| 画 | 冰箱按真实库存摆（每样按新鲜、不太新鲜、坏了画成不同的样子），冷冻门上的买菜券（最多画三张），搁板上的零食和常备，台面上的前三道菜，搁板下面一道菜一条的短册（最多四条），软木板上钉着的纸条（最多三张）。画上的位置有限，见下面。 | 点哪样就拿哪样。点冰箱或台面的空处：拿冰箱里最该先用掉的那样 / 看桌上。 |
+| 画 | 按厨房的钟点换光（白天 6 点到 17 点、傍晚 17 点到 19 点、其余是夜里；换的时候整张淡过去）。冰箱按真实库存摆（每样按新鲜、不太新鲜、坏了画成不同的样子），冷冻门上的买菜券（最多画三张），上层搁板的零食、下层搁板的常备，台面上的前三道菜，搁板下面一道菜一条的短册（最多四条），软木板上钉着的纸条（最多三张）。玩法开着时还有：窗台上的那束花（小贩）、台面上的三只罐子（罐子）、水槽和沥水架里的盘子（盘子）。画上的位置有限，见下面。 | 点哪样就拿哪样。点冰箱或台面的空处：拿冰箱里最该先用掉的那样 / 看桌上。点花、罐子、水槽或沥水架：打开升级那张纸上对应的那一页。 |
 | 手边的一样食材 | 名字、几个；每一批各是新鲜 / 不太新鲜 / 坏了、能放到哪天、谁买的、哪天买的。下面一排是冰箱里全部，最该先用掉的在前。 | 点那一排里的另一样，换成它。 |
 | 买菜券 | 小机手里有几张、最多几张；最近一条和券有关的记录。 | 「发一张」：给他一张券（满了置灰）。「给他买菜」：打开买菜的单子。 |
 | 冰箱门上的布袋 /「给他买菜」 | 按类别排的目录。 | 圈几样（再点取消）然后买：不扣券，直接放进冰箱。「添种类」：自己添一样食材（名字、哪一类、拿出来就能吃吗、一份几个、能放几天），也能撤掉自己添的。自己添的种类在服务端画出小图之前，先显示名字的头一个字（要接了画图函数才会画，见 [HOOKS.md](HOOKS.md)）。 |
@@ -226,10 +232,16 @@ python examples/kitchen_page.py
 | 虚线的那条短册 /「挂一道」 | 一张单子，分两段。 | 挂一道菜（菜名、备注）。挂一瓶药剂（回多少、备注）。 |
 | 小票 | 今天吃的每一顿，各是在哪个时段吃的。 | |
 | 软木板 | 厨房最近的事（买了什么、扔了什么、什么坏了、券、虫子……），一页六条。 | 「更早的」/「新一些」：翻页。 |
+| 手边下面那一排（这次升级） | 开着的玩法各一个词：食谱 · 图鉴 · 成就 · 小贩 · 零花钱 · 盘子 · 罐子。全关着时这一排不存在。 | 点一个：从上落下一张纸，每个入口一个标签页（见下面）。 |
+| 小贩在楼下时顶上那一行 | 「楼下有卖糖葫芦的 · 还待 20 分钟 →」 | 点它：直接打开小贩那一页。 |
 
 **画上摆得下多少。** 冰箱里最多画十二样食材：每层三样、抽屉里三样，另外门架上放牛奶；同一样食材有好几批也只画一份。台面上摆前三道菜，搁板下面最多挂四条短册。你自己添的种类在有自己的小图之前，画上没有它。摆不下的并没有丢：手边最底下那一排永远列着冰箱里的全部和菜单上的全部，每一样都能在那里点。
 
 **哪些会先问一句，哪些点了就做。** 对一道菜或一瓶药剂的三件事，会先在一张小纸条上问一句：「喂给他」「只划掉」「撤」。其余的都是点了就做：发券、买菜、喂零食、存零食的上限、添种类和撤掉自己添的种类、重画小图、挂一道菜或一瓶药剂、存改动。
+
+**这次升级那张纸。** 食谱：今天可以试试（他读到的那段原样）、翻公共食谱、「想吃这个」点菜（点菜开着时）、点过的菜与撤回、他的食谱本（带札记）、一页的码、收别人的码（先给你看一遍再「收下」）。图鉴：做过的每道一行（做过 / 做好 / 吃过、最好的一次、用料、他的那句话），每道可以写你的评语；收藏了还没做的另列一行。成就：全部成就，拿没拿到都列（他只读得到拿到的）。小贩：楼下这一趟的货、价钱、还剩几份，「替他买」（不花他的钱），他今天在小贩那儿花了多少、零花钱还剩多少、给他零花钱，窗台的花，他想要的新花同意或不同意。零花钱：他现在有多少；用自带小账本时在这里给，给多少、什么时候给都由你，给了他下一轮会知道（接了你们自家的钱包，就在那边给）。盘子：各种状态各几只、「让他自己刷」开或关、一次刷几只。小贩、盘子这两页顶上各有一小格小厨师在做家务：在窗边跟小贩买东西、一步一步刷盘子（某只到点、结果是碎了，就放一遍摔碎）、往洗碗机里放盘子；设备开了「减少动态效果」时只显示一张静帧（见 [ANIMATION.md](ANIMATION.md#厨房页上的家务)）。罐子：三只罐子、开出来的成品、喂他一份、每天的上限。这台设备上还没点开过的入口旁边带一个小小的红色「新」，点开一次就消失（记在浏览器的 localStorage 里）。这些都不往画上叠东西；画上和玩法有关的，只是东西本身（花、罐子、盘子），按同一档光画。
+
+**画上的玩法。** 花：一次一束，按品种（有图的六种：玫瑰、向日葵、郁金香、桔梗、洋甘菊、水仙）和样子（刚买的 / 有点蔫的 / 谢了的）；没有图的品种（你同意了的新品种）在画上窗台空着（那里也点不到），在小贩那一页照样列着。罐子：空着、泡着水果（封的是糖或蜂蜜）、泡着腌菜（封的是盐）。水槽：没有、几只（1 到 3）、堆高（4 只以上），他在刷的时候冒泡沫。沥水架：最近那一回刷的盘子，刷出来就摆上去，刷完再晾三个小时。关着的玩法在画上什么也不加（窗台空着；水槽、沥水架是房间的一部分，空着）。
 
 服务端把**体力**关掉的时候，页面上不出现任何和体力有关的东西：零食不显示回多少，「挂一道」的单子上没有药剂那一段。把**饱食度**关掉的时候，顶上不显示饱食度。对应 [CONFIG.md](CONFIG.md) 里的 `[stamina] enabled` 和 `[satiety] enabled`。
 
@@ -360,11 +372,11 @@ PW_DIR=/path/to/node_modules KITCHENETTE_PYTHON=python3 node e2e/walk.cjs     # 
 PW_DIR=/path/to/node_modules KITCHENETTE_PYTHON=python3 node e2e/modes.cjs    # 口令、关掉开关、嵌入
 ```
 
-`web/page/scripts/` 里的其他脚本：`gen-art.mjs`（图片登记表，添了或换了图之后跑）、`subset_fonts.py`（切字体文件）、`contract_fixture.py`（单元测试读的那份服务端回包）。
+`web/page/scripts/` 里的其他脚本：`gen-art.mjs`（图片登记表，添了或换了图之后跑）、`gen-scene.mjs`（三档光的厨房和贴回去的小块，从在线试玩 `docs/play/` 读；试玩页重新生成之后跑）、`gen-chores.mjs`（小厨师的家务动画，直接用 `assets/clawd/` 里的；素材变了之后跑）、`subset_fonts.py`（切字体文件）、`contract_fixture.py`（单元测试读的那份服务端回包）。
 
 ## 图、字体、第三方代码
 
-- **图**（`web/page/assets/kitchen/`，121 个文件）：作者自己的素材，用 ChatGPT 的出图功能（作者自己的订阅）画的，再用脚本抠图；红笔圈是代码画的。没有任何第三方的图。
+- **图**（`web/page/assets/kitchen/` 120 个文件，另有页面直接从 `docs/play/img/` 引用的 105 个）：作者自己的素材，用 ChatGPT 的出图功能（作者自己的订阅）画的，再用脚本抠图；红笔圈是代码画的。没有任何第三方的图。
 - **字体**：思源宋体（Noto Serif SC，400 和 300 两个字重）和 Bodoni Moda（三个光学尺寸），都是 SIL Open Font License 1.1；切小之后以 WOFF2 随包带，许可全文一起带。设备上装了思源宋体（Noto Serif SC / Source Han Serif SC）就先用设备上的，什么都不下载。
 - **脚本包里的代码**：React、React DOM、React Native for Web、Expo 和几个小包，除一个是 BSD-3-Clause 外都是 MIT。清单和每一份许可全文在构建时生成。
 

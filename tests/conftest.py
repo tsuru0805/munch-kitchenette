@@ -5,7 +5,7 @@ import os
 
 import pytest
 
-from kitchenette import art, clock as clock_mod, config, db, fridge, notify, sleep
+from kitchenette import art, clock as clock_mod, config, db, dex, fridge, notify, play, recipes, sleep, vendor
 
 T0 = 1_800_000_000.0     # 2027-01-15 17:00 in Asia/Tokyo
 DAY = 86400.0
@@ -34,6 +34,11 @@ def _isolated(tmp_path, monkeypatch):
     s.server_db_path = str(tmp_path / "kitchen.db")
     s.server_timezone = "Asia/Tokyo"       # receipts quote clock times; pin the zone
     s.art_dir = str(tmp_path / "art")
+    # The tests written before the upgrade check the kitchen word for word as it was: there every
+    # upgrade switch is off. Tests of the upgrade switch on what they need (play_on below);
+    # test_play_defaults checks the out-of-the-box defaults.
+    for key in play.KEYS:
+        setattr(s, f"play_{key}", False)
     config.use(s)
     db.forget()
     fridge._kinds_cache.clear()
@@ -42,6 +47,10 @@ def _isolated(tmp_path, monkeypatch):
     sleep.set_asleep_hook(None)
     sleep.set_factor_hook(None)
     art.set_provider(None)
+    dex.set_drawer(None)
+    recipes.set_weather_provider(None)
+    vendor.set_wallet(None)
+    vendor.set_talker(None)
     yield
     clock_mod.reset()
 
@@ -101,3 +110,8 @@ def run_reply(text: str, who: str = A, message_id: str | None = None) -> str:
 
 def receipts(ok: bool) -> list[dict]:
     return [{"marker": r.marker, "hint": r.text} for r in _receipts if r.ok == ok]
+
+
+def play_on(*keys: str, everything: bool = False) -> None:
+    """Switch upgrade features on (with everything=True: all seventeen)."""
+    config.override(**{f"play_{k}": True for k in (play.KEYS if everything else keys)})

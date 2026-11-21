@@ -56,6 +56,24 @@ The pictures here show one outfit per column to keep the page light; every clip 
 
 The rules live in two small files of pure functions, [`web/src/cookPhase.ts`](../web/src/cookPhase.ts) and [`web/src/cookSegments.ts`](../web/src/cookSegments.ts), each with its tests next to it.
 
+## Chores on the kitchen page
+
+Three more sets of clips are not played by the card but by the kitchen page ([`PAGE.md`](PAGE.md)), in a small panel at the top of its "vendor" and "plates" pages. Nothing is drawn onto the kitchen picture. They come from the same pack, in the same two outfits, and follow the card's outfit rule: a washing wears `outfits[hash(washing id) % 2]`, an order its order id's, calling the vendor over the visit id's.
+
+<img src="animation/chores.gif" width="660" alt="Three panels side by side: the cook buying from the vendor at the window, washing a plate step by step and dropping one, and loading the dishwasher">
+
+| Segment | What he does | When it plays |
+|---|---|---|
+| `vendor_call` | Waves at the window; a hand under an awning waves back (the vendor himself is never drawn). | A vendor is downstairs and the role has no order under way; also after carrying the last one back. |
+| `vendor_pay` | Hands two coins to the hand reaching in. | The role's latest order of this visit is created, being charged or paid. Not for an order the human treats him to (it costs him nothing). |
+| `vendor_take` → `vendor_carry` | Takes a steaming paper bag, holds it to his chest (once; `vendor_take_last` is its last frame), then carries it back, bobbing. | The order is delivered: `take` for 3 seconds from the moment it was, then `carry` for 9 seconds. A refunded or failed order takes nothing. |
+| `dish_sleeve` `dish_soap` `dish_scrub` `dish_rinse` `dish_shake` `dish_dry` `dish_stack` | Rolls up his sleeves, squeezes the soap, scrubs, rinses under the tap, shakes the water off, dries with a towel, stacks it on the rack. | While he washes up: each plate's time (`per_s`) is cut into seven equal parts in this order, each looping. The sleeves are rolled up once, at the start of the washing; from the second plate on the first part is soap too. |
+| `dish_break` | The plate slips, bounces, he grabs at it and misses; it breaks on the floor and he scratches his head (once; `dish_break_last` is its last frame). | When a plate's time is up and the server reports it broken. A plate's result is only told once its time is up, so the page never knows beforehand which one will break; the clip plays for 3 seconds from that moment, its last frame for 2 more, then the next plate goes on. |
+| `machine_load` → `machine_close` → `machine_start` → `machine_run` → `machine_done` | Puts the plates in, closes the door, presses the button, the machine runs, he opens it in a puff of steam (once; `machine_done_last` is its last frame). | From when a plate last went into the dishwasher: 3 + 3 + 3 seconds, the run for 8 seconds, then done, and its last frame stays. |
+| still | `base`, or the `_last` frame of `vendor_take`, `dish_break`, `machine_done`. | "Reduce motion": a clip that plays once shows its last frame, any other the standing pose. |
+
+The rules are pure functions in [`web/page/src/kitchen/choreAnim.ts`](../web/page/src/kitchen/choreAnim.ts) with tests next to them; the server gives what they need (`/api/dishes`: the washing's `breaks` and `machine_at`; `/api/vendor`: the role's orders with `updated_at`, see [`API.md`](API.md)). A pack of your own does not need them: the card's registry check reports them separately (`missingChoreKeys`), and without them the panels are simply empty.
+
 ## Using your own character
 
 The card does not know about Clawd. It asks a registry "which file is `<outfit>/<segment>`?" and shows that file. Give the element your own registry and folder:
@@ -104,8 +122,8 @@ Image spec:
 
 | | |
 |---|---|
-| [`assets/clawd/`](../assets/clawd/) | The sprite pack: `toque/` and `scarf/` (66 files each), `manifest.json`, the attribution and the licenses. |
-| [`clawd-engine-additions/`](../clawd-engine-additions/) | The outfits and moves as source files for the clawds-new-clothes engine, and how to export the pack again. |
+| [`assets/clawd/`](../assets/clawd/) | The sprite pack: `toque/` and `scarf/` (95 files each: the 66 the card needs, 9 settled stills, 20 chore clips and stills), `dishes/`, `manifest.json`, the attribution and the licenses. |
+| [`clawd-engine-additions/`](../clawd-engine-additions/) | The outfits and moves (the chores in `states/chores/`) as source files for the clawds-new-clothes engine, and how to export the pack again. |
 | [`web/`](../web/) | The card: the `<kitchenette-cooking-card>` element, its example pages and tests. |
 | [`docs/animation/`](animation/) | The GIFs on this page (made from the pack by `docs/animation/tools/make_gifs.py`). |
 
@@ -167,6 +185,24 @@ Image spec:
 
 规则在两个纯函数文件里：[`web/src/cookPhase.ts`](../web/src/cookPhase.ts) 和 [`web/src/cookSegments.ts`](../web/src/cookSegments.ts)，测试就在旁边。
 
+## 厨房页上的家务
+
+还有三组动画不在做饭卡上放，而在厨房页（[`PAGE.md`](PAGE.md)）的「小贩」页和「盘子」页顶上的一小格里放；厨房那张画上不叠动画。它们和做饭卡同一套素材、同两套衣服，也按做饭卡的规则挑衣服：一趟刷盘子按这一趟的 id，一单按订单号，叫小贩按到访号。
+
+<img src="animation/chores.gif" width="660" alt="三格并排:小贩窗边买东西、一步一步刷盘子并摔碎一只、往洗碗机里放盘子">
+
+| 段 | 他在做什么 | 什么时候放 |
+|---|---|---|
+| `vendor_call` | 站在窗边挥手，窗外篷布下一只手朝他摆摆（不画小贩本人）。 | 小贩在楼下，他没有正在办的单；接完东西捧回来以后也回到这一段。 |
+| `vendor_pay` | 把两枚硬币递给窗外伸进来的手。 | 他这一趟最新的一单刚下、在扣钱或已付。你替他买的单不花他的钱，没有这一段。 |
+| `vendor_take` → `vendor_carry` | 接过一只冒热气的纸袋抱在胸前（放一遍，末帧 `vendor_take_last`），然后抱着一颠一颠往回走。 | 这一单交货了：从交货那一刻起 `take` 3 秒，再 `carry` 9 秒。退了款、没扣成的单不放接东西。 |
+| `dish_sleeve` `dish_soap` `dish_scrub` `dish_rinse` `dish_shake` `dish_dry` `dish_stack` | 挽袖子、挤洗洁精、搓、在水龙头下冲、甩水、拿毛巾擦干、码到沥水架上。 | 他在刷的时候：每只盘子的时长（`per_s`）七等分，按这个顺序，每一段循环放。袖子只在这一趟开头挽一次，第二只起头一格也是挤洗洁精。 |
+| `dish_break` | 盘子一滑往上一蹦，手忙脚乱没接住，摔在地上碎了，他挠挠头（放一遍，末帧 `dish_break_last`）。 | 某只盘子到点、服务端说它碎了的时候。一只盘子的结果要到它到点才告诉页面，所以页面事先不知道哪只会碎；从那一刻起放 3 秒，末帧再停 2 秒，然后接着刷下一只。 |
+| `machine_load` → `machine_close` → `machine_start` → `machine_run` → `machine_done` | 把盘子放进去、关门、按按钮、洗碗机转着、洗好开门冒热气（放一遍，末帧 `machine_done_last`）。 | 从最近一只盘子进洗碗机起：3 + 3 + 3 秒，转 8 秒，然后开门，停在末帧。 |
+| 静帧 | `base`，或 `vendor_take`、`dish_break`、`machine_done` 的 `_last`。 | 设备开了「减少动态效果」：放一遍的段显示末帧，其余显示站好的姿势。 |
+
+规则是 [`web/page/src/kitchen/choreAnim.ts`](../web/page/src/kitchen/choreAnim.ts) 里的纯函数，测试就在旁边；要用到的东西由服务端给（`/api/dishes` 的 `breaks` 和 `machine_at`，`/api/vendor` 里他的单带 `updated_at`，见 [`API.md`](API.md)）。换成自己的小人时这几组可以不画：做饭卡的登记表检查把它们单列（`missingChoreKeys`），没有的话那一格就是空的。
+
 ## 换成自己的小人
 
 做饭卡并不认识 Clawd。它只问登记表「`<衣服>/<段>` 是哪个文件」，然后显示那个文件。把自己的登记表和素材目录交给它就行：
@@ -215,7 +251,7 @@ Image spec:
 
 | | |
 |---|---|
-| [`assets/clawd/`](../assets/clawd/) | 素材：`toque/`、`scarf/`（各 66 个文件）、`manifest.json`、署名与许可。 |
-| [`clawd-engine-additions/`](../clawd-engine-additions/) | 两套衣服和全部动作的引擎源文件，以及怎么重新导出。 |
+| [`assets/clawd/`](../assets/clawd/) | 素材：`toque/`、`scarf/`（各 95 个文件：做饭卡要的 66 个、结算定格 9 个、家务 20 个）、`dishes/`、`manifest.json`、署名与许可。 |
+| [`clawd-engine-additions/`](../clawd-engine-additions/) | 两套衣服和全部动作（家务在 `states/chores/`）的引擎源文件，以及怎么重新导出。 |
 | [`web/`](../web/) | 做饭卡：`<kitchenette-cooking-card>` 元素、例子页和测试。 |
 | [`docs/animation/`](animation/) | 本页的动图（用 `docs/animation/tools/make_gifs.py` 从素材生成）。 |

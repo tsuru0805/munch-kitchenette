@@ -7,7 +7,7 @@ import type { KitchenOutcome } from "./kitchenApi";
 import { BUY_ART, COUPON_ART } from "./couponArt";
 import { artRef, type AnyArt } from "./kindArt";
 import {
-  BUY_SLOT, CORK_RECT, DISH_SLOTS, FRIDGE_RECT, SNACK_IDS, SNACK_SLOTS, STAPLE_SLOTS, STRIP, TABLE_RECT, TICKET_SLOTS, dishArt, fridgePlacements,
+  BUY_SLOT, CORK_RECT, DISH_SLOTS, FLOWER_RECT, FRIDGE_RECT, JAR_RECTS, RACK_RECT, SINK_RECT, SNACK_IDS, SNACK_SLOTS, STAPLE_SLOTS, STRIP, TABLE_RECT, TICKET_SLOTS, dishArt, fridgePlacements,
   receiptRect, staplePlacements, stripRect, ticketCount, type Rect4, type Slot,
 } from "./sceneSlots";
 
@@ -21,8 +21,11 @@ export type Pick =
   | { k: "receipt" }
   | { k: "wall" };
 
-/** What tapping a thing does: hold it, or open a sheet (the grocery catalog / put a dish up), or it was an empty spot of the fridge / the counter */
-export type Tap = Pick | { k: "buy" } | { k: "write" } | { k: "fridge" } | { k: "table" };
+/** The sheet of a play that a thing of the picture opens (the flowers -> the vendor, a jar -> the jars, the sink / rack -> the plates) */
+export type SceneryTab = "vendor" | "jars" | "plates";
+
+/** What tapping a thing does: hold it, or open a sheet (the grocery catalog / put a dish up / a play), or it was an empty spot of the fridge / the counter */
+export type Tap = Pick | { k: "buy" } | { k: "write" } | { k: "fridge" } | { k: "table" } | { k: "sheet"; id: SceneryTab };
 
 export const tapKey = (t: Tap): string => ("id" in t ? `${t.k}-${t.id}` : t.k);
 export const samePick = (a: Pick | null, b: Pick | null): boolean => !!a && !!b && tapKey(a) === tapKey(b);
@@ -47,6 +50,8 @@ export interface SceneObj {
   paper?: "receipt" | "strip" | "blank" | "cork";
   /** a ground zone (the whole fridge / the counter): lies under everything, only gets the taps on empty spots; not drawn, and does not compete with the others for room */
   zone?: boolean;
+  /** part of the picture of the current light (the flowers, the jars, the sink and the rack): tapped like any thing, drawn by the scene's light layer, not from here */
+  scenery?: boolean;
 }
 
 export interface SceneDish {
@@ -61,6 +66,8 @@ export interface SceneInput {
   coupons: number;
   dishes: SceneDish[];
   auth: ArtAuth | null;
+  /** which things of the plays are in the picture (a play switched off has none; flowers only when a bunch is on the sill) */
+  scenery?: { flower: boolean; jars: boolean; plates: boolean };
 }
 
 const fit = (slot: Slot, art: AnyArt): Box => {
@@ -83,6 +90,13 @@ export function sceneObjects(inp: SceneInput): SceneObj[] {
   // the fridge still leads to the fridge row (hand out a coupon / buy groceries)
   out.push({ tap: { k: "fridge" }, label: "冰箱", box: rectBox(FRIDGE_RECT), zone: true });
   out.push({ tap: { k: "table" }, label: "桌上", box: rectBox(TABLE_RECT), zone: true });
+  const sc = inp.scenery;
+  if (sc?.flower) out.push({ tap: { k: "sheet", id: "vendor" }, label: "窗台的花", box: rectBox(FLOWER_RECT), scenery: true });
+  if (sc?.jars) JAR_RECTS.forEach((r) => out.push({ tap: { k: "sheet", id: "jars" }, label: "罐子", box: rectBox(r), scenery: true }));
+  if (sc?.plates) {
+    out.push({ tap: { k: "sheet", id: "plates" }, label: "水槽", box: rectBox(SINK_RECT), scenery: true });
+    out.push({ tap: { k: "sheet", id: "plates" }, label: "沥水架", box: rectBox(RACK_RECT), scenery: true });
+  }
   for (const s of TICKET_SLOTS.slice(0, ticketCount(inp.coupons))) art({ k: "coupon" }, "买菜券", COUPON_ART, s);
   art({ k: "buy" }, "给他买菜", BUY_ART, BUY_SLOT);
   for (const p of fridgePlacements(inp.items, inp.auth).placed) {

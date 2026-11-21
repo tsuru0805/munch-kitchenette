@@ -27,12 +27,18 @@ import {
   POTION_NAME, cleanMemo, dropPotion, feedPotion, fetchPotions, hangPotion, isPotionName, parsePct, potionNote, updatePotion,
   type PotionBook,
 } from "./kitchen/potionApi";
+import { PlaySheet, PlayShelf, VendorLine } from "./kitchen/PlaySheet";
+import {
+  NO_FEATURES, fetchFeatures, fetchJars, fetchPlates, fetchVendor, visibleTabs, type Features, type Jar, type Plates, type PlayTab, type VendorView,
+} from "./kitchen/playApi";
+import { flowerDrawn, lightAt, rackCount, scenePieces, type SceneState } from "./kitchen/sceneLight";
+import { loadSeen, markSeen } from "./kitchen/seenTabs";
 import { SnackHand } from "./kitchen/SnackHand";
 import { WriteSheet } from "./kitchen/WriteSheet";
 import { startAutoRefresh } from "./runtime/autoRefresh";
 import { usePageWidth } from "./runtime/layout";
 import { useStore } from "./runtime/store";
-import { nowMs as kitchenNow } from "./runtime/zone";
+import { nowMs as kitchenNow, wall } from "./runtime/zone";
 
 /** Horizontal padding of the page */
 const PAD_H = 18;
@@ -84,6 +90,17 @@ export function KitchenPage({ onBack, onForgetToken }: {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editNote, setEditNote] = useState("");
+  // The upgrade: which of its entrances are on, the sheet they open, and the vendor line at the top
+  const [features, setFeatures] = useState<Features>(NO_FEATURES);
+  const [playTab, setPlayTab] = useState<PlayTab | null>(null);
+  const [vendorView, setVendorView] = useState<VendorView | null>(null);
+  // what the picture shows of the plays: the jars and the plates (null = that play is off / not read yet)
+  const [sceneJars, setSceneJars] = useState<Jar[] | null>(null);
+  const [scenePlates, setScenePlates] = useState<Plates | null>(null);
+  // the light of the picture follows the kitchen's clock (read again every half minute and after every reload)
+  const [clockMs, setClockMs] = useState(() => kitchenNow());
+  // the entrances already opened on this device (the others carry a small 「新」)
+  const [seenTabs, setSeenTabs] = useState<Set<string>>(() => loadSeen());
 
   // The role guard: every asynchronous action takes a "ticket" (role + life-cycle number) when it
   // starts and checks it when it comes back. If the role was switched or the page was left, the
@@ -222,13 +239,43 @@ export function KitchenPage({ onBack, onForgetToken }: {
     reloadTable();
   }, [role, reloadTable]);
 
+  const reloadPlay = useCallback(() => {
+    const t = ticket();
+    fetchFeatures().then((f) => {
+      if (!valid(t)) return;
+      setFeatures(f);
+      setClockMs(kitchenNow());
+      if (f.vendor) fetchVendor(t.role).then((v) => valid(t) && setVendorView(v), () => {});
+      else setVendorView(null);
+      if (f.seal_jars) fetchJars(t.role).then((j) => valid(t) && setSceneJars(j.jars), () => {});
+      else setSceneJars(null);
+      if (f.dishwash) fetchPlates(t.role).then((p) => valid(t) && setScenePlates(p), () => {});
+      else setScenePlates(null);
+    }, () => {});
+  }, [ticket, valid]);
+  useEffect(() => {
+    setPlayTab(null);
+    setVendorView(null);
+    setSceneJars(null);
+    setScenePlates(null);
+    reloadPlay();
+  }, [role, reloadPlay]);
+  useEffect(() => {
+    const id = setInterval(() => setClockMs(kitchenNow()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+  useEffect(() => {
+    if (playTab) setSeenTabs((s) => markSeen(s, playTab));
+  }, [playTab]);
+
   // Read everything again when asked to (time was fast-forwarded, a turn of the timer, the page came back to the front)
   const firstTick = useRef(tick);
   useEffect(() => {
     if (tick === firstTick.current) return;
     reloadFridge();
     reloadTable();
-  }, [tick, reloadFridge, reloadTable]);
+    reloadPlay();
+  }, [tick, reloadFridge, reloadTable, reloadPlay]);
   // The role changes the kitchen through its tools while this page sits open: read again every 30
   // seconds while the page is visible, and at once when it comes back to the front. A turn is skipped
   // while a sheet or a question is open or a request is on its way, so nothing being typed is touched.
@@ -549,10 +596,22 @@ export function KitchenPage({ onBack, onForgetToken }: {
   const staples = fridge?.staples;
   const coupons = fridge?.coupons.count ?? 0;
   const sceneKey = sceneDishes.map((d) => `${d.key}:${d.name}:${d.outcome ?? ""}`).join("|");
+  // The light and the pieces of the plays in the picture (sceneLight.ts): a play that is off shows nothing of its own
+  const clock = wall(clockMs);
+  const light = lightAt(clock.hour, clock.minute);
+  const sceneState: SceneState = {
+    flower: features.vendor && vendorView?.flower ? { variety: vendorView.flower.variety, state: vendorView.flower.state } : null,
+    jars: features.seal_jars && sceneJars ? sceneJars.map((j) => ({ slot: j.slot, state: j.state, how: j.how })) : null,
+    plates: features.dishwash && scenePlates
+      ? { sink: scenePlates.sink, washing: scenePlates.washing, rack: rackCount(scenePlates.job, scenePlates.now) }
+      : null,
+  };
+  const pieces = scenePieces(light, sceneState);
+  const scenery = { flower: flowerDrawn(sceneState.flower), jars: sceneState.jars !== null, plates: sceneState.plates !== null };
   const objs = useMemo(
-    () => sceneObjects({ items: items ?? [], staples: staples ?? [], coupons, dishes: sceneDishes, auth }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- sceneDishes is rebuilt on every render; its content as a string is the dependency
-    [items, staples, coupons, sceneKey, auth],
+    () => sceneObjects({ items: items ?? [], staples: staples ?? [], coupons, dishes: sceneDishes, auth, scenery }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sceneDishes / scenery are rebuilt on every render; their content is the dependency
+    [items, staples, coupons, sceneKey, auth, scenery.flower, scenery.jars, scenery.plates],
   );
   // The thing in the hand: the one that was tapped while it still exists; never tapped / gone (the
   // ingredient was used up, the dish was taken off) = the thing in the fridge that most needs using up
@@ -562,6 +621,7 @@ export function KitchenPage({ onBack, onForgetToken }: {
     if (t.k === "buy") return setBuyOpen(true);
     if (t.k === "write") return openWrite();
     if (t.k === "fridge" || t.k === "table") return setPick(zonePick(t.k, items ?? []));
+    if (t.k === "sheet") return setPlayTab(t.id);
     setPick(t);
   };
   const openWrite = () => {
@@ -589,7 +649,7 @@ export function KitchenPage({ onBack, onForgetToken }: {
   };
 
   idle.current = () =>
-    !buyOpen && !writeOpen && editingId === null && !confirming && !skipping && !actRef.current && !addDishRef.current
+    !buyOpen && !writeOpen && playTab === null && editingId === null && !confirming && !skipping && !actRef.current && !addDishRef.current
     && !isInflight(inflightKey("coupon", role)) && !isInflight(inflightKey("buy", role)) && !isInflight(inflightKey("kind", "all"));
 
   return (
@@ -640,11 +700,12 @@ export function KitchenPage({ onBack, onForgetToken }: {
             <Text style={kit.dizzy}>{`没有「${unknownRole}」这个角色 · 这是${role}的厨房`}</Text>
           </Pressable>
         ) : null}
+        <VendorLine view={features.vendor ? vendorView : null} onOpen={() => setPlayTab("vendor")} />
         {dizzyLeftMs > 0 ? (
           <Text style={kit.dizzy} testID="dizzy-line">{`晕乎乎的 · 还有 ${fmtLeft(dizzyLeftMs)}`}</Text>
         ) : null}
         <View style={kit.bleed}>
-          <KitchenScene width={width} objs={objs} pick={held} logCount={fridge?.log.length ?? 0} onTap={onTap} />
+          <KitchenScene width={width} light={light} pieces={pieces} objs={objs} pick={held} logCount={fridge?.log.length ?? 0} onTap={onTap} />
           {/* the bottom edge of the picture fades into the colour of the hand, so the two read as one */}
           <LinearGradient colors={["rgba(239,223,200,0)", HAND_TOP]} style={[kit.fade, { top: width - 40 }]} />
           <Hand
@@ -680,6 +741,7 @@ export function KitchenPage({ onBack, onForgetToken }: {
             }
           />
         </View>
+        <PlayShelf tabs={visibleTabs(features)} seen={seenTabs} onOpen={setPlayTab} />
         {onForgetToken ? (
           <Pressable onPress={onForgetToken} accessibilityRole="button" style={kit.foot} testID="forget-token">
             <Text style={kit.footTx}>换口令 →</Text>
@@ -698,6 +760,18 @@ export function KitchenPage({ onBack, onForgetToken }: {
           return r;
         }}
         onOrphanError={toast}
+      />
+      <PlaySheet
+        open={playTab !== null && visibleTabs(features).includes(playTab)}
+        tab={playTab ?? "recipes"}
+        tabs={visibleTabs(features)}
+        features={features}
+        onTab={setPlayTab}
+        onClose={() => setPlayTab(null)}
+        onChanged={() => {
+          reloadFridge();
+          reloadPlay();
+        }}
       />
       <WriteSheet
         open={writeOpen || editing !== null}

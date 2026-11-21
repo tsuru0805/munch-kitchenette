@@ -61,6 +61,49 @@ clip("scarf", "stirfry_look", "stirfry-look-scarf")
 clip("toque", "steam_hot", "steam-hot-toque")
 clip("scarf", "mix_hot", "mix-hot-scarf")
 clip("scarf", "fry_taste", "fry-taste-scarf")
+# ── the chores the kitchen page plays (buying from the vendor, washing up, the dishwasher) ──
+# Each a run of whole clips in the order the page plays them, every clip 3 s here (on the page a washing-up
+# step lasts a seventh of each plate's time, and the dishwasher runs for 8 s). The strip puts the three side
+# by side; each lane is eight clips long, so they loop together.
+CHORE_CROP = (16, 234, 616, 574)        # everything a chore draws lies inside x 26-606, y 244-564
+LANES = {
+    "vendor": ("scarf", ["vendor_call", "vendor_pay", "vendor_take", "vendor_carry", "vendor_carry", "vendor_carry", "vendor_call", "vendor_call"]),
+    "wash": ("toque", ["dish_sleeve", "dish_soap", "dish_scrub", "dish_rinse", "dish_shake", "dish_dry", "dish_stack", "dish_break"]),
+    "washer": ("scarf", ["machine_load", "machine_close", "machine_start", "machine_run", "machine_run", "machine_run", "machine_done", "machine_done_last"]),
+}
+GAP = 12
+
+def chore_frames(outfit, seg):
+    path = os.path.join(PACK, outfit, seg + (".png" if seg.endswith("_last") else ".webp"))
+    im = Image.open(path)
+    w, h = (CHORE_CROP[2] - CHORE_CROP[0]) // 2, (CHORE_CROP[3] - CHORE_CROP[1]) // 2
+    out = []
+    n = getattr(im, "n_frames", 1)
+    for i in range(45):
+        im.seek(min(i, n - 1))
+        f = im.convert("RGBA").crop(CHORE_CROP).resize((w, h), Image.NEAREST)
+        tile = Image.new("RGBA", f.size, BG + (255,))
+        tile.alpha_composite(f)
+        out.append((tile.convert("RGB"), [70, 60, 70][i % 3]))
+    return out
+
+def lane(name):
+    outfit, segs = LANES[name]
+    return [f for s in segs for f in chore_frames(outfit, s)]
+
+lanes = {k: lane(k) for k in LANES}
+for k, fr in lanes.items():
+    save_gif(fr, os.path.join(OUT, f"chores-{k}.gif"))
+first = next(iter(lanes.values()))
+strip = []
+for i in range(0, len(first), 2):            # every other frame (each shown twice as long): keeps the file small
+    w, h = first[i][0].size
+    im = Image.new("RGB", (3 * w + 2 * GAP, h), (255, 255, 255))
+    for j, k in enumerate(LANES):
+        im.paste(lanes[k][i][0], (j * (w + GAP), 0))
+    strip.append((im, sum(d for _, d in first[i:i + 2])))
+save_gif(strip, os.path.join(OUT, "chores.gif"))
+
 total = 0
 for n in sorted(os.listdir(OUT)):
     if n.endswith(".gif"):

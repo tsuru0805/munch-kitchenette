@@ -73,6 +73,8 @@ export const CARD_CSS = `
 .track { height: 2px; background: var(--_hair); margin-top: 8px; overflow: hidden; }
 .fill { height: 2px; background: var(--_accent); }
 .foot { font-family: var(--_serif); font-size: 10.5px; line-height: 16px; color: var(--_mute); margin-top: 6px; font-variant-numeric: tabular-nums; }
+.settle { font-family: var(--_serif); font-size: 10.5px; line-height: 16px; color: var(--_mute); margin-top: 4px; padding-top: 4px; border-top: 1px dashed currentColor; white-space: pre-line; }
+.settle[hidden] { display: none; }
 .right { flex: none; display: flex; flex-direction: column; align-items: flex-end; justify-content: center; }
 .clock { font-family: var(--_display); font-size: 26px; color: var(--_ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .state-word { font-family: var(--_serif); font-size: 12.5px; line-height: 19px; color: var(--_accent); text-align: right; }

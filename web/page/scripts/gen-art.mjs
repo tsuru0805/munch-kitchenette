@@ -30,9 +30,6 @@ ${rows.join("\n")}
 } satisfies Record<string, FridgeArt>;
 
 export type FridgeArtId = keyof typeof FRIDGE_ART;
-
-/** The empty kitchen (1:1; the slot coordinates in sceneSlots.ts are measured on a 1254 px square of it) */
-export const BG_KITCHEN: ImageSourcePropType = require("../../assets/kitchen/fridge/bg_kitchen.jpg");
 `;
 writeFileSync(join(page, "src", "kitchen", "art.generated.ts"), out);
 console.log(`art.generated.ts: ${names.length} pictures`);

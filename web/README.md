@@ -138,6 +138,10 @@ How the text font is chosen, and what gets downloaded:
 
 To use your own font instead, set `--kitchenette-font-serif` to it: the bundled files are only fetched when "Kitchenette Serif" is actually used, so nothing is downloaded. To drop the bundled serif but keep the system one, set `--kitchenette-font-serif: "Songti SC", serif`. To keep the card from registering any font (the numerals included), write `fonts="none"`; you can then leave `web/fonts/` out of your site.
 
+## The settled still
+
+When the backend has the settled card switched on (`[play] settle_card`), its answer for a served pot carries a `settlement` (see [`docs/API.md`](../docs/API.md)). The card then keeps the cook on its top edge after serving, holding the dish — one of fourteen kinds of dish picture, picked by the backend from the dish's name — in a pose for how it turned out (great, ok, burnt, spoiled; a ruined pot shows the spilt pan), and writes a few lines under the times: the proficiency, the mishap ("一路顺利" only when it is known nothing happened and the dish did not burn or spoil) and the stamps. The still is put together in the browser from three pictures of the sprite pack (`settle_<pose>.png`, the dish, `settle_<pose>_front.png`); a pack without them shows the ordinary last frame. Without a settlement the card behaves as before.
+
 ## Try it locally
 
 ```sh
@@ -311,6 +315,10 @@ kitchenette-cooking-card {
 - 随包文件共 7967 个字符。不在其中的字，用设备上有的衬线字体画。
 
 想换成自己的字体：把 `--kitchenette-font-serif` 设成它。随包文件只在真的用到「Kitchenette Serif」时才会被取，所以不会下载。只想去掉随包的思源宋体、保留系统宋体：写 `--kitchenette-font-serif: "Songti SC", serif`。想让卡一个字体都不登记（数字字体也不要）：写 `fonts="none"`，这时站点上可以不放 `web/fonts/`。
+
+## 结算定格
+
+后端开着结算卡（`[play] settle_card`）时，出锅那一锅的回答里多一个 `settlement`（见 [`docs/API.md`](../docs/API.md)）。卡片收到它，出锅后小厨师就留在卡片上沿，举着这道菜——十四类菜的小图之一，后端按菜名挑——姿势跟着成色走（很好 / 普通 / 糊了 / 坏了；毁掉的锅是打翻的锅），时间那行下面再写几行：熟练度、小意外（确认没出、而且没糊没坏才写「一路顺利」）、印章。定格图在浏览器里用素材包里的三张图拼出来（`settle_<姿势>.png`、菜、`settle_<姿势>_front.png`）；素材包里没有这几张，就照旧停在最后一帧。没有 `settlement` 时，卡片和以前一样。
 
 ## 在自己电脑上看
 

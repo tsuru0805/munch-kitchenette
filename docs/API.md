@@ -147,6 +147,38 @@ Errors are `{"detail": {"message", "code", "rows"}}` with 409 for `used`,
 | `POST /api/scan` | Run the periodic scan now. |
 | `POST /api/dev/clock` `{advance_seconds?, reset?}` | Only with `server.dev_clock`. Walks time forward, scanning as it goes. It moves the clock of the whole server, for every role in the database: never use it on a kitchen in use. |
 
+## The upgrade
+
+Everything here belongs to one of the seventeen switches (`[play]`); a switched-off one answers 409
+"这个玩法没开". `who` (or `viewer`) is the role, as everywhere. `GET /api/about` also carries
+`features: {key: on}`.
+
+| | |
+|---|---|
+| `GET /api/features` | `{features: [{key, name, parent, default, markers, on, wanted, reason}]}` — what is on and why not. |
+| `GET /api/play/teaching` | `{text}`: the sentences teaching the markers of what is on (empty while markers are not in use). |
+| `GET /api/recipes?q=&limit=&who=` | Public recipes (search by name, ingredient or category). `{total, source, categories, recipes: [{id, name, main, optional, method, minutes, category_label, items_text, stopped, …}]}` |
+| `GET /api/recipes/today?who=` | `{text}`: today's three picks, as the role reads them. |
+| `GET /api/recipes/missing?who=&recipe=` | What the fridge lacks for that recipe, in whole packs, and whether each is sold. |
+| `PUT /api/recipes/<id>/stop` `{stopped?, why?}` | Take a recipe with a mistake out of picks and search (pots and pages stay). |
+| `GET` / `PUT /api/prefs` `{who, dislike: [item ids]}` | Ingredients not to recommend. |
+| `GET /api/book?who=` · `DELETE /api/book/<page>?who=` | The role's pages (with tasting notes and menus when those are on). |
+| `GET /api/orders?who=` · `POST /api/orders` `{who, recipe}` · `DELETE /api/orders/<id>?who=` | Ordering a dish; it moves on by itself (received → planned → cooking → done). |
+| `GET /api/codes?who=&page=` · `POST /api/codes/preview` `{code}` · `POST /api/codes/import` `{who, code}` | A page as a code; previewing reads it as text only. |
+| `GET /api/dex?who=` | The dish book: `{pages, silhouettes, totals, backfill, achievements (all, for the human), drawing}`. |
+| `PUT /api/dex/note` `{who, page_key, text}` · `PUT /api/dex/merge` `{who, dish, page_key}` | The human's comment; merging an unsorted dish into a page. |
+| `POST /api/dex/art/redraw` `{page_key}` · `PUT /api/dex/art/choice` `{page_key, version}` · `GET /api/dex/art?page_key=&version=` | Pictures (needs `[art] dish_provider`); every version is kept. |
+| `GET /api/dishes?who=` · `PUT /api/dishes/settings` `{who, self_wash?, quota?}` | Plates: counts by state, the last washing (`job`: `id`, `state`, `started_at`, `per_s`, `n`, `ended_at`, and `breaks`, the plates of it already washed that broke, 0-based in washing order; a plate still to come is never listed), `machine_at` (when a plate last went into the dishwasher, null = never); whether the role washes, how many (null = all). The page plays the cook washing up and loading the dishwasher from these (see [ANIMATION.md](ANIMATION.md#chores-on-the-kitchen-page)). |
+| `GET /api/jars?who=` · `PUT /api/jars/cap` `{who, cap}` · `POST /api/jars/feed` `{who, name}` | The three jars, what came out of them, the daily cap; feeding one serving. |
+| `GET /api/vendor?who=` · `GET /api/vendor/ledger?who=` | The vendor downstairs now (goods, prices, what is left), today's spending, the wallet, the sill, flower requests; the role's orders (`mine`: on the visit downstairs now, each with `payer`, `state`, `created_at` and `updated_at`, which the page's vendor clip is played from). |
+| `POST /api/vendor/treat` `{who, item_id, qty?, request_id}` | The human buys for the role (free for the role; only while the vendor is there). |
+| `POST /api/vendor/flowers/<id>` `{approve}` · `POST /api/vendor/flowers/ready` `{name}` | Answering a flower request; marking an agreed kind as ready to be sold. |
+| `GET /api/wallet?who=` · `POST /api/wallet/grant` `{who, amount, key, note?}` | The pocket money. Granting only with the built-in ledger (409 with your own wallet); `key` makes a retry grant nothing more; the role is told once. The ledger starts at 0 and nothing is paid in by itself. |
+
+`GET /api/kitchen?session_id=` also returns `settlement` when the settled card is on:
+`{has, outcome, link, dish, method, proficiency: {tier, n, before_tier, to_next} | null, mishap: {state, text} | null, stamps: [{key, text}]}`,
+or `{has: false, why}` (`not_settled`, `cancelled`, `legacy`, `feature_off`).
+
 ---
 
 # 中文：页面用的接口（REST）
@@ -280,3 +312,7 @@ Errors are `{"detail": {"message", "code", "rows"}}` with 409 for `used`,
 | `GET /api/about` | 页面画东西之前要知道的事，只读：`{version, now, timezone, timezone_label, roles: {default, list}, switches: {stamina, satiety, worms, dev_clock, art}, words: {human_name, human_pronoun, app_name}, limits: {coupon_max, buy_max_items, hungry_below}}`。`roles.list` 是目前有的角色加上 `roles.allowed` 和默认角色。`switches` 说明哪些部分开着：`stamina` 为 false 时页面不显示体力，`satiety` 为 false 时不显示饱食度，`dev_clock` 为 true 时才出现快进；`art` 表示有没有接画图函数。 |
 | `POST /api/scan` | 立刻做一次定时检查。 |
 | `POST /api/dev/clock` `{advance_seconds?, reset?}` | 只有打开 `server.dev_clock` 才有：让时间往前走，途中照常检查。它拨的是整台服务的钟，库里所有角色一起跳——正在用的厨房别用。 |
+
+## 这次升级
+
+上面英文「The upgrade」一节逐条列了。每条都属于 `[play]` 里的某一样，那一样关着就回 409「这个玩法没开」；页面先读 `GET /api/features` 决定显示哪些入口。`GET /api/kitchen?session_id=` 在结算卡开着时多带一个 `settlement`（结算那一刻的成色、熟练度、小意外、印章，之后不变）。

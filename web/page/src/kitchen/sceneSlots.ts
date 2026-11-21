@@ -1,9 +1,13 @@
 // The kitchen picture is put together in layers: the empty kitchen, then cut-out pictures placed in
 // fixed slots. This file is the one table of slot coordinates, plus the pure functions that decide
 // what goes where.
-// Coordinates are pixels on the empty-kitchen background as a 1254 × 1254 square (measured against
-// the picture itself: a different background needs measuring again); on screen everything is scaled
-// by width / 1254. A slot = centre x + bottom line y (things "stand" on a shelf) + the largest width
+// Coordinates are pixels on the empty-kitchen picture as a 1254 × 1254 square (measured against the
+// picture itself: a different background needs measuring again; the three lights of it are drawn on
+// one and the same layout); on screen everything is scaled by width / 1254.
+// The picture: the fridge on the left; on the right, two wall shelves (snacks on the upper one, the
+// cork board hanging just above the lower one, the staples to its right), a small window with a sill
+// (the flowers), and the counter below with the three jars on its left half, the sink and the
+// drying rack on its right half. A slot = centre x + bottom line y (things "stand" on a shelf) + the largest width
 // and height; a picture is scaled to fit and sits on the bottom line, centred.
 import type { FridgeArtId } from "./art.generated";
 import type { ArtAuth, FridgeItem } from "./fridgeApi";
@@ -57,12 +61,12 @@ export const SNACK_SLOTS: { art: FridgeArtId; slot: Slot }[] = [
   { art: "snack_cookie", slot: { x: 1150, y: 216, w: 100, h: 96 } },
 ];
 
-/** Lower wall shelf: the four staples (name = the word in the server's staples list) */
+/** Lower wall shelf, right of the cork board: the four staples, standing close together (name = the word in the server's staples list) */
 export const STAPLE_SLOTS: { name: string; art: FridgeArtId; slot: Slot }[] = [
-  { name: "油", art: "staple_oil", slot: { x: 692, y: 452, w: 64, h: 150 } },
-  { name: "酱油", art: "staple_soy", slot: { x: 772, y: 452, w: 76, h: 122 } },
-  { name: "盐", art: "staple_salt", slot: { x: 848, y: 452, w: 60, h: 96 } },
-  { name: "米", art: "staple_rice", slot: { x: 942, y: 452, w: 104, h: 124 } },
+  { name: "油", art: "staple_oil", slot: { x: 870, y: 448, w: 52, h: 112 } },
+  { name: "酱油", art: "staple_soy", slot: { x: 914, y: 450, w: 58, h: 94 } },
+  { name: "盐", art: "staple_salt", slot: { x: 990, y: 450, w: 44, h: 74 } },
+  { name: "米", art: "staple_rice", slot: { x: 952, y: 454, w: 72, h: 86 } },
 ];
 
 /** Grocery coupons on the freezer door (0–3) */
@@ -74,13 +78,13 @@ export const TICKET_SLOTS: Slot[] = [
 
 /** Paper notes on the cork board (0–3) and their paper colours */
 export const NOTE_SLOTS: (Slot & { color: string })[] = [
-  { x: 1086, y: 400, w: 74, h: 66, rot: -5, color: "#f7eedc" },
-  { x: 1176, y: 372, w: 62, h: 56, rot: 4, color: "#cfe0ea" },
-  { x: 1150, y: 500, w: 74, h: 58, rot: -2, color: "#f4cdd2" },
+  { x: 742, y: 350, w: 54, h: 48, rot: -5, color: "#f7eedc" },
+  { x: 804, y: 340, w: 46, h: 42, rot: 4, color: "#cfe0ea" },
+  { x: 786, y: 412, w: 54, h: 44, rot: -2, color: "#f4cdd2" },
 ];
 
-/** Dishes on the counter (the first three on the menu) */
-export const DISH_SLOTS: Slot[] = row([748, 932, 1116], 752, 150, 104);
+/** Dishes on the counter, in front of the jars (the first three on the menu; the right half is the sink and the rack) */
+export const DISH_SLOTS: Slot[] = row([682, 776, 866], 764, 92, 72);
 
 /** Top left of the freezer door: the "buy him groceries" memo */
 export const BUY_SLOT: Slot = { x: 186, y: 304, w: 124, h: 204 };
@@ -90,17 +94,28 @@ export const SNACK_IDS = ["coffee", "jelly", "pudding", "chocolate", "cookie"] a
 
 /** The whole fridge / the counter and cabinet: a tap on an empty spot counts too (fridge = what is in it, counter = the table); they lie under everything else */
 export const FRIDGE_RECT: [number, number, number, number] = [0, 60, 630, 1160];
-export const TABLE_RECT: [number, number, number, number] = [634, 660, 1254, 1100];
+export const TABLE_RECT: [number, number, number, number] = [630, 640, 1254, 1080];
 
 /** The whole cork board (rectangle in source pixels [x0, y0, x1, y1]) */
-export const CORK_RECT: [number, number, number, number] = [1020, 280, 1245, 530];
+export const CORK_RECT: [number, number, number, number] = [697, 278, 848, 430];
+
+/**
+ * The things of the plays that are part of the picture itself (drawn as pieces in the current light,
+ * see sceneLight.ts): where a tap on them lands, [x0, y0, x1, y1]. The jars only down to where the
+ * dishes on the counter start, so the two do not fight over a tap.
+ */
+export const FLOWER_RECT: Rect4 = [1066, 420, 1178, 562];
+export const JAR_RECTS: Rect4[] = [[656, 556, 744, 690], [750, 556, 838, 690], [840, 556, 914, 690]];
+export const SINK_RECT: Rect4 = [914, 640, 1104, 756];
+export const RACK_RECT: Rect4 = [1106, 600, 1236, 732];
 
 /**
  * Paper hanging under the lower shelf: leftmost the "meals today" receipt, then one strip per dish,
  * and last an empty strip = put a dish up. All [x0, y0, x1, y1] in source pixels. At this scale
  * lettering would be unreadable, so a strip carries none: it only shows how many dishes are up.
+ * Short, so they end above the jars on the counter.
  */
-export const STRIP = { x0: 664, y: 476, w: 46, h: 164, receiptH: 118, afterReceipt: 64, step: 56, max: 4 } as const;   // four strips + the empty one; any more would run into the cork board
+export const STRIP = { x0: 664, y: 480, w: 46, h: 70, receiptH: 54, afterReceipt: 64, step: 56, max: 4 } as const;   // four strips + the empty one; any more would run past the end of the shelf
 export type Rect4 = [number, number, number, number];
 export function receiptRect(): Rect4 {
   return [STRIP.x0, STRIP.y, STRIP.x0 + STRIP.w, STRIP.y + STRIP.receiptH];

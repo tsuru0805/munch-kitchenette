@@ -284,7 +284,9 @@ async function startKitchen() {
     }, { noisy: true });
 
     await run("staples: the shelf", async () => {
-      await tap("obj-staple");
+      // the four stand close together right of the cork board: their tap areas overlap (all of them mean
+      // "staples"), so aim at the one on top
+      await page.locator('[data-testid^="obj-staple"]').last().click();
       await tid("hand-staple").waitFor();
       for (const s of (await fridge()).staples) check(await has(`staple-${s}`), `staple ${s} is listed`);
       await handSays("常备");

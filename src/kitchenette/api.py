@@ -22,7 +22,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from pydantic import AliasChoices, BaseModel, Field
 
-from . import (__version__, art, clock, config, fridge, inline, kitchen, menu, notify, potion, roles,
+from . import (__version__, art, clock, config, fridge, inline, kitchen, menu, notify, play, potion, roles,
                service, sleep, snacks, stamina)
 from .texts import t
 
@@ -127,6 +127,10 @@ PAGE_DIR = Path(__file__).with_name("page")
 PAGE_MISSING = ("The kitchen page is not in this install. Build it from web/page/ (npm install && npm run build); "
                 "see docs/PAGE.md. / 这份安装里没有厨房页。请在 web/page/ 里构建（npm install && npm run build），"
                 "见 docs/PAGE.md。")
+
+
+# Content types of the page's files that must not depend on the system's mimetypes table
+_PAGE_TYPES = {".webp": "image/webp", ".woff2": "font/woff2"}
 
 
 def _origin_list(values: list[str]) -> list[str]:
@@ -237,6 +241,7 @@ def create_app(*, scheduler: bool = True, with_mcp: bool = True) -> FastAPI:
                 "switches": {"stamina": bool(cfg.stamina_enabled), "satiety": bool(cfg.satiety_enabled),
                              "worms": bool(cfg.kitchen_worm_enabled), "dev_clock": bool(cfg.server_dev_clock),
                              "art": art.enabled()},
+                "features": {f["key"]: f["on"] for f in play.capabilities()["features"]},
                 "words": {"human_name": cfg.words_human_name, "human_pronoun": cfg.words_human_pronoun,
                           "app_name": cfg.words_app_name},
                 "limits": {"coupon_max": cfg.fridge_coupon_max, "buy_max_items": cfg.fridge_buy_max_items,
@@ -564,6 +569,10 @@ def create_app(*, scheduler: bool = True, with_mcp: bool = True) -> FastAPI:
         scan = service.fast_forward(body.advance_seconds)
         return {"offset": clock.offset(), "now": clock.now(), "scan": scan}
 
+    # ── the upgrade (recipes, dish book, plates, jars, vendors) ─────────
+    from . import play_api
+    play_api.register(app, guarded, _role)
+
     # ── the kitchen page (static files; no token: the page sends it itself) ─────
     @app.get("/page", include_in_schema=False)
     def page_root():
@@ -577,9 +586,8 @@ def create_app(*, scheduler: bool = True, with_mcp: bool = True) -> FastAPI:
         target = (PAGE_DIR / rel).resolve()
         if PAGE_DIR.resolve() not in target.parents or not target.is_file():
             raise HTTPException(404, "Not found")
-        kind = mimetypes.guess_type(target.name)[0] or "application/octet-stream"
-        if target.suffix == ".woff2":
-            kind = "font/woff2"
+        # the types the page's own files need, not left to the system's mimetypes table (which may not know them)
+        kind = _PAGE_TYPES.get(target.suffix.lower()) or mimetypes.guess_type(target.name)[0] or "application/octet-stream"
         return FileResponse(str(target), media_type=kind, headers=_page_headers(rel))
 
     if mcp_server is not None:

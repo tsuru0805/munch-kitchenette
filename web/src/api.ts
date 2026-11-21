@@ -27,6 +27,43 @@ export interface KitchenSession {
   method?: string | null;
 }
 
+/**
+ * The settled card (the backend's "settle_card" switch): the facts of the moment the pot was served,
+ * written once and never changed. Present only when the backend has it.
+ */
+export interface KitchenSettlement {
+  outcome: string;
+  /** follow = cooked by a recipe; changed = by a recipe, changed; free = no recipe */
+  link: string;
+  /** null when proficiency is switched off */
+  proficiency: { tier: string; n: number; toNext: number | null } | null;
+  /** null = not shown (switched off, or not known); state none = nothing happened, had = what happened */
+  mishap: { state: "none" | "had" | "unknown"; text: string | null } | null;
+  stamps: string[];
+  /** which dish picture the cook holds up (a kind such as "stirfry"; "" = the plain bowl) */
+  icon: string;
+}
+
+/** The `settlement` object of an answer; null unless it says it has one */
+export function parseSettlement(v: unknown): KitchenSettlement | null {
+  if (!v || typeof v !== "object") return null;
+  const s = v as Record<string, unknown>;
+  if (s.has !== true) return null;
+  const pr = s.proficiency && typeof s.proficiency === "object" ? (s.proficiency as Record<string, unknown>) : null;
+  const mi = s.mishap && typeof s.mishap === "object" ? (s.mishap as Record<string, unknown>) : null;
+  const state = mi && (mi.state === "none" || mi.state === "had" || mi.state === "unknown") ? mi.state : null;
+  return {
+    outcome: typeof s.outcome === "string" ? s.outcome : "",
+    link: typeof s.link === "string" ? s.link : "free",
+    proficiency: pr && typeof pr.tier === "string"
+      ? { tier: pr.tier, n: typeof pr.n === "number" ? pr.n : 0, toNext: typeof pr.to_next === "number" ? pr.to_next : null }
+      : null,
+    mishap: state ? { state, text: typeof mi!.text === "string" ? mi!.text : null } : null,
+    icon: typeof s.icon === "string" ? s.icon : "",
+    stamps: Array.isArray(s.stamps) ? s.stamps.map((x) => (x && typeof x === "object" ? String((x as { text?: unknown }).text ?? "") : "")).filter(Boolean) : [],
+  };
+}
+
 export interface KitchenProbe {
   /** null = the backend does not know this pot */
   status: "cooking" | "served" | "cancelled" | null;
@@ -35,6 +72,8 @@ export interface KitchenProbe {
   session?: KitchenSession | null;
   /** The server's time zone, when the source knows it ("" = none set) */
   timezone?: string;
+  /** The settled card, when the source has one */
+  settlement?: KitchenSettlement | null;
 }
 
 /** fresh = true skips any cache (used right after the pot is due, when a cached answer may still say "cooking") */
@@ -99,13 +138,14 @@ export interface KitchenAnswer {
   session: KitchenSession | null;
   /** The time zone the server keeps its clock times in (an IANA name); "" when it has none set */
   timezone: string;
+  settlement: KitchenSettlement | null;
 }
 
 /** Turns the body of GET /api/kitchen?session_id= into an answer; anything unexpected reads as "no pot, no time zone" */
 export function parseAnswer(body: unknown): KitchenAnswer {
-  const b = (body && typeof body === "object" ? body : {}) as { session?: unknown; timezone?: unknown };
+  const b = (body && typeof body === "object" ? body : {}) as { session?: unknown; timezone?: unknown; settlement?: unknown };
   const session = b.session && typeof b.session === "object" ? (b.session as KitchenSession) : null;
-  return { session, timezone: typeof b.timezone === "string" ? b.timezone : "" };
+  return { session, timezone: typeof b.timezone === "string" ? b.timezone : "", settlement: parseSettlement(b.settlement) };
 }
 
 /**
@@ -169,7 +209,7 @@ export function apiProbe(base: string, token?: string | null | (() => string | n
       });
     }
     const answer = await hit.p;
-    return { ...probeFromSession(answer.session), timezone: answer.timezone };
+    return { ...probeFromSession(answer.session), timezone: answer.timezone, settlement: answer.settlement };
   };
 }
 

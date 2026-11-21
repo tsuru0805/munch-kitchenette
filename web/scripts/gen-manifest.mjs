@@ -18,6 +18,11 @@ for (const outfit of OUTFITS) {
     if (m) files[`${outfit}/${m[1]}`] = `${outfit}/${name}`;
   }
 }
+// The dishes the cook holds up on a settled card: one small cell image per kind (one pixel per cell)
+for (const name of readdirSync(join(pack, "dishes")).sort()) {
+  const m = /^(.+)\.png$/.exec(name);
+  if (m) files[`dishes/${m[1]}`] = `dishes/${name}`;
+}
 const manifest = { name: "clawd", outfits: OUTFITS, files };
 writeFileSync(join(pack, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");
 writeFileSync(

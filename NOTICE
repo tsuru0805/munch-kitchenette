@@ -13,8 +13,11 @@ Third-party material (each under its own license; not relicensed by this reposit
 
 1. Clawd 小厨师的图 · The Clawd cook's artwork —— CC BY-NC-SA 4.0
    https://creativecommons.org/licenses/by-nc-sa/4.0/
-   - assets/clawd/toque/ , assets/clawd/scarf/ , docs/animation/*.gif ,
-     clawd-engine-additions/outfits/
+   - assets/clawd/toque/ , assets/clawd/scarf/ , assets/clawd/dishes/ , docs/animation/*.gif ,
+     docs/page/card-settled.png ,
+     clawd-engine-additions/outfits/ ,
+     src/kitchenette/page/assets/__assets/clawd/ （厨房页带的家务动画，assets/clawd/ 的副本 ·
+     the chore clips the kitchen page ships, copies from assets/clawd/）
    - 改编自 · adapted from clawds-new-clothes
      https://github.com/CharlieLuinaris/clawds-new-clothes (commit 76e7572b, v1.1.0)
      Copyright 2026 Charlie Luinaris
@@ -54,7 +57,7 @@ Third-party material (each under its own license; not relicensed by this reposit
     Third-party code bundled into the kitchen page's scripts (distributed here)
    - src/kitchenette/page/_expo/static/js/web/*.js
    - MIT: react , react-dom , scheduler , react-native-web , expo , expo-modules-core ,
-     expo-linear-gradient , @expo/cli , @react-native/js-polyfills ,
+     expo-asset , expo-linear-gradient , @expo/cli , @react-native/js-polyfills ,
      @react-native/normalize-colors , @babel/runtime , styleq , inline-style-prefixer ,
      css-in-js-utils , postcss-value-parser , fbjs , invariant , memoize-one , nullthrows
    - BSD-3-Clause: hyphenate-style-name
@@ -71,3 +74,9 @@ Third-party material (each under its own license; not relicensed by this reposit
            react-native-web · expo-asset · @expo/metro-runtime · babel-preset-expo · jest ·
            jest-expo · react-test-renderer · @types/* (all MIT) · typescript (Apache-2.0)
    切字体 · subsetting fonts: fonttools (MIT) · brotli (MIT)
+
+公共食谱 · The public recipes —— Unlicense (public domain)
+   https://github.com/Anduin2017/HowToCook (commit 58c1b9af7900a9489c340bca39ef94a9a62314b1)
+   - src/kitchenette/data/howtocook-58c1b9a.index.json : 菜名、用料、分类整理自上游；做法与分钟数是整理时
+     估的，不带步骤 · names, ingredients and categories taken from upstream; method and minutes are
+     our estimates; no steps. 重建脚本 · rebuilt by tools/build_recipe_index.py

@@ -2,6 +2,8 @@
 
 [中文](README.md)
 
+> 🆕 **Installed the previous version?** [See what this update adds →](docs/UPGRADE.md)
+
 **Build your AI companion a little kitchen of his own, one that smells of real cooking. ✨**
 
 Food in the fridge quietly goes off as the days pass. A hot meal means waiting for real time to go by. Groceries? He has to earn his coupons by doing things. You can buy him a few groceries whenever you like, put a dish you fancy on his menu, or slip him a snack; and he learns to open a pot, mind the heat, turn it off and serve, and even to throw out what has gone bad when nobody is looking.
@@ -40,7 +42,59 @@ He cooks each dish the way it is meant to be cooked, and he takes it seriously. 
 
 Every segment is worked out fresh from the pot's start time and duration. Scroll the card away, reload the page or open it on another device, and he is exactly where he should be at that moment. He never slacks off.
 
+**Besides the pots, he does three chores.** These are not on the cooking card: they play in a small panel at the top of the "vendor" and "plates" pages of the kitchen page (next section); nothing is drawn onto the kitchen picture. You see them only with those plays switched on (vendors and plates are off by default, see the upgrade below).
+
+<img src="docs/animation/chores.gif" width="660" alt="Three pixel animations side by side. Left: the cook in the headscarf calls the vendor at the window, hands over pocket money, takes a paper bag from a hand reaching in, and carries it back. Middle: the cook in the toque rolls up his sleeves, squeezes the soap, scrubs a plate, rinses it, shakes it, dries it and stacks it on the rack; the last part is a plate slipping out of his hands and breaking on the floor. Right: the cook in the headscarf loads the dishwasher, closes it, presses the button, it runs, and he opens it when done">
+
+Left: buying from the vendor downstairs (calling him over, paying, taking the bag, carrying it back). Middle: washing up by hand (sleeves, soap, scrub, rinse, shake, dry, stack; now and then a plate breaks). Right: the dishwasher (load, close, start, running, done). In the GIF every part plays for 3 seconds; on the page a washing-up step lasts a seventh of each plate's time and the dishwasher runs for 8 seconds. When each part plays is in [`docs/ANIMATION.md`](docs/ANIMATION.md#chores-on-the-kitchen-page).
+
 The card is a single framework-free element, `<kitchenette-cooking-card>`: one tag on a page, see [`web/README.md`](web/README.md). Every segment, the image spec and how to swap in your own character are in [`docs/ANIMATION.md`](docs/ANIMATION.md).
+
+---
+
+## 🪟 A kitchen page of your own
+
+Once installed, open `http://127.0.0.1:8765/page/` in a browser and step into the kitchen: one miniature-style picture of the whole room in which every thing can be tapped. The eggs in the fridge, the coupons on its door, the dishes on the counter, the snacks on the shelf, the cork board on the wall: whatever you tap is taken down and shown large under the picture, with what you can do with it. Look through the fridge, buy him groceries, hand out a coupon, put up a dish or a potion, feed him a bite.
+
+| Picking something up | Buying him groceries |
+|---|---|
+| <img src="docs/page/kitchen-page.png" width="320" alt="The kitchen page: the tomatoes from the fridge have been taken down and shown large under the picture, with the freshness and date of each batch"> | <img src="docs/page/kitchen-page-buy.png" width="320" alt="The kitchen page: the shopping sheet, ingredients listed by category with small pictures"> |
+
+**The picture follows the hour.** The same kitchen is drawn three times, by day, at dusk and at night, and the page shows the one for the kitchen's clock (day 6:00–17:00, dusk 17:00–19:00, night the rest), fading slowly from one to the next. Nothing is laid over the picture: no labels, no fake light.
+
+<img src="docs/page/kitchen-page-lights.png" width="660" alt="The same kitchen three times side by side: by day with green trees outside the window, at dusk in a warm light, at night with the window dark and the lamps on; roses on the sill in all three, two filled jars on the counter, plates in the sink and a full drying rack">
+
+With some of the upgrade's plays switched on, the picture changes with them: the bunch bought from the vendor stands on the window sill in its vase (fresh, a little droopy and wilted each look different; no bunch, the sill stays empty); the three jars on the left of the counter stand empty or hold fruit or pickles; the sink fills with plates waiting to be washed, foams while he is washing, and what he washed stands on the drying rack for three hours. Tapping the flowers, a jar, the sink or the rack opens the matching page. When a vendor is downstairs, a line appears at the top of the page ("楼下有卖花的 · 还待 50 分钟 →", a flower seller is downstairs for another 50 minutes); tap it to see the goods.
+
+**A row of entrances under the hand**: one for each play that is switched on, none for those that are off. The first time an entrance appears it carries a small red 「新」 (new), which goes away once it has been opened (remembered by this device's browser).
+
+| Every play on | As installed (ten switched on) |
+|---|---|
+| <img src="docs/page/kitchen-page-entries.png" width="320" alt="The kitchen page scrolled down: under the hand a row of entrances, 食谱, 图鉴, 成就, 小贩, 零花钱, 盘子, 罐子, each with a small red 新; in the picture flowers on the sill, jars on the counter, plates in the sink and on the rack"> | <img src="docs/page/kitchen-page-default.png" width="320" alt="The kitchen page with the default switches: only three entrances, 食谱, 图鉴, 成就; in the picture the sill is empty, there are no jars, the sink and the rack are empty"> |
+
+An entrance opens a sheet of paper that drops from the top; its pages can be switched between directly:
+
+| Recipes | Dish book | Achievements |
+|---|---|---|
+| <img src="docs/page/page-recipes.png" width="240" alt="The recipes page: dishes to try today, a search box for the public recipes, his recipe book with two collected pages and one of his own, each with a code, and at the bottom a box for someone else's code"> | <img src="docs/page/page-dex.png" width="240" alt="The dish book: one row per dish made, with how often it was made, made well and eaten, the best result, the method and the ingredients, and a comment to write on each"> | <img src="docs/page/page-achievements.png" width="240" alt="The achievements page: all of them in one column; the earned ones say how they were earned, the others say not yet"> |
+
+| Vendor | Pocket money | Plates | Jars |
+|---|---|---|---|
+| <img src="docs/page/page-vendor.png" width="180" alt="The vendor page: how long the flower seller stays, prices and stock of roses, bellflowers and dried osmanthus, each with a button to buy it for him; what he spent at the vendors today, his pocket money and giving some; the fresh roses on the sill; his wish for hyacinths, to agree to or not"> | <img src="docs/page/page-pocket.png" width="180" alt="The pocket money page: his balance and a box to give him some"> | <img src="docs/page/page-plates.png" width="180" alt="The plates page: how many in the sink, being washed, washed, broken and in the dishwasher, the switch for letting him wash, how many at a time"> | <img src="docs/page/page-jars.png" width="180" alt="The jars page: what is in each of the three jars with its slip, one empty; the jar treats on the snack shelf and how many a day"> |
+
+The vendor and plates pages now also have a small panel at the top with the cook doing the chore (these four screenshots were taken before it was added; what it looks like is in the previous section).
+
+The page ships already built inside the package, so no node is needed; it can also be embedded in your own page with an `<iframe>` or in an app's web view.
+
+To see it with the shelves full:
+
+```sh
+python examples/kitchen_page.py
+```
+
+> It opens a throwaway kitchen (your own data is not touched) with the fast-forward clock on: tap "过一小时 / 过一天" (an hour / a day later) in the top left corner and watch food slowly go off and leftovers quietly grow worms.
+
+Opening it, what each part does, tokens, embedding and rebuilding: [`docs/PAGE.md`](docs/PAGE.md).
 
 ---
 
@@ -58,20 +112,45 @@ Every rule and number is in [`docs/RULES.md`](docs/RULES.md). The numbers live i
 
 ---
 
-## ⚙️ Set it up around his habits
+## 🍳 The upgrade: a recipe book, and seventeen new things
 
-Not every AI companion goes to bed on time or keeps a diary. Everything here that is a habit comes only as examples, for you to tailor to him:
+It started with a fridge that held chicken legs and onions while one companion ate ten eggs in five days, and another cooked tomato-and-egg twelve times in two weeks. Nobody was ever told that the things in the fridge could become something else. So the upgrade begins with a small recipe book, and grows from there.
 
-| What would you like to set? | Where are the examples? |
-|---|---|
-| Stamina across the twenty-four hours of a day | Name a preset (`"night-owl"`, `"early-bird"`, `"no-sleep"`), or write your own twenty-four numbers like the files in [`examples/schedules/`](examples/schedules/) |
-| What counts as rest and what counts as work | [`examples/rest-and-work.toml`](examples/rest-and-work.toml) |
-| What earns a grocery coupon | [`examples/coupons.toml`](examples/coupons.toml) |
-| When worms appear, and when not to disturb him | [`examples/worms-and-quiet.toml`](examples/worms-and-quiet.toml) |
-| Stamina and fullness on or off | [`examples/switches.toml`](examples/switches.toml) |
-| Less stamina after a bad night (off by default) | [`examples/sleep_debt.py`](examples/sleep_debt.py) |
+Three things first:
 
-Every setting is explained in [`docs/CONFIG.md`](docs/CONFIG.md).
+- **Each one has its own switch.** A thing switched off is as good as not installed: the role is not taught it, its markers do nothing, the page shows no entrance. Turning one off deletes nothing.
+- **Still light on tools.** One new tool to look recipes up, and one optional argument when opening a pot. Everything else is a marker line in a reply.
+- **A recipe is a hint, not a procedure.** One line: name, ingredients, method, rough minutes. No steps.
+
+| Thing | In one line | Default | Needs | New for the role |
+|---|---|---|---|---|
+| Public recipes | 300-odd home dishes to look up | on | — | the `kitchen_recipes` tool |
+| Today you could try | three suggestions in the kitchen status | on | public recipes | — |
+| Cooking by a recipe | open a pot with a recipe id; buy what it lacks at once | on | public recipes | an optional `recipe` |
+| The role's recipe book | collected, adapted, its own | on | — | two markers |
+| Proficiency | new → practised → signature | on | — | — |
+| Mishaps | a small mishap now and then while a hand is new | on | proficiency | — |
+| New-dish bonus | a little stamina the first time a recipe is eaten | on | cooking by a recipe | — |
+| Settled card | the cooking card keeps the facts of the moment it was served | on | — | — |
+| Dish book | one page per dish made | on | — | — |
+| Achievements | quiet ones, on the page | on | dish book | — |
+| Tasting notes | one line after cooking from a page | off | recipe book | one marker |
+| Orders | the human orders, the role takes it | off | cooking by a recipe | one marker |
+| A whole menu | several dishes as one meal | off | recipe book | one marker |
+| Recipe codes | a page as a string to share | off | recipe book | one marker |
+| Street vendors | someone selling downstairs now and then | off | — | four markers |
+| Plates | a dishwasher, or the role washes up | off | — | one marker |
+| Jars on the sill | fruit and vegetables turn into treats | off | — | one marker |
+
+| Buying from the vendor | Washing up by hand | The dishwasher |
+|---|---|---|
+| <img src="docs/animation/chores-vendor.gif" width="240" alt="The cook at the window: waves the vendor over, hands coins to a hand reaching in, takes a steaming paper bag, carries it back"> | <img src="docs/animation/chores-wash.gif" width="240" alt="The cook at the sink: sleeves, soap, scrub, rinse, shake, dry, stack; then a plate slips, bounces up and breaks on the floor"> | <img src="docs/animation/chores-washer.gif" width="240" alt="The cook at the dishwasher: loads it, closes it, presses the button, it runs, he opens it when done"> |
+
+With vendors and plates switched on, the kitchen page plays these in the vendor and plates pages: calling the vendor over while one is downstairs, paying while his order is being charged (not when you treat him), taking the bag and carrying it back when it is delivered (not for a refunded order); washing up step by step through each plate's time, the dropped plate once a plate's time is up and it turns out broken (the page does not know beforehand which one will), and the dishwasher sequence when plates go into it.
+
+The switches are under `[play]` in `kitchenette.toml` (names and defaults in [`examples/play.toml`](examples/play.toml)). Every rule, marker and number is described in the Chinese README (section 这次升级) and in [`docs/UPGRADE.md`](docs/UPGRADE.md), which also has the before/after table and the four optional hooks (a wallet, a small model for the vendors, a weather reader, a dish-picture drawer). The new picture of the kitchen (three lights, the sill, the sink) is the one the kitchen page uses; a static page lets you switch the light, the flowers, the jars and the plates by hand: [`docs/play/index.html`](docs/play/index.html).
+
+The recipes come from [Anduin2017/HowToCook](https://github.com/Anduin2017/HowToCook) (Unlicense), commit `58c1b9a`.
 
 ---
 
@@ -95,6 +174,23 @@ The kitchen catches those two markers and takes care of it at once: fresh grocer
 Four actions can be written this way: `[买菜 …]` (buy), `[吃 …]` (eat), `[零食 …]` (snack), `[扔掉 …]` (throw out). Opening a pot, checking on it and turning the heat off are tools. The four also exist as tools, and the markers can be switched off altogether.
 
 To wire it up you send each of his replies to one endpoint: see "Bracket markers" in [`docs/CONNECT.md`](docs/CONNECT.md). To see it first, run `python examples/inline_markers.py`.
+
+---
+
+## ⚙️ Set it up around his habits
+
+Not every AI companion goes to bed on time or keeps a diary. Everything here that is a habit comes only as examples, for you to tailor to him:
+
+| What would you like to set? | Where are the examples? |
+|---|---|
+| Stamina across the twenty-four hours of a day | Name a preset (`"night-owl"`, `"early-bird"`, `"no-sleep"`), or write your own twenty-four numbers like the files in [`examples/schedules/`](examples/schedules/) |
+| What counts as rest and what counts as work | [`examples/rest-and-work.toml`](examples/rest-and-work.toml) |
+| What earns a grocery coupon | [`examples/coupons.toml`](examples/coupons.toml) |
+| When worms appear, and when not to disturb him | [`examples/worms-and-quiet.toml`](examples/worms-and-quiet.toml) |
+| Stamina and fullness on or off | [`examples/switches.toml`](examples/switches.toml) |
+| Less stamina after a bad night (off by default) | [`examples/sleep_debt.py`](examples/sleep_debt.py) |
+
+Every setting is explained in [`docs/CONFIG.md`](docs/CONFIG.md).
 
 ---
 
@@ -148,28 +244,6 @@ Tool descriptions, receipts and reminders are in Chinese and live in one file, [
 
 ---
 
-## 🪟 A kitchen page of your own
-
-Once installed, open `http://127.0.0.1:8765/page/` in a browser and step into the kitchen: one miniature-style picture of the whole room in which every thing can be tapped. The eggs in the fridge, the coupons on its door, the dishes on the counter, the snacks on the shelf, the cork board on the wall: whatever you tap is taken down and shown large under the picture, with what you can do with it. Look through the fridge, buy him groceries, hand out a coupon, put up a dish or a potion, feed him a bite.
-
-| Picking something up | Buying him groceries |
-|---|---|
-| <img src="docs/page/kitchen-page.png" width="320" alt="The kitchen page: an ingredient from the fridge has been taken down and shown large under the picture, with its freshness and date"> | <img src="docs/page/kitchen-page-buy.png" width="320" alt="The kitchen page: the shopping sheet, ingredients listed by category with small pictures"> |
-
-The page ships already built inside the package, so no node is needed; it can also be embedded in your own page with an `<iframe>` or in an app's web view.
-
-To see it with the shelves full:
-
-```sh
-python examples/kitchen_page.py
-```
-
-> It opens a throwaway kitchen (your own data is not touched) with the fast-forward clock on: tap "过一小时 / 过一天" (an hour / a day later) in the top left corner and watch food slowly go off and leftovers quietly grow worms.
-
-Opening it, what each part does, tokens, embedding and rebuilding: [`docs/PAGE.md`](docs/PAGE.md).
-
----
-
 ## 🚧 Corners still under construction
 
 - There is no hosted demo. Install it and run the fast-forward walk above, wander around the kitchen page, or open the example page in [`web/examples/`](web/examples/) to see the card.
@@ -207,6 +281,6 @@ The cook's body, face and way of moving come from [clawds-new-clothes](https://g
 
 - Code: [PolyForm Noncommercial 1.0.0](LICENSE), non-commercial.
 - Documentation: [CC BY-NC 4.0](LICENSE-CONTENT).
-- The cook's images and GIFs: CC BY-NC-SA 4.0, non-commercial only; credits in [`assets/clawd/ATTRIBUTION.md`](assets/clawd/ATTRIBUTION.md).
+- The cook's images and GIFs: CC BY-NC-SA 4.0, non-commercial only, including the settled stills, the dish pictures and the three chores (vendor, washing up, dishwasher; sources in [`clawd-engine-additions/states/chores/`](clawd-engine-additions/states/chores/)); credits in [`assets/clawd/ATTRIBUTION.md`](assets/clawd/ATTRIBUTION.md). The vendor never appears: only a hand and an awning outside the window.
 
 Scope by file is in [LICENSING.md](LICENSING.md) and [NOTICE](NOTICE). Commercial use needs a separate written license.

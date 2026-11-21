@@ -77,17 +77,28 @@ def scan(who: str, now: float | None = None) -> dict:
         out["hungry"] = bool(line)
     except Exception as e:  # noqa: BLE001
         log.error("hunger pass failed for %s: %r", who, e)
+    try:
+        from . import playkit
+        out["play"] = playkit.tick(who, now)
+    except Exception as e:  # noqa: BLE001
+        log.error("upgrade pass failed for %s: %r", who, e)
     return out
 
 
 def scan_all(now: float | None = None) -> dict:
+    try:
+        from . import playkit
+        street = playkit.tick_all(now)
+    except Exception as e:  # noqa: BLE001
+        log.error("vendor pass failed: %r", e)
+        street = {}
     results = [scan(who, now) for who in roles.known()]
     try:
         pushed = notify.flush(now)
     except Exception as e:  # noqa: BLE001
         log.error("pushing notes failed: %r", e)
         pushed = {}
-    return {"roles": results, "push": pushed}
+    return {"roles": results, "push": pushed, "street": street}
 
 
 def settle_round(who: str, calls: list, round_id: str | None = None, now: float | None = None) -> dict:

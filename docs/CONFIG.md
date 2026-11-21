@@ -240,6 +240,59 @@ directly with `POST /api/coupons/earn`.
 |---|---|---|
 | `provider` | `""` | `"module:function"` that draws pictures for ingredient kinds added from the page. Empty = text cards. |
 | `dir` | `"art"` | Where drawn pictures are stored. |
+| `dish_provider` | `""` | `"module:function"` drawing the dish book's pictures: `draw(name, ingredients, method) -> PNG bytes`. Empty = placeholders. |
+
+## `[play]`
+
+The seventeen things the upgrade added, one switch each (`true` / `false`). A switch whose parent is
+off does nothing, and the server says so when it starts; turning one off deletes nothing. See
+[`UPGRADE.md`](UPGRADE.md) and [`../examples/play.toml`](../examples/play.toml).
+
+| Key | Default | Parent |
+|---|---|---|
+| `recipes_public` | `true` | |
+| `recipes_today` | `true` | `recipes_public` |
+| `recipe_cook` | `true` | `recipes_public` |
+| `recipe_book` | `true` | |
+| `proficiency` | `true` | |
+| `mishaps` | `true` | `proficiency` |
+| `new_dish_bonus` | `true` | `recipe_cook` |
+| `settle_card` | `true` | |
+| `dex` | `true` | |
+| `achievements` | `true` | `dex` |
+| `tasting_notes` | `false` | `recipe_book` |
+| `orders` | `false` | `recipe_cook` |
+| `menus` | `false` | `recipe_book` |
+| `recipe_codes` | `false` | `recipe_book` |
+| `vendor` | `false` | |
+| `dishwash` | `false` | |
+| `seal_jars` | `false` | |
+
+## `[recipes]`
+
+| Key | Default | Meaning |
+|---|---|---|
+| `skilled_at` | `3` | Pots made well before a dish is practised (拿手). |
+| `signature_at` | `8` | ...and a signature dish (招牌). |
+| `mishap_rate_new` | `0.1` | Chance of a mishap per pot while a dish is new. |
+| `mishap_rate_skilled` | `0.0333…` | ...once practised. A signature dish has none. |
+| `new_dish_bonus` | `0.03` | Stamina added the first time a recipe is eaten. |
+| `avoid_days` | `3.0` | "Today you could try" skips dishes cooked this recently. |
+| `weather_provider` | `""` | `"module:function"` returning `{"rain", "temp_c"}`; empty = hour and season only. |
+
+## `[dishwash]`, `[jars]`, `[vendor]`
+
+| Key | Default | Meaning |
+|---|---|---|
+| `dishwash.seconds_per_plate` | `120.0` | Real time per plate. |
+| `dishwash.break_rate` | `0.05` | About one plate in twenty breaks. |
+| `jars.daily_cap` | `3` | Jar servings per role per day (the human feeding one counts too). |
+| `vendor.order_max` | `30` | Most one order may cost. |
+| `vendor.day_max` | `60` | Most a role may spend at the vendors in one day. |
+| `vendor.wallet_url` | `""` | Your own pocket-money system over HTTP (the contract is in [`UPGRADE.md`](UPGRADE.md)). Set = orders are charged there and the built-in ledger is not used. Empty = the built-in ledger: it starts at 0 and only the human puts money in, from the page. |
+| `vendor.wallet_token` | `""` | Bearer token sent to `wallet_url`, if it wants one. With an `http://` address it travels in clear text: use `https://` except on this machine or a trusted network. |
+| `vendor.wallet_provider` | `""` | `"module:object"`: a wallet written in Python instead (same four calls, see `UPGRADE.md`); wins over `wallet_url`. |
+| `vendor.talk_provider` | `""` | `"module:function"`, a small model playing the vendor; empty = fixed lines. |
 
 ---
 
@@ -484,3 +537,25 @@ write_diary = "日记"
 |---|---|---|
 | `provider` | `""` | 留空：你在页面上新添的食材只显示名字（字卡）。想要小图，这里填一个画图函数的位置，写成 `"模块:函数"`，见 [HOOKS.md](HOOKS.md)。 |
 | `dir` | `"art"` | 画好的图存在哪个文件夹。 |
+| `dish_provider` | `""` | 图鉴每道菜的图：填一个画图函数 `"模块:函数"`（`draw(菜名, 用料, 做法)` 回 PNG）。留空=占位图。 |
+
+## `[play]` 这次升级的十七样开关
+
+一行一个，填 `true` 或 `false`；默认十开七关，要先开着的那一样关着时它不起作用（启动时会说），关掉不删数据。逐样是什么见 README 的「这次升级」，名字与默认值见 [`examples/play.toml`](../examples/play.toml)，前后对照与几个口子见 [`UPGRADE.md`](UPGRADE.md)。
+
+## `[recipes]` `[dishwash]` `[jars]` `[vendor]` 各样用到的数
+
+| 键 | 默认 | 是什么 |
+|---|---|---|
+| `recipes.skilled_at` / `signature_at` | `3` / `8` | 做成几次算拿手 / 招牌 |
+| `recipes.mishap_rate_new` / `mishap_rate_skilled` | `0.1` / `0.0333…` | 生疏 / 拿手时每锅出小意外的几率（招牌不出） |
+| `recipes.new_dish_bonus` | `0.03` | 第一次吃到照谱做成的新菜多回的体力 |
+| `recipes.avoid_days` | `3.0` | 推荐避开最近几天做过的 |
+| `recipes.weather_provider` | `""` | 天气：填一个函数；留空只看钟点和季节 |
+| `dishwash.seconds_per_plate` / `break_rate` | `120` / `0.05` | 一只盘子刷几秒 / 大约多少碎一只 |
+| `jars.daily_cap` | `3` | 罐子里泡的每天最多吃几份（你喂的也算） |
+| `vendor.order_max` / `day_max` | `30` / `60` | 一单 / 一天在小贩那儿最多花多少 |
+| `vendor.wallet_url` | `""` | 你们自家的零花钱系统的地址（接口约定见 [`UPGRADE.md`](UPGRADE.md)）。填了就从那里扣，不用自带小账本。留空=自带小账本：从 0 开始，钱只由你在页面上给，给多少由你定 |
+| `vendor.wallet_token` | `""` | 调 `wallet_url` 时带的口令（要的话）。地址是 `http://` 时口令明文传输，只在本机或可信内网这样用 |
+| `vendor.wallet_provider` | `""` | 用 Python 写的钱包（`"模块:对象"`，四个口子同上）；比 `wallet_url` 优先 |
+| `vendor.talk_provider` | `""` | 扮小贩的小模型；留空只说固定台词 |

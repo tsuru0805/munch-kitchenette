@@ -1,0 +1,47 @@
+# The seventeen things the upgrade added, one switch each (see README, "这次升级", and docs/UPGRADE.md).
+# These are the defaults: ten on, seven off. A switch whose parent is off does nothing (the server says so
+# when it starts). Turning one off deletes nothing.
+[play]
+recipes_public = true      # 公共食谱
+recipes_today = true       # 今天可以试试          (needs recipes_public)
+recipe_cook = true         # 照谱开锅              (needs recipes_public)
+recipe_book = true         # 他的食谱本
+proficiency = true         # 熟练度
+mishaps = true             # 小意外                (needs proficiency)
+new_dish_bonus = true      # 新菜加成              (needs recipe_cook)
+settle_card = true         # 结算卡
+dex = true                 # 图鉴
+achievements = true        # 厨房成就              (needs dex)
+tasting_notes = false      # 试菜札记              (needs recipe_book)
+orders = false             # 点菜                  (needs recipe_cook)
+menus = false              # 一桌菜单              (needs recipe_book)
+recipe_codes = false       # 食谱码                (needs recipe_book)
+vendor = false             # 流动小贩
+dishwash = false           # 刷盘子
+seal_jars = false          # 窗台密封罐
+
+# The numbers each of them uses (these are the defaults):
+[recipes]
+skilled_at = 3             # pots made well before a dish is 拿手
+signature_at = 8           # ...and 招牌
+mishap_rate_new = 0.1      # mishap chance per pot while 生疏
+mishap_rate_skilled = 0.0333333
+new_dish_bonus = 0.03      # stamina, the first time a recipe is eaten
+avoid_days = 3.0           # "today you could try" skips what was cooked this recently
+# weather_provider = "my_weather:read"   # optional; without it only the hour and the season count
+
+[dishwash]
+seconds_per_plate = 120.0
+break_rate = 0.05
+
+[jars]
+daily_cap = 3
+
+[vendor]
+order_max = 30
+day_max = 60
+# wallet_url = "https://pocket.example.com/api"   # optional; your own pocket-money system (docs/UPGRADE.md)
+# wallet_token = "..."                            # if it wants a bearer token
+# Without wallet_url, the built-in ledger starts at 0 and the human gives pocket money from the page.
+# wallet_provider = "my_wallet:wallet"   # optional; your own pocket-money system
+# talk_provider = "my_vendor:say"        # optional; a small model playing the vendor

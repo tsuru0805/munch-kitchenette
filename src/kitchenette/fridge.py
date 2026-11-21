@@ -125,15 +125,24 @@ def hidden_freshness(item_id: str) -> bool:
 
 def all_items() -> list[dict]:
     """Everything that can be bought now: the built-in catalog plus custom kinds still offered."""
-    return list(_cfg().fridge_ingredients) + [k for k in kinds() if not k["removed"]]
+    from . import recipes
+    return list(_cfg().fridge_ingredients) + list(recipes.extra_items()) + [k for k in kinds() if not k["removed"]]
 
 
 def item(item_id: str) -> dict | None:
     """id -> kind. Removed custom kinds still resolve (batches of them may remain in a fridge)."""
     it = builtin(item_id)
-    if it is not None or not str(item_id).startswith(KIND_ID_PREFIX):
+    if it is not None:
         return it
-    return next((k for k in kinds() if k["id"] == item_id), None)
+    sid = str(item_id)
+    if sid.startswith(KIND_ID_PREFIX):
+        return next((k for k in kinds() if k["id"] == item_id), None)
+    # The upgrade's extra shop items and vendor-only things: once in a fridge they keep being
+    # recognised, whatever is switched on now.
+    from . import recipes
+    if sid.startswith("v_"):
+        return recipes.vendor_item(sid)
+    return recipes.extra_item(sid)
 
 
 def is_raw_edible(item_id: str | None) -> bool:
@@ -153,6 +162,8 @@ def catalog() -> list[dict]:
                "raw_edible": is_raw_edible(it["id"]), "custom": bool(it.get("custom"))}
         if it.get("custom"):
             row["art"] = it["art"]
+        elif builtin(it["id"]) is None:
+            row["art_pending"] = True       # an extra item added by the recipes: no picture shipped yet
         out.append(row)
     return out
 
@@ -175,16 +186,53 @@ def resolve(name: str, *, gone: bool = False) -> str | None:
     buying must not find them, but using up, eating or tossing what is left must."""
     n = (name or "").strip()
     iid = _index()[1].get(n)
+    from . import recipes
+    if iid is None and n and (gone or recipes.extra_items()):
+        iid = recipes.resolve_extra(n)
     if iid is None and n:
         ks = kinds()
         iid = next((k["id"] for k in ks if not k["removed"] and k["name"] == n), None)
         if iid is None and gone:
             iid = next((k["id"] for k in reversed(ks) if k["name"] == n), None)
+    if iid is None and n and (gone or recipes.extra_items()):
+        # A recipe ingredient outside the catalog (v_ id): sold at the shop while the public recipes
+        # are on; the few only a vendor brings are recognised only for using up, eating and tossing.
+        v = recipes.vendor_resolve(n)
+        if v is not None and (gone or not recipes.is_vendor_only(v)):
+            iid = v
     return iid
 
 
+def canon(item_id: str) -> str:
+    """One identity per thing, for comparing: a recipe ingredient (v_ id) and an ingredient kind of the
+    same name that the human added are the same thing. While that kind is offered it represents both;
+    once removed, the recipe ingredient does (its old batches count too). Anything else is itself."""
+    sid = str(item_id)
+    from . import recipes
+    if sid.startswith("v_"):
+        it = recipes.vendor_item(sid)
+        if it is None:
+            return item_id
+        v, name = sid, it["name"]
+    elif sid.startswith(KIND_ID_PREFIX):
+        k = next((k for k in kinds() if k["id"] == sid), None)
+        if k is None or not k["removed"]:
+            return item_id
+        v = recipes.vendor_resolve(k["name"])
+        if v is None:
+            return item_id
+        name = recipes.vendor_item(v)["name"]
+    else:
+        return item_id
+    k = next((k for k in kinds() if not k["removed"] and k["name"] == name), None)
+    return k["id"] if k else v
+
+
 def is_staple(name: str) -> bool:
-    return (name or "").strip() in _cfg().fridge_staple_aliases
+    if (name or "").strip() in _cfg().fridge_staple_aliases:
+        return True
+    from . import recipes
+    return recipes.is_staple_extra(name)
 
 
 _QTY_RE = re.compile(r"^(.+?)\s*[×xX*]\s*(\d+)$")
@@ -521,6 +569,15 @@ def status_text(who: str, now: float | None = None) -> str:
         lines.append(t("status_dizzy", hm=_hm(dz["until"])))
     if _cfg().satiety_enabled:
         lines.append(t("status_satiety", pct=round(ov["satiety"]["value"])))
+    # The upgrade's paragraphs (orders, today's picks, jars, sink, vendor) come after; each one that
+    # fails says so in one line and never takes the fridge paragraph down with it.
+    try:
+        from . import playkit
+        extra = playkit.status_extra(who, ov["now"])
+        if extra:
+            lines.append(extra)
+    except Exception:  # noqa: BLE001
+        log.warning("the upgrade's status paragraphs failed", exc_info=True)
     return "\n".join(lines)
 
 
@@ -530,7 +587,9 @@ def _add_batches(conn, who: str, ids: list[str], by: str, source: str, now: floa
     added = []
     for iid in ids:
         it, days = builtin(iid), None
-        if it is None:
+        if it is None and not iid.startswith(KIND_ID_PREFIX) and item(iid) is not None:
+            it = item(iid)              # an extra shop item, or a vendor-only thing
+        elif it is None:
             # Custom kinds are re-read inside this write transaction rather than trusted from the
             # cache: one removed a moment ago must not be bought (the caller rolls everything back).
             r = conn.execute("SELECT * FROM kinds WHERE id=?", (iid,)).fetchone()
@@ -624,7 +683,8 @@ def _box_cooked(conn, who: str, ids: list[str], days: set[str]) -> bool:
         except ValueError:
             continue
         for u in used:
-            if u.get("item_id") in ids and u.get("bought_at") and bought_md(float(u["bought_at"])) in days:
+            if (u.get("item_id") and canon(u["item_id"]) in ids and u.get("bought_at")
+                    and bought_md(float(u["bought_at"])) in days):
                 return True
     return False
 
@@ -651,8 +711,8 @@ def toss_self(who: str, text: str, *, key: str, now: float | None = None) -> str
         iid = resolve(n, gone=True)
         if iid is None:
             unknown.append(n)
-        elif iid not in ids:
-            ids.append(iid)
+        elif canon(iid) not in ids:
+            ids.append(canon(iid))
     if unknown:
         raise FridgeError(t("toss_unknown", names="、".join(unknown)), "unknown_item")
     conn = _conn()
@@ -665,7 +725,7 @@ def toss_self(who: str, text: str, *, key: str, now: float | None = None) -> str
         batches = _batches(conn, who, now)
         hit = [b for b in batches
                if (b["freshness"] == BAD and not hidden_freshness(b["item_id"]) if want_bad
-                   else b["item_id"] in ids)
+                   else canon(b["item_id"]) in ids)
                and (not days or bought_md(b["bought_at"]) in days)]
         if not hit:
             used_up = bool(days and ids) and _box_cooked(conn, who, ids, days)
@@ -818,6 +878,7 @@ def take_in_tx(conn, who: str, wanted: list[tuple[str, int]], now: float | None 
         if iid is None:
             unknown.append(name)
             continue
+        iid = canon(iid)                # a recipe ingredient and a kind of the same name are one thing
         need[iid] = need.get(iid, 0) + n
     if unknown:
         raise FridgeError(t("take_unknown", names="、".join(unknown), catalog=catalog_names()), "unknown_item")
@@ -827,7 +888,7 @@ def take_in_tx(conn, who: str, wanted: list[tuple[str, int]], now: float | None 
     short = []
     plan: list[tuple[dict, int]] = []
     for iid, n in need.items():
-        mine = [b for b in batches if b["item_id"] == iid]
+        mine = [b for b in batches if canon(b["item_id"]) == iid]
         if hidden_freshness(iid):
             mine.sort(key=lambda b: b["bought_at"])          # cannot tell good from bad: oldest box first
         else:

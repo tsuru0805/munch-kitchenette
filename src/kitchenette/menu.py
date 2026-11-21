@@ -356,6 +356,8 @@ def _eat_locked(who: str, meal: str, note: str, *, key: str | None, now: float |
         lines.append(t("eat_satiety", before=round(before), after=round(after), state=state))
     if detail and detail.get("raw_receipt"):
         lines.append(detail["raw_receipt"])
+    if detail and detail.get("extra"):
+        lines.extend(detail["extra"])
     if hits:
         for d in hits:
             lines.append(t("eat_crossed", dish=d["dish"])

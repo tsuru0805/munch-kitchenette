@@ -1,0 +1,284 @@
+{
+ "note": "Which icon a dish name gets: rules from the top, the first keyword found in the name wins; nothing found = the fallback.",
+ "kinds": [
+  "stirfry",
+  "soup",
+  "noodles",
+  "donburi",
+  "friedrice",
+  "friedegg",
+  "fish",
+  "meat",
+  "steamer",
+  "bake",
+  "salad",
+  "dessert",
+  "drink",
+  "bowl"
+ ],
+ "rules": {
+  "match": "子串包含,不分大小写;ordered 从上往下第一条命中即返回",
+  "fallback": "bowl",
+  "ordered": [
+   {
+    "category": "bake",
+    "why": "整词例外:含「面」「粉」但是面包类",
+    "keywords": [
+     "面包",
+     "吐司",
+     "贝果",
+     "司康",
+     "可颂",
+     "欧包",
+     "法棍",
+     "披萨",
+     "比萨",
+     "面饼"
+    ]
+   },
+   {
+    "category": "dessert",
+    "why": "整词例外",
+    "keywords": [
+     "汤圆",
+     "冰粉",
+     "藕粉",
+     "糖水",
+     "西米露",
+     "红豆沙"
+    ]
+   },
+   {
+    "category": "steamer",
+    "why": "整词例外",
+    "keywords": [
+     "汤包",
+     "肠粉",
+     "粉蒸",
+     "煎饺",
+     "锅贴"
+    ]
+   },
+   {
+    "category": "donburi",
+    "why": "整词例外",
+    "keywords": [
+     "拌饭",
+     "茶泡饭",
+     "煲仔饭",
+     "汤泡饭"
+    ]
+   },
+   {
+    "category": "salad",
+    "why": "整词例外",
+    "keywords": [
+     "凉粉",
+     "凉皮"
+    ]
+   },
+   {
+    "category": "stirfry",
+    "why": "整词例外:不是鱼",
+    "keywords": [
+     "鱼香"
+    ]
+   },
+   {
+    "category": "meat",
+    "why": "整词例外:不是饮料",
+    "keywords": [
+     "可乐鸡"
+    ]
+   },
+   {
+    "category": "friedegg",
+    "keywords": [
+     "煎蛋",
+     "荷包蛋",
+     "太阳蛋"
+    ]
+   },
+   {
+    "category": "friedrice",
+    "keywords": [
+     "炒饭",
+     "抓饭",
+     "蛋包饭"
+    ]
+   },
+   {
+    "category": "noodles",
+    "keywords": [
+     "面",
+     "粉",
+     "乌冬",
+     "米线",
+     "意面",
+     "荞麦",
+     "拉面",
+     "udon",
+     "ramen",
+     "pasta"
+    ]
+   },
+   {
+    "category": "dessert",
+    "keywords": [
+     "蛋糕",
+     "布丁",
+     "甜品",
+     "甜点",
+     "冰淇淋",
+     "雪糕",
+     "慕斯",
+     "提拉米苏",
+     "双皮奶",
+     "芋圆",
+     "奶冻",
+     "果冻",
+     "蛋挞",
+     "舒芙蕾",
+     "曲奇",
+     "饼干",
+     "泡芙",
+     "大福",
+     "团子",
+     "羊羹",
+     "圣代",
+     "松饼",
+     "可丽饼"
+    ]
+   },
+   {
+    "category": "drink",
+    "keywords": [
+     "茶",
+     "咖啡",
+     "拿铁",
+     "果汁",
+     "奶昔",
+     "汽水",
+     "可乐",
+     "豆浆",
+     "可可",
+     "酒",
+     "饮",
+     "柠檬水",
+     "苏打",
+     "椰奶"
+    ]
+   },
+   {
+    "category": "donburi",
+    "keywords": [
+     "盖饭",
+     "丼",
+     "盖浇",
+     "咖喱饭",
+     "饭"
+    ]
+   },
+   {
+    "category": "soup",
+    "keywords": [
+     "汤",
+     "羹",
+     "味噌",
+     "浓汤",
+     "煲汤"
+    ]
+   },
+   {
+    "category": "salad",
+    "keywords": [
+     "凉拌",
+     "拌",
+     "沙拉",
+     "色拉",
+     "拍黄瓜",
+     "凉菜",
+     "泡菜",
+     "腌"
+    ]
+   },
+   {
+    "category": "steamer",
+    "keywords": [
+     "包子",
+     "饺",
+     "烧卖",
+     "烧麦",
+     "小笼",
+     "馒头",
+     "花卷",
+     "点心"
+    ]
+   },
+   {
+    "category": "stirfry",
+    "keywords": [
+     "炒",
+     "爆",
+     "煸",
+     "小炒"
+    ]
+   },
+   {
+    "category": "fish",
+    "keywords": [
+     "鱼",
+     "鲑",
+     "三文",
+     "鳕",
+     "鲈",
+     "鳗",
+     "金枪",
+     "虾",
+     "蟹",
+     "贝",
+     "鱿",
+     "海鲜",
+     "刺身"
+    ]
+   },
+   {
+    "category": "meat",
+    "keywords": [
+     "鸡腿",
+     "鸡翅",
+     "排骨",
+     "牛排",
+     "猪排",
+     "肉排",
+     "炸鸡",
+     "烤肉",
+     "叉烧",
+     "五花",
+     "肉",
+     "鸡",
+     "牛",
+     "猪",
+     "羊",
+     "鸭"
+    ]
+   },
+   {
+    "category": "steamer",
+    "why": "上面都没中才按做法归",
+    "keywords": [
+     "蒸"
+    ]
+   },
+   {
+    "category": "bake",
+    "why": "上面都没中才按做法归",
+    "keywords": [
+     "烤",
+     "焗",
+     "烘"
+    ]
+   }
+  ]
+ }
+}

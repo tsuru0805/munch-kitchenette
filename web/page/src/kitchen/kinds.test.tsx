@@ -131,6 +131,15 @@ test("a tile on the grocery sheet: an added kind that is drawn = the server's pi
   await act(async () => r.unmount());
 });
 
+test("a built-in kind the page has no picture for (a recipe ingredient outside the bundled ones) shows the first character too, never an empty box", async () => {
+  catalog = [TOMATO, { id: "bamboo_shoot", name: "竹笋", category: "veg", pack_qty: 1, shelf_days: 4, raw_edible: false, custom: false }];
+  const r = await mount();
+  expect(has(r, "buy-ch-bamboo_shoot")).toBe(true);
+  expect(texts(r)).toContain("竹");
+  expect(has(r, "buy-ch-tomato")).toBe(false);   // a bundled picture: no character
+  await act(async () => r.unmount());
+});
+
 test("adding a kind: a name and \"fruit\" -> added (the right request body) -> the form is cleared and the catalog read again; back to buying", async () => {
   const r = await mount();
   expect(has(r, "kind-form")).toBe(false);

@@ -26,6 +26,9 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "check":
             print(config.dump(config.load(args.config)), end="")
+            from . import play
+            for line in play.startup_lines():   # a switch on under a parent that is off does nothing
+                print(line, file=sys.stderr)
             return 0
         if args.command in (None, "serve"):
             cfg = config.load(getattr(args, "config", None))
@@ -33,6 +36,9 @@ def main(argv: list[str] | None = None) -> int:
                 config.override(server_host=args.host)
             if getattr(args, "port", None):
                 config.override(server_port=args.port)
+            from . import play
+            for line in play.startup_lines():
+                print(line, file=sys.stderr)
     except config.ConfigError as e:
         # a settings mistake is the user's to fix: say which one and what it takes, no traceback
         for line in e.lines():

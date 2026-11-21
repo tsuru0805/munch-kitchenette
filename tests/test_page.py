@@ -24,6 +24,8 @@ def built(tmp_path, monkeypatch):
     (page / "index.html").write_text("<!doctype html><title>Kitchenette</title>", encoding="utf-8")
     (page / "_expo" / "static" / "js" / "web" / "index-abc.js").write_text("console.log(1)", encoding="utf-8")
     (page / "fonts" / "a.woff2").write_bytes(b"wOF2")
+    (page / "assets").mkdir()
+    (page / "assets" / "base_day.abc.webp").write_bytes(b"RIFF\x00\x00\x00\x00WEBP")
     (tmp_path / "secret.txt").write_text("not part of the page", encoding="utf-8")
     monkeypatch.setattr(api, "PAGE_DIR", page)
     return page
@@ -53,6 +55,7 @@ def test_files_of_the_page_and_how_long_they_may_be_kept(built):
     assert "immutable" in js.headers["cache-control"]          # its name carries a hash of its content
     assert c.get("/page/index.html").headers["cache-control"] == "no-cache"
     assert c.get("/page/fonts/a.woff2").headers["content-type"] == "font/woff2"
+    assert c.get("/page/assets/base_day.abc.webp").headers["content-type"] == "image/webp"   # whatever the system's table says
     assert c.get("/page/index.html").headers["x-content-type-options"] == "nosniff"
 
 

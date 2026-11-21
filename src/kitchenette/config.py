@@ -236,10 +236,71 @@ class Settings:
     # ── [art] ───────────────────────────────────────────────────────────
     art_provider: str = ""                 # "package.module:callable"; empty = text cards only
     art_dir: str = "art"
+    # Pictures for the dish book: "package.module:callable" drawing one dish; empty = a placeholder.
+    art_dish_provider: str = ""
+
+    # ── [play] ──────────────────────────────────────────────────────────
+    # The seventeen things added in the upgrade, one switch each (see docs/UPGRADE.md). A switch that is
+    # off means the thing is not installed: its markers are plain text, nothing teaches it, the page
+    # hides it, and asking for it directly says it is off. Turning one off never deletes anything.
+    # A switch whose parent is off counts as off. Defaults: ten on, seven off.
+    play_recipes_public: bool = True       # the public recipe book (300-odd home dishes)
+    play_recipes_today: bool = True        # "today you could try" in the kitchen status
+    play_recipe_cook: bool = True          # open a pot by a recipe id; buy what a recipe lacks at once
+    play_recipe_book: bool = True          # the role's own recipe pages
+    play_proficiency: bool = True          # new → practised → signature
+    play_mishaps: bool = True              # small mishaps while a hand is still new
+    play_new_dish_bonus: bool = True       # a little extra stamina the first time a new dish is eaten
+    play_settle_card: bool = True          # the cooking card turns into a settled still when done
+    play_dex: bool = True                  # the dish book: one page per dish made
+    play_achievements: bool = True         # quiet kitchen achievements
+    play_tasting_notes: bool = False       # one line after cooking from a page
+    play_orders: bool = False              # the human orders a dish from a recipe
+    play_menus: bool = False               # several dishes put together as one meal
+    play_recipe_codes: bool = False        # share a page as a string of characters
+    play_vendor: bool = False              # street vendors who come by now and then
+    play_dishwash: bool = False            # plates: a dishwasher, or the role washes them
+    play_seal_jars: bool = False           # jars on the sill: fruit and vegetables turn into treats
+
+    # ── [recipes] ───────────────────────────────────────────────────────
+    recipes_skilled_at: int = 3            # pots made well before a dish counts as practised...
+    recipes_signature_at: int = 8          # ...and as a signature dish
+    recipes_mishap_rate_new: float = 0.10  # chance of a mishap per pot while a dish is new
+    recipes_mishap_rate_skilled: float = 1 / 30   # ...once practised (a signature dish has none)
+    recipes_new_dish_bonus: float = 0.03   # stamina added the first time a dish cooked by a recipe is eaten
+    recipes_avoid_days: float = 3.0        # "today you could try" skips dishes cooked this recently
+    # "package.module:callable" returning {"rain": bool | None, "temp_c": float | None} for now;
+    # empty = recommendations look only at the hour and the season.
+    recipes_weather_provider: str = ""
+
+    # ── [dishwash] ──────────────────────────────────────────────────────
+    dishwash_seconds_per_plate: float = 120.0
+    dishwash_break_rate: float = 0.05      # about one plate in twenty breaks
+
+    # ── [jars] ──────────────────────────────────────────────────────────
+    jars_daily_cap: int = 3                # servings from the jars per day (the human feeding shares it)
+
+    # ── [vendor] ────────────────────────────────────────────────────────
+    vendor_order_max: int = 30             # most one order may cost
+    vendor_day_max: int = 60               # most the role may spend at the vendors in one day
+    # Pocket money comes from one of two places (docs/UPGRADE.md):
+    # 1. your own pocket-money system over HTTP: wallet_url (+ wallet_token for a bearer token). Orders are
+    #    charged there, and the built-in ledger is not used;
+    # 2. otherwise the small ledger in the kitchen's database. It starts at 0 and nothing is paid into it by
+    #    itself: the human gives pocket money from the page, as much as they like, whenever they like, and
+    #    the role is told.
+    vendor_wallet_url: str = ""
+    vendor_wallet_token: str = ""
+    # "package.module:object" with debit / lookup / void / balance (docs/UPGRADE.md); empty = the
+    # small ledger kept in the kitchen's own database.
+    vendor_wallet_provider: str = ""
+    # "package.module:callable" that plays the vendor: (system, history, line) -> one sentence.
+    # Empty = the vendors only say their fixed lines.
+    vendor_talk_provider: str = ""
 
 
 _SECTIONS = ("server", "roles", "words", "inline", "fridge", "satiety", "kitchen", "snacks", "stamina",
-             "coupons", "notify", "art")
+             "coupons", "notify", "art", "play", "recipes", "dishwash", "jars", "vendor")
 _FIELDS = {f.name: f for f in fields(Settings)}
 
 _current: Settings = Settings()
@@ -317,6 +378,10 @@ _RANGES: dict[str, tuple[float | None, float | None]] = {
     "stamina_tau_hours": (0.01, None), "stamina_init": (0, 1), "stamina_cost_base": (0, 1),
     "stamina_cost_per_kind": (0, 1), "stamina_cost_cap": (0, 1), "stamina_recharge_cap": (0, 1),
     "stamina_auto_round_seconds": (0, None),
+    "recipes_skilled_at": (1, None), "recipes_signature_at": (1, None), "recipes_mishap_rate_new": (0, 1),
+    "recipes_mishap_rate_skilled": (0, 1), "recipes_new_dish_bonus": (0, 1), "recipes_avoid_days": (0, None),
+    "dishwash_seconds_per_plate": (1, None), "dishwash_break_rate": (0, 1), "jars_daily_cap": (0, 20),
+    "vendor_order_max": (1, None), "vendor_day_max": (1, None), 
 }
 # table settings whose values are numbers: name -> (lowest, highest)
 _TABLE_RANGES: dict[str, tuple[float | None, float | None]] = {
@@ -426,6 +491,13 @@ def _validate(s: Settings) -> None:
     if s.kitchen_minutes_max < s.kitchen_minutes_min:
         raise _bad("kitchen_minutes_max", s.kitchen_minutes_max, "must not be smaller than minutes_min",
                    "不能比 minutes_min 小")
+    if s.vendor_wallet_url and not s.vendor_wallet_url.startswith(("http://", "https://")):
+        # the address may carry a secret (a key in the path or the query): only its first characters are shown
+        raise _bad("vendor_wallet_url", s.vendor_wallet_url[:8] + "…",
+                   "expected an address starting with http:// or https://", "要填 http:// 或 https:// 开头的地址")
+    if s.recipes_signature_at < s.recipes_skilled_at:
+        raise _bad("recipes_signature_at", s.recipes_signature_at, "must not be smaller than skilled_at",
+                   "不能比 skilled_at 小")
     if s.snacks_cap_max < s.snacks_cap_min:
         raise _bad("snacks_cap_max", s.snacks_cap_max, "must not be smaller than cap_min", "不能比 cap_min 小")
     if s.satiety_init > s.satiety_max:

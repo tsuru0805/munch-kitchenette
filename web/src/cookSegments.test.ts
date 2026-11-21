@@ -108,6 +108,6 @@ test("assets: both outfits x (wash + chop + seven parts for each of seven method
   const missing: string[] = [];
   for (const o of ["toque", "scarf"] as const) for (const s of segs) if (CLAWD_MANIFEST.files[assetKey(o, s)] === undefined) missing.push(`${o}/${s}`);
   expect(missing).toEqual([]);
-  expect(Object.keys(CLAWD_MANIFEST.files)).toHaveLength(2 * segs.length);
+  expect(Object.keys(CLAWD_MANIFEST.files).filter((k) => !k.includes("settle_") && !k.startsWith("dishes/") && !/\/(vendor|dish|machine)_/.test(k))).toHaveLength(2 * segs.length);
   expect(hashStr("a")).toBe(hashStr("a"));
 });

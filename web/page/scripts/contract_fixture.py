@@ -23,6 +23,10 @@ def main() -> None:
         s.server_db_path = os.path.join(tmp, "contract.db")
         s.server_timezone = "Asia/Tokyo"
         s.art_dir = os.path.join(tmp, "art")
+        from kitchenette import play
+        defaults = {k: getattr(s, f"play_{k}") for k in play.KEYS}
+        for k in play.KEYS:                  # the answers from before the upgrade: every switch off
+            setattr(s, f"play_{k}", False)
         config.use(s)
         c = TestClient(api.create_app(scheduler=False, with_mcp=False))
         get = lambda path, **params: c.get(path, params=params).json()   # noqa: E731
@@ -55,6 +59,38 @@ def main() -> None:
         out["fridge_off"] = get("/api/fridge", who=WHO)
         out["potions_off"] = get("/api/potions", who=WHO)
         out["snacks_off"] = get("/api/snacks", who=WHO)
+
+        # The upgrade: every switch on (vendors, plates and jars too), one of each thing to read
+        import random
+
+        from kitchenette import vendor
+        config.override(stamina_enabled=True, satiety_enabled=True, **{f"play_{k}": True for k in play.KEYS})
+        out["features"] = get("/api/features")
+        c.post("/api/orders", json={"who": WHO, "recipe": "hc-e0a19bc9"})
+        from kitchenette import inline
+        fridge.buy_her(WHO, ["egg", "apple"])
+        inline.execute(WHO, "[收藏 蒸水蛋]\n[记菜 拌黄瓜 黄瓜 拌 5 | 夏天吃]\n[封罐 苹果 冰糖 | 给冬天]", "m1")
+        tools.call("kitchen_cook", {"dish": "蒸水蛋", "minutes": 5, "ingredients": ["鸡蛋"], "recipe": "hc-e0a19bc9"}, WHO)
+        service.fast_forward(600)
+        menu.eat(WHO, "蒸水蛋")
+        out["recipes"] = get("/api/recipes", who=WHO, q="鸡蛋", limit=3)
+        out["book"] = get("/api/book", who=WHO)
+        out["orders"] = get("/api/orders", who=WHO)
+        out["dex"] = get("/api/dex", who=WHO)
+        out["dishes"] = get("/api/dishes", who=WHO)
+        out["jars"] = get("/api/jars", who=WHO)
+        conn = __import__("kitchenette.db", fromlist=["x"]).connect()
+        now = __import__("kitchenette.clock", fromlist=["x"]).now()
+        conn.execute("INSERT INTO vendor_visits (id, day, slot, vendor, arrive_at, leave_at, goods_json, created_at)"
+                     " VALUES (?,?,?,?,?,?,?,?)", ("v1", vendor.kitchen_day(now), 0, "tanghulu", now, now + 3000,
+                                                   json.dumps(vendor.stock_goods(conn, "tanghulu", now, random.Random(1)),
+                                                              ensure_ascii=False), now))
+        conn.commit()
+        conn.close()
+        out["vendor"] = get("/api/vendor", who=WHO)
+        out["about_play"] = get("/api/about")
+        config.override(**{f"play_{k}": v for k, v in defaults.items()})
+        out["features_default"] = get("/api/features")
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, indent=1, sort_keys=True)

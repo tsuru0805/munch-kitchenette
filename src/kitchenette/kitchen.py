@@ -99,6 +99,17 @@ def _settle_due(conn: sqlite3.Connection, who: str) -> None:
         conn.execute("UPDATE cook_sessions SET outcome=? WHERE id=? AND outcome IS NULL",
                      (fridge.decide_outcome(r["id"], _ingredients(r)), r["id"]))
     conn.commit()
+    # The upgrade: each pot served from now on gets its settlement, once (proficiency, orders,
+    # achievements). A failure here never undoes the serving; the next read tries again.
+    try:
+        from . import progress
+        progress.settle_due(conn, who, now)
+    except Exception:  # noqa: BLE001
+        log.warning("settling a served pot failed (tried again on the next read)", exc_info=True)
+        try:
+            conn.rollback()
+        except Exception:  # noqa: BLE001
+            pass
 
 
 def _ingredients(r) -> list[dict]:
@@ -211,6 +222,11 @@ def _card_entry(r: sqlite3.Row | dict) -> dict:
 # ── tool schemas ────────────────────────────────────────────────────────
 
 def tool_schemas() -> list[dict]:
+    from . import playkit
+    return playkit.adjust_cook_schema(_base_tool_schemas()) + playkit.browse_schema()
+
+
+def _base_tool_schemas() -> list[dict]:
     lo, hi = _cfg().kitchen_minutes_min, _cfg().kitchen_minutes_max
     return [
         {
@@ -313,11 +329,20 @@ def _exec_cook_locked(collector: list | None, args: dict, who: str) -> tuple[str
     method = resolve_method(args.get("method"), dish)
     if method is None:
         return t("cook_method_bad", labels=" / ".join(METHOD_LABELS), got=str(args.get("method"))[:10]), True
+    from . import play
+    from .texts_play import tp
+    raw_recipe = str(args.get("recipe") or "").strip()
+    if raw_recipe and not play.on("recipe_cook"):
+        return tp("feature_off"), True
     try:
         conn = _conn()
     except Exception as e:  # noqa: BLE001
         return t("cook_db_open", err=type(e).__name__), True
     used: list[dict] = []
+    recipe = None
+    link = "free"
+    changed_missing: list[str] = []
+    egg_note = ""
     try:
         _settle_due(conn, who)
         now = _now()
@@ -330,14 +355,47 @@ def _exec_cook_locked(collector: list | None, args: dict, who: str) -> tuple[str
                     collector.append(_card_entry(r))
                 return t("cook_already", dish=dish, started=_hm(r["started_at"]),
                          remain=_fmt_remaining(remain)), False
+        if raw_recipe:
+            # Cooking by a recipe: the ingredients are still exactly what the role wrote; the recipe
+            # is only compared with them. An id that is not found opens nothing.
+            from . import book, recipes
+            recipe = book.resolve_ref(conn, who, raw_recipe)
+            if recipe is None:
+                return tp("cook_no_recipe"), True
+            if recipe.get("kind") == "menu":
+                return tp("cook_menu", name=recipe["name"]), True
+            want_ids: dict[str, int] = {}
+            for nm, n in wanted:
+                if fridge.is_staple(nm):
+                    continue
+                iid = fridge.resolve(nm, gone=True)
+                if iid:
+                    want_ids[iid] = want_ids.get(iid, 0) + n
+            changed_missing = recipes.covers(recipe["main"], want_ids)
+            link = "changed" if changed_missing else "follow"
+            if not str(args.get("method") or "").strip():
+                method = recipe["method"]
+        guard = False
+        if play.on("proficiency"):
+            from . import progress
+            guard = progress.tier_now(conn, who, link, recipe["identity"] if recipe else None, dish) != "生疏"
         sid = uuid.uuid4().hex
         conn.execute("BEGIN IMMEDIATE")
         try:
+            conn.execute("SAVEPOINT play_cook")
             used = fridge.take_in_tx(conn, who, wanted, now)
             # A hidden-freshness item that turns out spoiled ruins the pot on the spot:
             # the ingredients are gone, nothing is served, nothing reaches the menu.
             bad_eggs = [u for u in used
                         if fridge.hidden_freshness(u["item_id"]) and u["freshness"] == fridge.BAD]
+            if bad_eggs and guard:
+                # A practised hand cracks each egg into a bowl first: only the bad ones are thrown away.
+                used, egg_note, fail = _egg_guard(conn, who, used, now)
+                if fail is not None:
+                    conn.commit()
+                    return fail, True
+                bad_eggs = []
+            conn.execute("RELEASE play_cook")
             conn.execute(
                 "INSERT INTO cook_sessions (id, who, dish, note, duration_seconds,"
                 " started_at, status, created_at, ingredients_json, outcome, served_at, method)"
@@ -347,9 +405,16 @@ def _exec_cook_locked(collector: list | None, args: dict, who: str) -> tuple[str
                  "ruined" if bad_eggs else None, now if bad_eggs else None, method))
             if bad_eggs:
                 fridge._log(conn, who, "ruined", t("log_ruined", dish=dish), now)
+            if play.any_on("recipe_cook", "proficiency", "mishaps", "orders", "settle_card", "dex"):
+                from . import progress
+                progress.on_cook_start(conn, who=who, sid=sid, dish=dish, method=method, recipe=recipe,
+                                       link=link, ruined=bool(bad_eggs), now=now)
         except fridge.FridgeError as fe:
             conn.rollback()
-            return fe.text, True
+            text = fe.text
+            if recipe is not None and fe.code == "short":
+                text += _recipe_short_suffix(conn, who, recipe, now)
+            return text, True
         except Exception:
             conn.rollback()
             raise
@@ -369,9 +434,77 @@ def _exec_cook_locked(collector: list | None, args: dict, who: str) -> tuple[str
              served=_hm(now + minutes * 60), used=_used_text(used))
     if n_on > 1:
         text += t("cook_ok_count", n=n_on)
+    if egg_note:
+        text += egg_note
+    if recipe is not None and link == "changed":
+        from . import recipes
+        from .texts import markers_on
+        text += tp("cook_changed" if markers_on() else "cook_changed_tools", name=recipe["name"],
+                   missing="、".join(recipes.item_name(i) for i in changed_missing))
     if collector is not None:
         collector.append(_card_entry(row))
     return text, False
+
+
+def _recipe_short_suffix(conn, who: str, recipe: dict, now: float) -> str:
+    """Not enough in the fridge while cooking by a recipe: also say what that recipe still lacks."""
+    try:
+        from . import recipes
+        from .texts_play import tp
+        short = recipes.feasibility([recipe["main"]], recipes.fridge_snapshot(fridge._batches(conn, who, now)))["short"]
+        return tp("cook_recipe_short", name=recipe["name"], missing=recipes.short_text(short)) if short else ""
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def _egg_guard(conn, who: str, used: list[dict], now: float) -> tuple[list[dict], str, str | None]:
+    """A bad egg met by a practised hand: the bad ones already cracked are thrown away (not put back),
+    as many are taken again, and again while those are bad, until the eggs are good or there are none.
+    Enough -> (new list used, sentence, None). Not enough -> back to before the pot (everything else
+    restored), only the cracked bad eggs are gone, one log line -> (used, "", refusal). The caller commits."""
+    from .texts_play import tp
+
+    def bad(u):
+        return fridge.hidden_freshness(u["item_id"]) and u["freshness"] == fridge.BAD
+    nth = 1
+    for u in used:
+        if not fridge.hidden_freshness(u["item_id"]):
+            continue
+        if bad(u):
+            break
+        nth += u["qty"]
+    opened_bad = [u for u in used if bad(u)]
+    good = [u for u in used if not bad(u)]
+    need = sum(u["qty"] for u in opened_bad)
+    egg_name = fridge.item(opened_bad[0]["item_id"])["name"]
+    while need > 0:
+        try:
+            more = fridge.take_in_tx(conn, who, [(egg_name, need)], now)
+        except fridge.FridgeError:
+            conn.execute("ROLLBACK TO play_cook")
+            for u in opened_bad:
+                conn.execute("UPDATE batches SET qty=qty-? WHERE id=? AND who=?", (u["qty"], u["batch_id"], who))
+            conn.execute("DELETE FROM batches WHERE who=? AND qty<=0", (who,))
+            conn.execute("RELEASE play_cook")
+            fridge._log(conn, who, "egg_tossed", tp("log_egg_tossed_none", n=sum(u["qty"] for u in opened_bad)), now)
+            return used, "", tp("egg_no_spare")
+        newbad = [u for u in more if bad(u)]
+        good += [u for u in more if not bad(u)]
+        opened_bad += newbad
+        need = sum(u["qty"] for u in newbad)
+    n_bad = sum(u["qty"] for u in opened_bad)
+    first = opened_bad[0]
+    left = conn.execute("SELECT COALESCE(SUM(qty),0) FROM batches WHERE id=? AND who=?",
+                        (first["batch_id"], who)).fetchone()[0]
+    box = fridge.bought_md(float(first["bought_at"]))
+    fridge._log(conn, who, "egg_tossed", tp("log_egg_tossed", n=n_bad), now)
+    note = (tp("egg_saved", nth=nth, box=box, left=int(left)) if n_bad == 1
+            else tp("egg_saved_many", n=n_bad, box=box, left=int(left)))
+    merged: dict[str, dict] = {}
+    for u in good:
+        k = u["batch_id"]
+        merged[k] = {**merged[k], "qty": merged[k]["qty"] + u["qty"]} if k in merged else dict(u)
+    return list(merged.values()), note, None
 
 
 def ruined_text(dish: str, now: float, used: list[dict], box_md: str, left: int) -> str:
@@ -469,6 +602,9 @@ def _exec_cancel(args: dict, who: str) -> tuple[str, bool]:
         cur = conn.execute(
             "UPDATE cook_sessions SET status='cancelled', cancelled_at=?"
             " WHERE id=? AND status='cooking'", (now, target["id"]))
+        if cur.rowcount == 1:
+            from . import progress
+            progress.on_cancel(conn, target["id"], now)
         conn.commit()
         if cur.rowcount != 1:
             return t("cancel_too_late", dish=target["dish"]), True
@@ -484,12 +620,16 @@ def local_tools(collector: list | None = None, who: str | None = None) -> dict:
     None means pots still open, just without a card. An invalid role gets no tools."""
     if not roles.valid(who):
         return {}
-    return {
+    from . import playkit
+    out = {
         TOOL_COOK: lambda args: _exec_cook(collector, args or {}, who),
         TOOL_STATUS: lambda args: _exec_status(args or {}, who),
         TOOL_CANCEL: lambda args: _exec_cancel(args or {}, who),
         TOOL_TOSS: lambda args: _exec_toss(args or {}, who),
     }
+    if playkit.browse_schema():
+        out[playkit.TOOL_BROWSE] = lambda args: playkit.browse(who, args or {})
+    return out
 
 
 # ── what the page reads ─────────────────────────────────────────────────
@@ -504,7 +644,16 @@ def overview(who: str | None = None, session_id: str | None = None) -> dict:
             if r is not None:
                 _settle_due(conn, r["who"])
                 r = conn.execute("SELECT * FROM cook_sessions WHERE id=?", (session_id,)).fetchone()
-            return {"now": now, "timezone": _cfg().server_timezone, "session": _row_dict(r, now) if r else None}
+            out = {"now": now, "timezone": _cfg().server_timezone, "session": _row_dict(r, now) if r else None}
+            if r is not None:
+                from . import play, progress
+                if play.on("settle_card"):
+                    try:
+                        out["settlement"] = progress.card(conn, session_id)
+                    except Exception:  # noqa: BLE001
+                        log.warning("reading the settled card failed", exc_info=True)
+                        out["settlement"] = {"has": False, "why": "error"}
+            return out
         roles.check(who)
         _settle_due(conn, who)
         on = _cooking_rows(conn, who)
@@ -579,10 +728,26 @@ def menu_note(s: dict) -> str:
     return " · ".join(parts)
 
 
+def served_extra(s: dict) -> str:
+    """The upgrade's sentences after "your dish is ready" (a mishap, a tier change); empty when off."""
+    if not s.get("id"):
+        return ""
+    try:
+        from . import progress
+        return "".join(progress.served_lines(s["id"]))
+    except Exception:  # noqa: BLE001
+        log.warning("the sentences after serving could not be read", exc_info=True)
+        return ""
+
+
 def served_event_payload(s: dict, menu_ok: bool) -> dict:
-    return {"dish": s["dish"], "started_hm": _hm(s["started_at"]),
-            "minutes": str(s["duration_seconds"] // 60), "menu_ok": "1" if menu_ok else "0",
-            "outcome": s.get("outcome") or ""}
+    out = {"dish": s["dish"], "started_hm": _hm(s["started_at"]),
+           "minutes": str(s["duration_seconds"] // 60), "menu_ok": "1" if menu_ok else "0",
+           "outcome": s.get("outcome") or ""}
+    extra = served_extra(s)
+    if extra:
+        out["extra"] = extra[:160]
+    return out
 
 
 def process_due(*, find_menu, add_menu, wake, float_event, in_quiet: bool, busy,
@@ -937,7 +1102,8 @@ def can_eat(who: str, meal: str, now: float | None = None) -> dict:
             return {"ok": False, "why": "cooking",
                     "text": t("eat_cooking", meal=meal, hm=_hm(fire["started_at"] + fire["duration_seconds"]))}
         iid = fridge.resolve(meal, gone=True)
-        if fridge.is_raw_edible(iid) and any(b["item_id"] == iid for b in fridge._batches(conn, who, now)):
+        if fridge.is_raw_edible(iid) and any(fridge.canon(b["item_id"]) == fridge.canon(iid)
+                                             for b in fridge._batches(conn, who, now)):
             conn.commit()
             return {"ok": True, "why": "raw", "text": ""}
         conn.commit()
@@ -1002,12 +1168,16 @@ def eat_detail(who: str, meal: str, *, key: str, by_her: bool = False, now: floa
             if sess_id is not None:
                 conn.execute("UPDATE cook_sessions SET eaten_at=? WHERE id=? AND eaten_at IS NULL",
                              (now, sess_id))
+            from . import playkit
+            extra_lines = playkit.on_eat_in_tx(conn, who, sess_id=sess_id, outcome=outcome, meal=meal, key=key,
+                                               raw=raw_taken is not None, by_human=by_her, now=now)
         except Exception:
             conn.rollback()
             raise
         left = None
         if raw_taken is not None:
-            left = sum(b["qty"] for b in fridge._batches(conn, who, now) if b["item_id"] == raw_taken["item_id"])
+            same = fridge.canon(raw_taken["item_id"])
+            left = sum(b["qty"] for b in fridge._batches(conn, who, now) if fridge.canon(b["item_id"]) == same)
         conn.commit()
     finally:
         conn.close()
@@ -1025,7 +1195,8 @@ def eat_detail(who: str, meal: str, *, key: str, by_her: bool = False, now: floa
             stamina.pulse(who, delta, now=now, rule=f"kitchen:{outcome}")
         except Exception:  # noqa: BLE001
             log.warning("stamina difference for a kitchen dish was not recorded", exc_info=True)
-    return {"outcome": outcome, "session_id": sess_id, "raw": raw_taken, "raw_receipt": raw_receipt}
+    return {"outcome": outcome, "session_id": sess_id, "raw": raw_taken, "raw_receipt": raw_receipt,
+            "extra": extra_lines}
 
 
 def on_eat(who: str, meal: str, *, key: str, by_her: bool = False, now: float | None = None) -> str | None:

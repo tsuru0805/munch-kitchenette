@@ -169,9 +169,9 @@ export function BuySheet({
                             <ArtImage
                               art={art}
                               style={st.img}
-                              fallback={it.custom ? (
-                                <Text style={[st.tileCh, { fontSize: tileW * 0.4, lineHeight: tileW - 8 }]}>{Array.from(it.name)[0]}</Text>
-                              ) : null}
+                              fallback={
+                                <Text style={[st.tileCh, { fontSize: tileW * 0.4, lineHeight: tileW - 8 }]} testID={`buy-ch-${it.id}`}>{Array.from(it.name)[0]}</Text>
+                              }
                             />
                             {on ? <Ring style={st.ring} /> : null}
                           </View>

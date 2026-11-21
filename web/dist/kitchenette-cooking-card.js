@@ -1,6 +1,22 @@
 // kitchenette-cooking-card: built from web/src by `npm run build`. Edit the sources, not this file.
 
 // src/api.ts
+function parseSettlement(v) {
+  if (!v || typeof v !== "object") return null;
+  const s = v;
+  if (s.has !== true) return null;
+  const pr = s.proficiency && typeof s.proficiency === "object" ? s.proficiency : null;
+  const mi = s.mishap && typeof s.mishap === "object" ? s.mishap : null;
+  const state = mi && (mi.state === "none" || mi.state === "had" || mi.state === "unknown") ? mi.state : null;
+  return {
+    outcome: typeof s.outcome === "string" ? s.outcome : "",
+    link: typeof s.link === "string" ? s.link : "free",
+    proficiency: pr && typeof pr.tier === "string" ? { tier: pr.tier, n: typeof pr.n === "number" ? pr.n : 0, toNext: typeof pr.to_next === "number" ? pr.to_next : null } : null,
+    mishap: state ? { state, text: typeof mi.text === "string" ? mi.text : null } : null,
+    icon: typeof s.icon === "string" ? s.icon : "",
+    stamps: Array.isArray(s.stamps) ? s.stamps.map((x) => x && typeof x === "object" ? String(x.text ?? "") : "").filter(Boolean) : []
+  };
+}
 var OUTCOMES = /* @__PURE__ */ new Set(["great", "ok", "burnt", "spoiled"]);
 function parseOutcome(v) {
   return typeof v === "string" && OUTCOMES.has(v) ? v : null;
@@ -35,7 +51,7 @@ function asKitchenError(e) {
 function parseAnswer(body) {
   const b = body && typeof body === "object" ? body : {};
   const session = b.session && typeof b.session === "object" ? b.session : null;
-  return { session, timezone: typeof b.timezone === "string" ? b.timezone : "" };
+  return { session, timezone: typeof b.timezone === "string" ? b.timezone : "", settlement: parseSettlement(b.settlement) };
 }
 async function fetchKitchen(base, sessionId, token) {
   const url = `${base.replace(/\/+$/, "")}/api/kitchen?session_id=${encodeURIComponent(sessionId)}`;
@@ -85,7 +101,7 @@ ${sessionId}`;
       });
     }
     const answer = await hit.p;
-    return { ...probeFromSession(answer.session), timezone: answer.timezone };
+    return { ...probeFromSession(answer.session), timezone: answer.timezone, settlement: answer.settlement };
   };
 }
 
@@ -270,6 +286,31 @@ function requiredSegments() {
   for (const m of COOK_METHODS) for (const k of METHOD_PARTS) segs.push(`${m}_${k}`);
   return segs;
 }
+var CHORE_SEGMENTS = [
+  "vendor_call",
+  "vendor_pay",
+  "vendor_take",
+  "vendor_take_last",
+  "vendor_carry",
+  "dish_sleeve",
+  "dish_soap",
+  "dish_scrub",
+  "dish_rinse",
+  "dish_shake",
+  "dish_dry",
+  "dish_stack",
+  "dish_break",
+  "dish_break_last",
+  "machine_load",
+  "machine_close",
+  "machine_start",
+  "machine_run",
+  "machine_done",
+  "machine_done_last"
+];
+function missingChoreKeys(manifest) {
+  return manifest.outfits.flatMap((o) => CHORE_SEGMENTS.map((s) => assetKey(o, s))).filter((k) => manifest.files[k] === void 0);
+}
 function missingKeys(manifest) {
   const missing = [];
   for (const o of manifest.outfits) {
@@ -281,6 +322,77 @@ var SRC_CANVAS = 720;
 var SRC_LINE_Y = 560;
 var CANVAS_PX = 180;
 var STAGE_PX = CANVAS_PX * SRC_LINE_Y / SRC_CANVAS;
+
+// src/settle.ts
+var CELL = 10;
+var GRID_X = 6;
+var PLATES = {
+  toque: {
+    great: { bottomCenter: [306, 270] },
+    ok: { bottomCenter: [466, 510] },
+    burnt: { bottomCenter: [146, 510] },
+    spoiled: { bottomCenter: [136, 520], tiltEvery: 3 }
+  },
+  scarf: {
+    great: { bottomCenter: [306, 330] },
+    ok: { bottomCenter: [466, 510] },
+    burnt: { bottomCenter: [146, 510] },
+    spoiled: { bottomCenter: [136, 520], tiltEvery: 3 }
+  }
+};
+var ICONS = /* @__PURE__ */ new Set([
+  "stirfry",
+  "soup",
+  "noodles",
+  "donburi",
+  "friedrice",
+  "friedegg",
+  "fish",
+  "meat",
+  "steamer",
+  "bake",
+  "salad",
+  "dessert",
+  "drink",
+  "bowl"
+]);
+function poseFor(outcome) {
+  return outcome === "great" || outcome === "ok" || outcome === "burnt" || outcome === "spoiled" || outcome === "ruined" ? outcome : null;
+}
+function settleKeys(outfit, pose, icon) {
+  const keys = [`${outfit}/settle_${pose}`];
+  if (pose === "ruined") return keys;
+  const kind = icon && ICONS.has(icon) ? icon : "bowl";
+  keys.push(`${outfit}/settle_${pose}_front`, `dishes/${kind}${pose === "burnt" ? "_burnt" : ""}_cells`);
+  return keys;
+}
+function placeDish(spot, cols, rows) {
+  const [bx, by] = spot.bottomCenter;
+  const x = Math.round((bx - cols * CELL / 2 - GRID_X) / CELL) * CELL + GRID_X;
+  const n = spot.tiltEvery;
+  const drop = n ? (c) => Math.floor((cols - 1 - c) / n) : () => 0;
+  return { x, y: by - rows * CELL, drop };
+}
+function drawSettle(canvas, pose, outfit, imgs) {
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return false;
+  canvas.width = 720;
+  canvas.height = 720;
+  ctx.imageSmoothingEnabled = false;
+  ctx.clearRect(0, 0, 720, 720);
+  ctx.drawImage(imgs.pose, 0, 0);
+  if (pose !== "ruined" && imgs.dish) {
+    const spot = PLATES[outfit]?.[pose] ?? PLATES.toque[pose];
+    const cols = imgs.dish.naturalWidth;
+    const rows = imgs.dish.naturalHeight;
+    const p = placeDish(spot, cols, rows);
+    for (let c = 0; c < cols; c++) {
+      ctx.drawImage(imgs.dish, c, 0, 1, rows, p.x + c * CELL, p.y + p.drop(c) * CELL, CELL, rows * CELL);
+    }
+  }
+  if (imgs.front) ctx.drawImage(imgs.front, 0, 0);
+  return true;
+}
 
 // src/manifest.generated.ts
 var CLAWD_MANIFEST = {
@@ -319,6 +431,15 @@ var CLAWD_MANIFEST = {
     "toque/deepfry_serve_last": "toque/deepfry_serve_last.png",
     "toque/deepfry_taste": "toque/deepfry_taste.webp",
     "toque/deepfry_wipe": "toque/deepfry_wipe.webp",
+    "toque/dish_break": "toque/dish_break.webp",
+    "toque/dish_break_last": "toque/dish_break_last.png",
+    "toque/dish_dry": "toque/dish_dry.webp",
+    "toque/dish_rinse": "toque/dish_rinse.webp",
+    "toque/dish_scrub": "toque/dish_scrub.webp",
+    "toque/dish_shake": "toque/dish_shake.webp",
+    "toque/dish_sleeve": "toque/dish_sleeve.webp",
+    "toque/dish_soap": "toque/dish_soap.webp",
+    "toque/dish_stack": "toque/dish_stack.webp",
     "toque/fry_fail": "toque/fry_fail.webp",
     "toque/fry_fail_last": "toque/fry_fail_last.png",
     "toque/fry_hot": "toque/fry_hot.webp",
@@ -328,6 +449,12 @@ var CLAWD_MANIFEST = {
     "toque/fry_serve_last": "toque/fry_serve_last.png",
     "toque/fry_taste": "toque/fry_taste.webp",
     "toque/fry_wipe": "toque/fry_wipe.webp",
+    "toque/machine_close": "toque/machine_close.webp",
+    "toque/machine_done": "toque/machine_done.webp",
+    "toque/machine_done_last": "toque/machine_done_last.png",
+    "toque/machine_load": "toque/machine_load.webp",
+    "toque/machine_run": "toque/machine_run.webp",
+    "toque/machine_start": "toque/machine_start.webp",
     "toque/mix_fail": "toque/mix_fail.webp",
     "toque/mix_fail_last": "toque/mix_fail_last.png",
     "toque/mix_hot": "toque/mix_hot.webp",
@@ -337,6 +464,15 @@ var CLAWD_MANIFEST = {
     "toque/mix_serve_last": "toque/mix_serve_last.png",
     "toque/mix_taste": "toque/mix_taste.webp",
     "toque/mix_wipe": "toque/mix_wipe.webp",
+    "toque/settle_burnt": "toque/settle_burnt.png",
+    "toque/settle_burnt_front": "toque/settle_burnt_front.png",
+    "toque/settle_great": "toque/settle_great.png",
+    "toque/settle_great_front": "toque/settle_great_front.png",
+    "toque/settle_ok": "toque/settle_ok.png",
+    "toque/settle_ok_front": "toque/settle_ok_front.png",
+    "toque/settle_ruined": "toque/settle_ruined.png",
+    "toque/settle_spoiled": "toque/settle_spoiled.png",
+    "toque/settle_spoiled_front": "toque/settle_spoiled_front.png",
     "toque/steam_fail": "toque/steam_fail.webp",
     "toque/steam_fail_last": "toque/steam_fail_last.png",
     "toque/steam_hot": "toque/steam_hot.webp",
@@ -355,6 +491,11 @@ var CLAWD_MANIFEST = {
     "toque/stirfry_serve_last": "toque/stirfry_serve_last.png",
     "toque/stirfry_taste": "toque/stirfry_taste.webp",
     "toque/stirfry_wipe": "toque/stirfry_wipe.webp",
+    "toque/vendor_call": "toque/vendor_call.webp",
+    "toque/vendor_carry": "toque/vendor_carry.webp",
+    "toque/vendor_pay": "toque/vendor_pay.webp",
+    "toque/vendor_take": "toque/vendor_take.webp",
+    "toque/vendor_take_last": "toque/vendor_take_last.png",
     "toque/wash": "toque/wash.webp",
     "scarf/bake_fail": "scarf/bake_fail.webp",
     "scarf/bake_fail_last": "scarf/bake_fail_last.png",
@@ -385,6 +526,15 @@ var CLAWD_MANIFEST = {
     "scarf/deepfry_serve_last": "scarf/deepfry_serve_last.png",
     "scarf/deepfry_taste": "scarf/deepfry_taste.webp",
     "scarf/deepfry_wipe": "scarf/deepfry_wipe.webp",
+    "scarf/dish_break": "scarf/dish_break.webp",
+    "scarf/dish_break_last": "scarf/dish_break_last.png",
+    "scarf/dish_dry": "scarf/dish_dry.webp",
+    "scarf/dish_rinse": "scarf/dish_rinse.webp",
+    "scarf/dish_scrub": "scarf/dish_scrub.webp",
+    "scarf/dish_shake": "scarf/dish_shake.webp",
+    "scarf/dish_sleeve": "scarf/dish_sleeve.webp",
+    "scarf/dish_soap": "scarf/dish_soap.webp",
+    "scarf/dish_stack": "scarf/dish_stack.webp",
     "scarf/fry_fail": "scarf/fry_fail.webp",
     "scarf/fry_fail_last": "scarf/fry_fail_last.png",
     "scarf/fry_hot": "scarf/fry_hot.webp",
@@ -394,6 +544,12 @@ var CLAWD_MANIFEST = {
     "scarf/fry_serve_last": "scarf/fry_serve_last.png",
     "scarf/fry_taste": "scarf/fry_taste.webp",
     "scarf/fry_wipe": "scarf/fry_wipe.webp",
+    "scarf/machine_close": "scarf/machine_close.webp",
+    "scarf/machine_done": "scarf/machine_done.webp",
+    "scarf/machine_done_last": "scarf/machine_done_last.png",
+    "scarf/machine_load": "scarf/machine_load.webp",
+    "scarf/machine_run": "scarf/machine_run.webp",
+    "scarf/machine_start": "scarf/machine_start.webp",
     "scarf/mix_fail": "scarf/mix_fail.webp",
     "scarf/mix_fail_last": "scarf/mix_fail_last.png",
     "scarf/mix_hot": "scarf/mix_hot.webp",
@@ -403,6 +559,15 @@ var CLAWD_MANIFEST = {
     "scarf/mix_serve_last": "scarf/mix_serve_last.png",
     "scarf/mix_taste": "scarf/mix_taste.webp",
     "scarf/mix_wipe": "scarf/mix_wipe.webp",
+    "scarf/settle_burnt": "scarf/settle_burnt.png",
+    "scarf/settle_burnt_front": "scarf/settle_burnt_front.png",
+    "scarf/settle_great": "scarf/settle_great.png",
+    "scarf/settle_great_front": "scarf/settle_great_front.png",
+    "scarf/settle_ok": "scarf/settle_ok.png",
+    "scarf/settle_ok_front": "scarf/settle_ok_front.png",
+    "scarf/settle_ruined": "scarf/settle_ruined.png",
+    "scarf/settle_spoiled": "scarf/settle_spoiled.png",
+    "scarf/settle_spoiled_front": "scarf/settle_spoiled_front.png",
     "scarf/steam_fail": "scarf/steam_fail.webp",
     "scarf/steam_fail_last": "scarf/steam_fail_last.png",
     "scarf/steam_hot": "scarf/steam_hot.webp",
@@ -421,7 +586,40 @@ var CLAWD_MANIFEST = {
     "scarf/stirfry_serve_last": "scarf/stirfry_serve_last.png",
     "scarf/stirfry_taste": "scarf/stirfry_taste.webp",
     "scarf/stirfry_wipe": "scarf/stirfry_wipe.webp",
-    "scarf/wash": "scarf/wash.webp"
+    "scarf/vendor_call": "scarf/vendor_call.webp",
+    "scarf/vendor_carry": "scarf/vendor_carry.webp",
+    "scarf/vendor_pay": "scarf/vendor_pay.webp",
+    "scarf/vendor_take": "scarf/vendor_take.webp",
+    "scarf/vendor_take_last": "scarf/vendor_take_last.png",
+    "scarf/wash": "scarf/wash.webp",
+    "dishes/bake_burnt_cells": "dishes/bake_burnt_cells.png",
+    "dishes/bake_cells": "dishes/bake_cells.png",
+    "dishes/bowl_burnt_cells": "dishes/bowl_burnt_cells.png",
+    "dishes/bowl_cells": "dishes/bowl_cells.png",
+    "dishes/dessert_burnt_cells": "dishes/dessert_burnt_cells.png",
+    "dishes/dessert_cells": "dishes/dessert_cells.png",
+    "dishes/donburi_burnt_cells": "dishes/donburi_burnt_cells.png",
+    "dishes/donburi_cells": "dishes/donburi_cells.png",
+    "dishes/drink_burnt_cells": "dishes/drink_burnt_cells.png",
+    "dishes/drink_cells": "dishes/drink_cells.png",
+    "dishes/fish_burnt_cells": "dishes/fish_burnt_cells.png",
+    "dishes/fish_cells": "dishes/fish_cells.png",
+    "dishes/friedegg_burnt_cells": "dishes/friedegg_burnt_cells.png",
+    "dishes/friedegg_cells": "dishes/friedegg_cells.png",
+    "dishes/friedrice_burnt_cells": "dishes/friedrice_burnt_cells.png",
+    "dishes/friedrice_cells": "dishes/friedrice_cells.png",
+    "dishes/meat_burnt_cells": "dishes/meat_burnt_cells.png",
+    "dishes/meat_cells": "dishes/meat_cells.png",
+    "dishes/noodles_burnt_cells": "dishes/noodles_burnt_cells.png",
+    "dishes/noodles_cells": "dishes/noodles_cells.png",
+    "dishes/salad_burnt_cells": "dishes/salad_burnt_cells.png",
+    "dishes/salad_cells": "dishes/salad_cells.png",
+    "dishes/soup_burnt_cells": "dishes/soup_burnt_cells.png",
+    "dishes/soup_cells": "dishes/soup_cells.png",
+    "dishes/steamer_burnt_cells": "dishes/steamer_burnt_cells.png",
+    "dishes/steamer_cells": "dishes/steamer_cells.png",
+    "dishes/stirfry_burnt_cells": "dishes/stirfry_burnt_cells.png",
+    "dishes/stirfry_cells": "dishes/stirfry_cells.png"
   }
 };
 
@@ -507,6 +705,8 @@ var zh = {
   ariaCooking: (dish, remaining) => `${dish},\u5728\u706B\u4E0A,\u8FD8\u5269 ${remaining}`,
   ariaServed: (dish, served) => `${dish},${served}`,
   ariaCancelled: (dish) => `${dish},\u5173\u706B\u4E86`,
+  settleTier: (tier, toNext) => toNext ? `${tier} \xB7 \u518D\u505A ${toNext} \u6B21\u5347\u6863` : tier,
+  settleSmooth: "\u4E00\u8DEF\u987A\u5229",
   loadFailed: (kind, status) => `\u53D6\u4E0D\u5230\u8FD9\u4E00\u9505\uFF1A${{
     unreachable: "\u8FDE\u4E0D\u4E0A\u53A8\u623F\u670D\u52A1\u3002",
     blocked: "\u6D4F\u89C8\u5668\u62E6\u4E0B\u4E86\u8FD9\u6B21\u8BFB\u53D6\uFF0C\u53A8\u623F\u670D\u52A1\u7684\u8DE8\u7AD9\u540D\u5355\u91CC\u6CA1\u6709\u8FD9\u4E2A\u9875\u9762\u3002",
@@ -539,6 +739,8 @@ var en = {
   ariaCooking: (dish, remaining) => `${dish}, on the stove, ${remaining} left`,
   ariaServed: (dish, served) => `${dish}, ${served}`,
   ariaCancelled: (dish) => `${dish}, heat off`,
+  settleTier: (tier, toNext) => toNext ? `${tier} \xB7 ${toNext} more to the next` : tier,
+  settleSmooth: "no mishaps",
   loadFailed: (kind, status) => `Can't load this pot: ${{
     unreachable: "the kitchen server can't be reached.",
     blocked: "the browser blocked the request. This page is not on the kitchen server's list of allowed sites.",
@@ -624,6 +826,8 @@ var CARD_CSS = `
 .track { height: 2px; background: var(--_hair); margin-top: 8px; overflow: hidden; }
 .fill { height: 2px; background: var(--_accent); }
 .foot { font-family: var(--_serif); font-size: 10.5px; line-height: 16px; color: var(--_mute); margin-top: 6px; font-variant-numeric: tabular-nums; }
+.settle { font-family: var(--_serif); font-size: 10.5px; line-height: 16px; color: var(--_mute); margin-top: 4px; padding-top: 4px; border-top: 1px dashed currentColor; white-space: pre-line; }
+.settle[hidden] { display: none; }
 .right { flex: none; display: flex; flex-direction: column; align-items: flex-end; justify-content: center; }
 .clock { font-family: var(--_display); font-size: 26px; color: var(--_ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .state-word { font-family: var(--_serif); font-size: 12.5px; line-height: 19px; color: var(--_accent); text-align: right; }
@@ -718,6 +922,7 @@ function checkPack(folder, probeUrl) {
   }
   return pack;
 }
+var settleCache = /* @__PURE__ */ new Map();
 var h = (tag, cls, parent) => {
   const el = document.createElement(tag);
   el.className = cls;
@@ -777,6 +982,7 @@ var KitchenetteCookingCard = class extends Base {
   #track;
   #fill;
   #foot;
+  #settle;
   #wrap;
   constructor() {
     super();
@@ -810,6 +1016,8 @@ var KitchenetteCookingCard = class extends Base {
     this.#track = h("div", "track", body);
     this.#fill = h("div", "fill", this.#track);
     this.#foot = h("div", "foot", body);
+    this.#settle = h("div", "settle", body);
+    this.#settle.hidden = true;
   }
   // ── public API ──
   /** One pot's data. Assign it directly, or leave it unset and give `api-base` + `session-id` instead. */
@@ -999,6 +1207,7 @@ var KitchenetteCookingCard = class extends Base {
     if (!pot) return;
     if (r.status === "cancelled") pot.cancelledSeenAtMs ??= this.#clock();
     else if (r.status === "served") pot.outcome ??= { v: r.outcome, atMs: this.#clock() };
+    if (r.settlement) pot.settlement ??= r.settlement;
   }
   #check(fresh) {
     const pot = this.#pot;
@@ -1069,7 +1278,12 @@ var KitchenetteCookingCard = class extends Base {
       sessionId: pot.id
     });
     this.#segment = segment;
-    this.#renderSprite(phase, outfit, segment, visible);
+    const settled = !!pot.settlement && pot.outcome !== void 0 && !pot.cancelledSeenAtMs && (phase === "exit" || phase === "done");
+    if (settled) {
+      const last = `${parseMethod(pot.method)}_${isFailOutcome(pot.outcome?.v ?? null) ? "fail" : "serve"}_last`;
+      this.#segment = last;
+      this.#renderSprite("serve", outfit, last, visible);
+    } else this.#renderSprite(phase, outfit, segment, visible);
     const t = { ...stringsFor(this.getAttribute("lang")), ...this.#strings };
     const p = cookProgress(pot.startedAt, pot.durationSec, nowMs);
     const onFire = !cancelled && p.remainingSec > 0;
@@ -1096,6 +1310,14 @@ var KitchenetteCookingCard = class extends Base {
       this.#foot,
       cancelled ? t.footCancelled(start) : onFire ? t.footCooking(start, duration, due) : t.footServed(start, duration, due)
     );
+    const st = !onFire && !cancelled && phase !== "stir" ? pot.settlement ?? null : null;
+    const settleText = st ? [
+      st.proficiency ? t.settleTier(st.proficiency.tier, st.proficiency.toNext) : "",
+      st.mishap ? st.mishap.state === "none" ? t.settleSmooth : st.mishap.text ?? "" : "",
+      st.stamps.join(" \xB7 ")
+    ].filter(Boolean).join("\n") : "";
+    this.#settle.hidden = !settleText;
+    setText(this.#settle, settleText);
     const label = cancelled ? t.ariaCancelled(pot.dish) : onFire ? t.ariaCooking(pot.dish, remaining) : t.ariaServed(pot.dish, served);
     if (this.#card.getAttribute("aria-label") !== label) this.#card.setAttribute("aria-label", label);
     if (!phaseIsLive(phase)) {
@@ -1182,13 +1404,40 @@ var KitchenetteCookingCard = class extends Base {
     this.#canvas.style.transform = "";
     this.#stage.hidden = true;
   }
+  #settleUrl(outfit, st) {
+    const pose = poseFor(st.outcome);
+    if (!pose) return null;
+    const keys = settleKeys(outfit, pose, st.icon);
+    const urls = keys.map((k) => this.#assetUrl(k));
+    if (urls.some((u) => !u)) return null;
+    const cacheKey = urls.join("|");
+    const hit = settleCache.get(cacheKey);
+    if (hit !== void 0) return hit || null;
+    settleCache.set(cacheKey, "");
+    const load = (u) => new Promise((ok, no) => {
+      const im = new Image();
+      im.crossOrigin = "anonymous";
+      im.onload = () => ok(im);
+      im.onerror = no;
+      im.src = u;
+    });
+    Promise.all(urls.map((u) => load(u))).then(([poseImg, front, dish]) => {
+      const c = document.createElement("canvas");
+      if (!drawSettle(c, pose, outfit, { pose: poseImg, front, dish })) return;
+      settleCache.set(cacheKey, c.toDataURL("image/png"));
+      if (this.#pot) this.#render();
+    }).catch(() => {
+    });
+    return null;
+  }
   #renderSprite(phase, outfit, segment, visible) {
     if (spriteOnStage(phase) && segment && !this.#packReady(outfit)) {
       this.#wantSeat(false);
       this.#clearSprite();
       return;
     }
-    const url = segment ? this.#assetUrl(assetKey(outfit, segment)) : null;
+    let url = segment ? this.#assetUrl(assetKey(outfit, segment)) : null;
+    if (url && segment?.endsWith("_last") && this.#pot?.settlement) url = this.#settleUrl(outfit, this.#pot.settlement) ?? url;
     const baseUrl = this.#assetUrl(assetKey(outfit, "base"));
     if (!spriteOnStage(phase) || !segment || !url) {
       this.#wantSeat(false);
@@ -1231,7 +1480,7 @@ var KitchenetteCookingCard = class extends Base {
         this.#stillImg.draggable = false;
         this.#canvas.appendChild(this.#stillImg);
       }
-      const src = baseUrl ?? url;
+      const src = url.startsWith("data:") ? url : baseUrl ?? url;
       if (this.#stillImg.dataset.url !== src) {
         this.#stillImg.dataset.url = src;
         this.#stillImg.src = src;
@@ -1289,6 +1538,7 @@ export {
   CANVAS_PX,
   CHOP_FRAC,
   CHOP_MAX_S,
+  CHORE_SEGMENTS,
   CLAWD_MANIFEST,
   CLIP_MS,
   COOK_METHODS,
@@ -1332,6 +1582,7 @@ export {
   isFailOutcome,
   kitchenPhase,
   kitchenTiming,
+  missingChoreKeys,
   missingKeys,
   outcomeWord,
   outfitFor,

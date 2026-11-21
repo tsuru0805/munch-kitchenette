@@ -7,14 +7,17 @@
 // the element out of the document and putting it back, or reloading the page, therefore lands on
 // the right moment instead of replaying anything.
 import {
-  apiProbe, asKitchenError, notFound, probeFromSession, type KitchenFetchError, type KitchenProbe, type KitchenSession, type ProbeFn,
+  apiProbe, asKitchenError, notFound, probeFromSession, type KitchenFetchError, type KitchenProbe, type KitchenSession,
+  type KitchenSettlement, type ProbeFn,
 } from "./api";
 import {
-  EXIT_MS, OUTCOME_WAIT_MS, cookProgress, fmtHM, fmtRemaining, kitchenPhase, phaseIsLive, pickTimeZone, revealAtMs, spriteOnStage,
+  EXIT_MS, OUTCOME_WAIT_MS, cookProgress, fmtHM, fmtRemaining, isFailOutcome, kitchenPhase, phaseIsLive, pickTimeZone, revealAtMs,
+  spriteOnStage,
   type KitchenFacts, type KitchenOutcome, type KitchenPhase,
 } from "./cookPhase";
 import { assetKey, cookSegment, outfitFor, parseMethod } from "./cookSegments";
 import { STAGE_PX, type SpriteManifest } from "./manifest";
+import { drawSettle, poseFor, settleKeys } from "./settle";
 import { CLAWD_MANIFEST } from "./manifest.generated";
 import { acquireSeat, onSeatFree, releaseSeat, seatFree } from "./seats";
 import { isFirstSeen, markSeen } from "./seen";
@@ -162,7 +165,12 @@ interface PotState {
   firstSeen: boolean;
   cancelledSeenAtMs: number | undefined;
   outcome: { v: KitchenOutcome | null; atMs: number } | undefined;
+  /** the settled card, once the backend sent one */
+  settlement?: KitchenSettlement | null;
 }
+
+/** Settled stills already drawn (as data URLs) by the URLs of their pictures; "" = being drawn */
+const settleCache = new Map<string, string>();
 
 const h = <K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, parent?: Node): HTMLElementTagNameMap[K] => {
   const el = document.createElement(tag);
@@ -227,6 +235,7 @@ export class KitchenetteCookingCard extends Base {
   #track!: HTMLElement;
   #fill!: HTMLElement;
   #foot!: HTMLElement;
+  #settle!: HTMLElement;
   #wrap!: HTMLElement;
 
   constructor() {
@@ -261,6 +270,8 @@ export class KitchenetteCookingCard extends Base {
     this.#track = h("div", "track", body);
     this.#fill = h("div", "fill", this.#track);
     this.#foot = h("div", "foot", body);
+    this.#settle = h("div", "settle", body);
+    this.#settle.hidden = true;
   }
 
   // ── public API ──
@@ -476,6 +487,7 @@ export class KitchenetteCookingCard extends Base {
     if (!pot) return;
     if (r.status === "cancelled") pot.cancelledSeenAtMs ??= this.#clock();
     else if (r.status === "served") pot.outcome ??= { v: r.outcome, atMs: this.#clock() };
+    if (r.settlement) pot.settlement ??= r.settlement;
   }
 
   #check(fresh: boolean): void {
@@ -556,7 +568,15 @@ export class KitchenetteCookingCard extends Base {
       sessionId: pot.id,
     });
     this.#segment = segment;
-    this.#renderSprite(phase, outfit, segment, visible);
+    // A pot with a settlement: once served, the cook stays on the card holding the dish (the settled still)
+    // instead of walking off; the still is the same picture from then on, whenever the card is shown.
+    const settled = !!pot.settlement && pot.outcome !== undefined && !pot.cancelledSeenAtMs
+      && (phase === "exit" || phase === "done");
+    if (settled) {
+      const last = `${parseMethod(pot.method)}_${isFailOutcome(pot.outcome?.v ?? null) ? "fail" : "serve"}_last`;
+      this.#segment = last;
+      this.#renderSprite("serve", outfit, last, visible);
+    } else this.#renderSprite(phase, outfit, segment, visible);
 
     // The card
     const t = { ...stringsFor(this.getAttribute("lang")), ...this.#strings };
@@ -587,6 +607,18 @@ export class KitchenetteCookingCard extends Base {
       this.#foot,
       cancelled ? t.footCancelled(start) : onFire ? t.footCooking(start, duration, due) : t.footServed(start, duration, due),
     );
+    // The settled lines: proficiency, the mishap (or "no mishaps", only when the backend knows there was
+    // none), and the stamps. Only once served, only what the backend sent.
+    const st = !onFire && !cancelled && phase !== "stir" ? pot.settlement ?? null : null;
+    const settleText = st
+      ? [
+          st.proficiency ? t.settleTier(st.proficiency.tier, st.proficiency.toNext) : "",
+          st.mishap ? (st.mishap.state === "none" ? t.settleSmooth : st.mishap.text ?? "") : "",
+          st.stamps.join(" · "),
+        ].filter(Boolean).join("\n")
+      : "";
+    this.#settle.hidden = !settleText;
+    setText(this.#settle, settleText);
     const label = cancelled ? t.ariaCancelled(pot.dish) : onFire ? t.ariaCooking(pot.dish, remaining) : t.ariaServed(pot.dish, served);
     if (this.#card.getAttribute("aria-label") !== label) this.#card.setAttribute("aria-label", label);
 
@@ -685,6 +717,36 @@ export class KitchenetteCookingCard extends Base {
     this.#stage.hidden = true;
   }
 
+  #settleUrl(outfit: string, st: KitchenSettlement): string | null {
+    const pose = poseFor(st.outcome);
+    if (!pose) return null;
+    const keys = settleKeys(outfit, pose, st.icon);
+    const urls = keys.map((k) => this.#assetUrl(k));
+    if (urls.some((u) => !u)) return null;
+    const cacheKey = urls.join("|");
+    const hit = settleCache.get(cacheKey);
+    if (hit !== undefined) return hit || null;
+    settleCache.set(cacheKey, "");
+    const load = (u: string) => new Promise<HTMLImageElement>((ok, no) => {
+      const im = new Image();
+      im.crossOrigin = "anonymous";
+      im.onload = () => ok(im);
+      im.onerror = no;
+      im.src = u;
+    });
+    Promise.all(urls.map((u) => load(u!)))
+      .then(([poseImg, front, dish]) => {
+        const c = document.createElement("canvas");
+        if (!drawSettle(c, pose, outfit, { pose: poseImg, front, dish })) return;
+        settleCache.set(cacheKey, c.toDataURL("image/png"));
+        if (this.#pot) this.#render();
+      })
+      .catch(() => {
+        // A picture is missing (an older sprite pack): the ordinary last frame stays
+      });
+    return null;
+  }
+
   #renderSprite(phase: KitchenPhase, outfit: string, segment: string | null, visible: boolean): void {
     if (spriteOnStage(phase) && segment && !this.#packReady(outfit)) {
       // No sprite pack (yet, or at all): no cook. The phase is not recorded, so an entrance that is still
@@ -693,7 +755,10 @@ export class KitchenetteCookingCard extends Base {
       this.#clearSprite();
       return;
     }
-    const url = segment ? this.#assetUrl(assetKey(outfit, segment)) : null;
+    let url = segment ? this.#assetUrl(assetKey(outfit, segment)) : null;
+    // The last frame of a served pot with a settlement: the settled still (him holding the dish), once its
+    // pictures are loaded; until then, or if they are missing, the ordinary last frame
+    if (url && segment?.endsWith("_last") && this.#pot?.settlement) url = this.#settleUrl(outfit, this.#pot.settlement) ?? url;
     const baseUrl = this.#assetUrl(assetKey(outfit, "base"));
     if (!spriteOnStage(phase) || !segment || !url) {
       this.#wantSeat(false);
@@ -740,7 +805,7 @@ export class KitchenetteCookingCard extends Base {
         this.#stillImg.draggable = false;
         this.#canvas.appendChild(this.#stillImg);
       }
-      const src = baseUrl ?? url;
+      const src = url.startsWith("data:") ? url : baseUrl ?? url;
       if (this.#stillImg.dataset.url !== src) {
         this.#stillImg.dataset.url = src;
         this.#stillImg.src = src;

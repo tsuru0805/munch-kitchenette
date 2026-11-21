@@ -2,7 +2,8 @@
 
 The wording is part of the design: tool descriptions, receipts, status lines
 and notifications state facts and never tell the role how to feel or what to
-do next. Change the wording here and nowhere else.
+do next. Change the wording here and nowhere else (the sentences the upgrade added — recipes,
+dish book, plates, jars, vendors — live the same way in :mod:`kitchenette.texts_play`).
 
 ``t(key, **values)`` fills a template. Three placeholders are filled from the
 settings for every template: ``{human}`` (``words.human_name``), ``{she}``

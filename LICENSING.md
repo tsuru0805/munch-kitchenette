@@ -7,10 +7,10 @@ The contents of this repository are licensed in four layers. Each file belongs t
 
 | 层 · Layer | 范围 · Scope | 许可 · License |
 |---|---|---|
-| 软件 · Software | `src/`、`tests/`、`examples/` 里的代码与配置，`pyproject.toml`，`web/` 里的源码、构建产物与例子页，包括厨房页的源码 `web/page/` 与构建好的页面 `src/kitchenette/page/`（其中的图、字体和第三方代码除外，见下面几行） | [PolyForm Noncommercial 1.0.0](LICENSE) |
-| 文档与自有素材 · Docs and our own material | `README.md`、`README.en.md`、`docs/` 里的文字（`docs/animation/` 的动图除外）；厨房页的食玩图 `web/page/assets/kitchen/` 与 `src/kitchenette/page/assets/`；`docs/page/` 的页面截图 | [CC BY-NC 4.0](LICENSE-CONTENT) |
-| Clawd 的图 · Clawd artwork | `assets/clawd/` 的全部图片、`docs/animation/` 的全部动图、`clawd-engine-additions/outfits/` | **CC BY-NC-SA 4.0**，不随本仓改授权，见 [`assets/clawd/ATTRIBUTION.md`](assets/clawd/ATTRIBUTION.md) |
-| 第三方 · Third party | `clawd-engine-additions/states/` 与 `tools/`（MIT，接在上游引擎的代码上）；字体 `web/fonts/`、`web/page/public/fonts/`、`src/kitchenette/page/fonts/`（SIL OFL 1.1）；打进厨房页脚本里的第三方代码（清单与许可全文见 `src/kitchenette/page/THIRD-PARTY.txt`）；依赖包 | 各自原许可，逐项见 [NOTICE](NOTICE) |
+| 软件 · Software | `src/`、`tests/`、`examples/`、`tools/` 里的代码与配置（`src/kitchenette/data/` 的食谱索引除外），`pyproject.toml`，`web/` 里的源码、构建产物与例子页，包括厨房页的源码 `web/page/` 与构建好的页面 `src/kitchenette/page/`（其中的图、字体和第三方代码除外，见下面几行） | [PolyForm Noncommercial 1.0.0](LICENSE) |
+| 文档与自有素材 · Docs and our own material | `README.md`、`README.en.md`、`docs/` 里的文字（`docs/animation/` 的动图除外）；厨房页的食玩图 `web/page/assets/kitchen/` 与 `src/kitchenette/page/assets/`（其中 `assets/__assets/clawd/` 除外，它在 Clawd 那一层）；`docs/page/` 的页面截图（`docs/page/card-settled.png` 除外，它在 Clawd 那一层）；试玩页 `docs/play/` 的页面与画面 | [CC BY-NC 4.0](LICENSE-CONTENT) |
+| Clawd 的图 · Clawd artwork | `assets/clawd/` 的全部图片、`docs/animation/` 的全部动图、`docs/page/card-settled.png`、`clawd-engine-additions/outfits/`、构建好的厨房页里带的小厨师家务动画 `src/kitchenette/page/assets/__assets/clawd/`（`assets/clawd/` 的副本） | **CC BY-NC-SA 4.0**，不随本仓改授权，见 [`assets/clawd/ATTRIBUTION.md`](assets/clawd/ATTRIBUTION.md) |
+| 第三方 · Third party | 公共食谱的索引 `src/kitchenette/data/`（整理自 HowToCook，Unlicense，公有领域）；`clawd-engine-additions/states/` 与 `clawd-engine-additions/tools/`（MIT，接在上游引擎的代码上）；字体 `web/fonts/`、`web/page/public/fonts/`、`src/kitchenette/page/fonts/`（SIL OFL 1.1）；打进厨房页脚本里的第三方代码（清单与许可全文见 `src/kitchenette/page/THIRD-PARTY.txt`）；依赖包 | 各自原许可，逐项见 [NOTICE](NOTICE) |
 
 - 个人、爱好、学习、研究等非商业用途可以使用、修改、再分发（再分发须附上许可全文或链接，以及 NOTICE 里以 `Required Notice:` 开头的行）。
   Personal, hobby, study and research use is fine: use it, change it, pass it on (keep the license text or a link to it, and the `Required Notice:` lines from NOTICE).

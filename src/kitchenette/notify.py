@@ -126,7 +126,7 @@ def render_coupon(events: list[dict]) -> str:
 def _served_lines(events: list[dict]) -> tuple[list[str], str]:
     lines = [t("served_line", started=_clean(p.get("started_hm", ""), 5), dish=_clean(p.get("dish", "")),
                minutes=_clean(p.get("minutes", ""), 5)) + OUTCOME_SENTENCE.get(p.get("outcome") or "", "")
-             for p in events]
+             + _clean(p.get("extra", ""), 160) for p in events]
     all_ok = all(p.get("menu_ok", "1") == "1" for p in events)
     return lines, t("served_menu_ok") if all_ok else t("served_menu_failed")
 

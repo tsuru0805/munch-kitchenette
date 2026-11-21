@@ -4,4 +4,4 @@ A fridge that spoils, real-time cooking, grocery coupons, a snack shelf,
 satiety and stamina, served over REST (for a page) and MCP (for the model).
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"

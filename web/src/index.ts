@@ -4,7 +4,7 @@ export { KitchenFetchError, apiProbe, fetchKitchen, fetchSession, parseAnswer, p
 export type { KitchenAnswer, KitchenErrorKind, KitchenIngredient, KitchenProbe, KitchenSession, ProbeFn } from "./api";
 export * from "./cookPhase";
 export * from "./cookSegments";
-export { METHOD_PARTS, missingKeys, requiredSegments, CANVAS_PX, SRC_CANVAS, SRC_LINE_Y, STAGE_PX } from "./manifest";
+export { CHORE_SEGMENTS, METHOD_PARTS, missingChoreKeys, missingKeys, requiredSegments, CANVAS_PX, SRC_CANVAS, SRC_LINE_Y, STAGE_PX } from "./manifest";
 export type { SpriteManifest } from "./manifest";
 export { CLAWD_MANIFEST } from "./manifest.generated";
 export { MAX_ANIMATED } from "./seats";

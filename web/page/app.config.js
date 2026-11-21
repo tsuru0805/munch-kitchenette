@@ -7,7 +7,7 @@ module.exports = {
   expo: {
     name: "Kitchenette",
     slug: "kitchenette-page",
-    version: "0.1.0",
+    version: "0.2.0",
     orientation: "portrait",
     userInterfaceStyle: "light",
     platforms: ["web"],

@@ -1,11 +1,30 @@
 {
  "about": {
+  "features": {
+   "achievements": false,
+   "dex": false,
+   "dishwash": false,
+   "menus": false,
+   "mishaps": false,
+   "new_dish_bonus": false,
+   "orders": false,
+   "proficiency": false,
+   "recipe_book": false,
+   "recipe_codes": false,
+   "recipe_cook": false,
+   "recipes_public": false,
+   "recipes_today": false,
+   "seal_jars": false,
+   "settle_card": false,
+   "tasting_notes": false,
+   "vendor": false
+  },
   "limits": {
    "buy_max_items": 5,
    "coupon_max": 3,
    "hungry_below": 30.0
   },
-  "now": 1794493849.701099,
+  "now": 1795259946.132658,
   "roles": {
    "default": "companion",
    "list": [
@@ -22,7 +41,7 @@
   },
   "timezone": "Asia/Tokyo",
   "timezone_label": "",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "words": {
    "app_name": "App",
    "human_name": "用户",
@@ -30,12 +49,31 @@
   }
  },
  "about_off": {
+  "features": {
+   "achievements": false,
+   "dex": false,
+   "dishwash": false,
+   "menus": false,
+   "mishaps": false,
+   "new_dish_bonus": false,
+   "orders": false,
+   "proficiency": false,
+   "recipe_book": false,
+   "recipe_codes": false,
+   "recipe_cook": false,
+   "recipes_public": false,
+   "recipes_today": false,
+   "seal_jars": false,
+   "settle_card": false,
+   "tasting_notes": false,
+   "vendor": false
+  },
   "limits": {
    "buy_max_items": 5,
    "coupon_max": 3,
    "hungry_below": 30.0
   },
-  "now": 1794493849.708489,
+  "now": 1795259946.142551,
   "roles": {
    "default": "companion",
    "list": [
@@ -52,12 +90,107 @@
   },
   "timezone": "Asia/Tokyo",
   "timezone_label": "",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "words": {
    "app_name": "App",
    "human_name": "用户",
    "human_pronoun": "她"
   }
+ },
+ "about_play": {
+  "features": {
+   "achievements": true,
+   "dex": true,
+   "dishwash": true,
+   "menus": true,
+   "mishaps": true,
+   "new_dish_bonus": true,
+   "orders": true,
+   "proficiency": true,
+   "recipe_book": true,
+   "recipe_codes": true,
+   "recipe_cook": true,
+   "recipes_public": true,
+   "recipes_today": true,
+   "seal_jars": true,
+   "settle_card": true,
+   "tasting_notes": true,
+   "vendor": true
+  },
+  "limits": {
+   "buy_max_items": 5,
+   "coupon_max": 3,
+   "hungry_below": 30.0
+  },
+  "now": 1795260546.2162418,
+  "roles": {
+   "default": "companion",
+   "list": [
+    "aster",
+    "companion"
+   ]
+  },
+  "switches": {
+   "art": false,
+   "dev_clock": true,
+   "satiety": true,
+   "stamina": true,
+   "worms": true
+  },
+  "timezone": "Asia/Tokyo",
+  "timezone_label": "",
+  "version": "0.2.0",
+  "words": {
+   "app_name": "App",
+   "human_name": "用户",
+   "human_pronoun": "她"
+  }
+ },
+ "book": {
+  "pages": [
+   {
+    "created_at": 1795259946.1620421,
+    "id": "p-84137a0e",
+    "kind": "fav",
+    "main": [
+     {
+      "item": "egg",
+      "name": "鸡蛋",
+      "qty": 1
+     }
+    ],
+    "menu": null,
+    "method": "steam",
+    "minutes": 15,
+    "name": "蒸水蛋",
+    "note": "",
+    "notes": [],
+    "optional": [],
+    "ref_id": "hc-e0a19bc9",
+    "version": 1
+   },
+   {
+    "created_at": 1795259946.16526,
+    "id": "p-a536ac5a",
+    "kind": "own",
+    "main": [
+     {
+      "item": "cucumber",
+      "name": "黄瓜",
+      "qty": 1
+     }
+    ],
+    "menu": null,
+    "method": "mix",
+    "minutes": 5,
+    "name": "拌黄瓜",
+    "note": "夏天吃",
+    "notes": [],
+    "optional": [],
+    "ref_id": null,
+    "version": 1
+   }
+  ]
  },
  "catalog": [
   {
@@ -732,13 +865,557 @@
    "category": "fruit",
    "category_label": "水果",
    "custom": true,
-   "id": "u_a7dadc9971",
+   "id": "u_c7be96a46c",
    "name": "柿子",
    "pack_qty": 1,
    "raw_edible": true,
    "shelf_days": 7.0
   }
  ],
+ "dex": {
+  "achievements": [
+   {
+    "earned": false,
+    "earned_at": null,
+    "key": "one_method",
+    "name": "学会一种做法",
+    "why": ""
+   },
+   {
+    "earned": false,
+    "earned_at": null,
+    "key": "all_methods",
+    "name": "七种做法全会",
+    "why": ""
+   },
+   {
+    "earned": false,
+    "earned_at": null,
+    "key": "five_of_seven",
+    "name": "连续七天里有五天开火",
+    "why": ""
+   },
+   {
+    "earned": false,
+    "earned_at": null,
+    "key": "own_dish",
+    "name": "自创菜第一次做成",
+    "why": ""
+   },
+   {
+    "earned": false,
+    "earned_at": null,
+    "key": "rescued",
+    "name": "救回一份快放坏的食材",
+    "why": ""
+   },
+   {
+    "earned": false,
+    "earned_at": null,
+    "key": "vendor_regular",
+    "name": "小贩常客",
+    "why": ""
+   },
+   {
+    "earned": false,
+    "earned_at": null,
+    "key": "first_burnt",
+    "name": "第一次糊锅",
+    "why": ""
+   },
+   {
+    "earned": false,
+    "earned_at": null,
+    "key": "first_worm",
+    "name": "第一次长虫",
+    "why": ""
+   },
+   {
+    "earned": false,
+    "earned_at": null,
+    "key": "late_night",
+    "name": "深夜开火",
+    "why": ""
+   },
+   {
+    "earned": false,
+    "earned_at": null,
+    "key": "fifty_eggs",
+    "name": "蛋的五十种做法",
+    "why": ""
+   },
+   {
+    "earned": false,
+    "earned_at": null,
+    "key": "hundred_plates",
+    "name": "刷满一百只盘子",
+    "why": ""
+   },
+   {
+    "earned": false,
+    "earned_at": null,
+    "key": "first_jar",
+    "name": "第一次泡成",
+    "why": ""
+   }
+  ],
+  "backfill": {
+   "counted": 2,
+   "excluded": 0,
+   "pages": 2,
+   "pending": 1,
+   "scanned": 2
+  },
+  "drawing": false,
+  "pages": [
+   {
+    "art": null,
+    "best": "great",
+    "eaten": 0,
+    "first_at": 1795259346.0963259,
+    "good": 1,
+    "human_note": "",
+    "ingredients": [
+     "鸡蛋"
+    ],
+    "key": "d:煎蛋",
+    "made": 1,
+    "method": "fry",
+    "name": "煎蛋",
+    "pending": true,
+    "recipe_id": null,
+    "role_note": ""
+   },
+   {
+    "art": null,
+    "best": "great",
+    "eaten": 1,
+    "first_at": 1795259946.1713622,
+    "good": 1,
+    "human_note": "",
+    "ingredients": [
+     "鸡蛋"
+    ],
+    "key": "r:hc-e0a19bc9",
+    "made": 1,
+    "method": "steam",
+    "name": "蒸水蛋",
+    "pending": false,
+    "recipe_id": "hc-e0a19bc9",
+    "role_note": ""
+   }
+  ],
+  "silhouettes": [],
+  "totals": {
+   "art_missing": 2,
+   "made_public": 1,
+   "pages": 2,
+   "public": 374
+  }
+ },
+ "dishes": {
+  "counts": {
+   "broken": 0,
+   "clean": 0,
+   "machine": 1,
+   "sink": 0,
+   "washing": 0
+  },
+  "job": null,
+  "machine_at": 1795260546.1872058,
+  "now": 1795260546.208558,
+  "on": true,
+  "quota": null,
+  "self_wash": false
+ },
+ "features": {
+  "features": [
+   {
+    "default": true,
+    "key": "recipes_public",
+    "markers": [],
+    "name": "公共食谱",
+    "on": true,
+    "parent": null,
+    "reason": "",
+    "wanted": true
+   },
+   {
+    "default": true,
+    "key": "recipes_today",
+    "markers": [],
+    "name": "今天可以试试",
+    "on": true,
+    "parent": "recipes_public",
+    "reason": "",
+    "wanted": true
+   },
+   {
+    "default": true,
+    "key": "recipe_cook",
+    "markers": [],
+    "name": "照谱开锅",
+    "on": true,
+    "parent": "recipes_public",
+    "reason": "",
+    "wanted": true
+   },
+   {
+    "default": true,
+    "key": "recipe_book",
+    "markers": [
+     "收藏",
+     "记菜"
+    ],
+    "name": "他的食谱本",
+    "on": true,
+    "parent": null,
+    "reason": "",
+    "wanted": true
+   },
+   {
+    "default": true,
+    "key": "proficiency",
+    "markers": [],
+    "name": "熟练度",
+    "on": true,
+    "parent": null,
+    "reason": "",
+    "wanted": true
+   },
+   {
+    "default": true,
+    "key": "mishaps",
+    "markers": [],
+    "name": "小意外",
+    "on": true,
+    "parent": "proficiency",
+    "reason": "",
+    "wanted": true
+   },
+   {
+    "default": true,
+    "key": "new_dish_bonus",
+    "markers": [],
+    "name": "新菜加成",
+    "on": true,
+    "parent": "recipe_cook",
+    "reason": "",
+    "wanted": true
+   },
+   {
+    "default": true,
+    "key": "settle_card",
+    "markers": [],
+    "name": "结算卡",
+    "on": true,
+    "parent": null,
+    "reason": "",
+    "wanted": true
+   },
+   {
+    "default": true,
+    "key": "dex",
+    "markers": [],
+    "name": "图鉴",
+    "on": true,
+    "parent": null,
+    "reason": "",
+    "wanted": true
+   },
+   {
+    "default": true,
+    "key": "achievements",
+    "markers": [],
+    "name": "厨房成就",
+    "on": true,
+    "parent": "dex",
+    "reason": "",
+    "wanted": true
+   },
+   {
+    "default": false,
+    "key": "tasting_notes",
+    "markers": [
+     "札记"
+    ],
+    "name": "试菜札记",
+    "on": true,
+    "parent": "recipe_book",
+    "reason": "",
+    "wanted": true
+   },
+   {
+    "default": false,
+    "key": "orders",
+    "markers": [
+     "接单"
+    ],
+    "name": "点菜",
+    "on": true,
+    "parent": "recipe_cook",
+    "reason": "",
+    "wanted": true
+   },
+   {
+    "default": false,
+    "key": "menus",
+    "markers": [
+     "配一桌"
+    ],
+    "name": "一桌菜单",
+    "on": true,
+    "parent": "recipe_book",
+    "reason": "",
+    "wanted": true
+   },
+   {
+    "default": false,
+    "key": "recipe_codes",
+    "markers": [
+     "出码"
+    ],
+    "name": "食谱码",
+    "on": true,
+    "parent": "recipe_book",
+    "reason": "",
+    "wanted": true
+   },
+   {
+    "default": false,
+    "key": "vendor",
+    "markers": [
+     "问小贩",
+     "买",
+     "送花",
+     "想要花"
+    ],
+    "name": "流动小贩",
+    "on": true,
+    "parent": null,
+    "reason": "",
+    "wanted": true
+   },
+   {
+    "default": false,
+    "key": "dishwash",
+    "markers": [
+     "刷盘子"
+    ],
+    "name": "刷盘子",
+    "on": true,
+    "parent": null,
+    "reason": "",
+    "wanted": true
+   },
+   {
+    "default": false,
+    "key": "seal_jars",
+    "markers": [
+     "封罐"
+    ],
+    "name": "窗台密封罐",
+    "on": true,
+    "parent": null,
+    "reason": "",
+    "wanted": true
+   }
+  ]
+ },
+ "features_default": {
+  "features": [
+   {
+    "default": true,
+    "key": "recipes_public",
+    "markers": [],
+    "name": "公共食谱",
+    "on": true,
+    "parent": null,
+    "reason": "",
+    "wanted": true
+   },
+   {
+    "default": true,
+    "key": "recipes_today",
+    "markers": [],
+    "name": "今天可以试试",
+    "on": true,
+    "parent": "recipes_public",
+    "reason": "",
+    "wanted": true
+   },
+   {
+    "default": true,
+    "key": "recipe_cook",
+    "markers": [],
+    "name": "照谱开锅",
+    "on": true,
+    "parent": "recipes_public",
+    "reason": "",
+    "wanted": true
+   },
+   {
+    "default": true,
+    "key": "recipe_book",
+    "markers": [
+     "收藏",
+     "记菜"
+    ],
+    "name": "他的食谱本",
+    "on": true,
+    "parent": null,
+    "reason": "",
+    "wanted": true
+   },
+   {
+    "default": true,
+    "key": "proficiency",
+    "markers": [],
+    "name": "熟练度",
+    "on": true,
+    "parent": null,
+    "reason": "",
+    "wanted": true
+   },
+   {
+    "default": true,
+    "key": "mishaps",
+    "markers": [],
+    "name": "小意外",
+    "on": true,
+    "parent": "proficiency",
+    "reason": "",
+    "wanted": true
+   },
+   {
+    "default": true,
+    "key": "new_dish_bonus",
+    "markers": [],
+    "name": "新菜加成",
+    "on": true,
+    "parent": "recipe_cook",
+    "reason": "",
+    "wanted": true
+   },
+   {
+    "default": true,
+    "key": "settle_card",
+    "markers": [],
+    "name": "结算卡",
+    "on": true,
+    "parent": null,
+    "reason": "",
+    "wanted": true
+   },
+   {
+    "default": true,
+    "key": "dex",
+    "markers": [],
+    "name": "图鉴",
+    "on": true,
+    "parent": null,
+    "reason": "",
+    "wanted": true
+   },
+   {
+    "default": true,
+    "key": "achievements",
+    "markers": [],
+    "name": "厨房成就",
+    "on": true,
+    "parent": "dex",
+    "reason": "",
+    "wanted": true
+   },
+   {
+    "default": false,
+    "key": "tasting_notes",
+    "markers": [
+     "札记"
+    ],
+    "name": "试菜札记",
+    "on": false,
+    "parent": "recipe_book",
+    "reason": "off",
+    "wanted": false
+   },
+   {
+    "default": false,
+    "key": "orders",
+    "markers": [
+     "接单"
+    ],
+    "name": "点菜",
+    "on": false,
+    "parent": "recipe_cook",
+    "reason": "off",
+    "wanted": false
+   },
+   {
+    "default": false,
+    "key": "menus",
+    "markers": [
+     "配一桌"
+    ],
+    "name": "一桌菜单",
+    "on": false,
+    "parent": "recipe_book",
+    "reason": "off",
+    "wanted": false
+   },
+   {
+    "default": false,
+    "key": "recipe_codes",
+    "markers": [
+     "出码"
+    ],
+    "name": "食谱码",
+    "on": false,
+    "parent": "recipe_book",
+    "reason": "off",
+    "wanted": false
+   },
+   {
+    "default": false,
+    "key": "vendor",
+    "markers": [
+     "问小贩",
+     "买",
+     "送花",
+     "想要花"
+    ],
+    "name": "流动小贩",
+    "on": false,
+    "parent": null,
+    "reason": "off",
+    "wanted": false
+   },
+   {
+    "default": false,
+    "key": "dishwash",
+    "markers": [
+     "刷盘子"
+    ],
+    "name": "刷盘子",
+    "on": false,
+    "parent": null,
+    "reason": "off",
+    "wanted": false
+   },
+   {
+    "default": false,
+    "key": "seal_jars",
+    "markers": [
+     "封罐"
+    ],
+    "name": "窗台密封罐",
+    "on": false,
+    "parent": null,
+    "reason": "off",
+    "wanted": false
+   }
+  ]
+ },
  "fridge": {
   "coupons": {
    "count": 1,
@@ -746,16 +1423,16 @@
   },
   "dizzy": {
    "dish": "坏汤",
-   "since": 1794493249.66642,
-   "until": 1794502249.66642
+   "since": 1795259346.0745401,
+   "until": 1795268346.0745401
   },
   "items": [
    {
-    "batch_id": "864dbc0942364d71a21a146c945b283b",
-    "bought_at": 1794493249.660898,
+    "batch_id": "f0095655d7bd4f599fad22075783a32d",
+    "bought_at": 1795259346.0625951,
     "by": "her",
     "category": "leafy",
-    "expires_at": 1794666049.660898,
+    "expires_at": 1795432146.0625951,
     "freshness": "fresh",
     "item_id": "spinach",
     "name": "菠菜",
@@ -763,11 +1440,11 @@
     "wormed": false
    },
    {
-    "batch_id": "2cd7a6d1e7be43ed9ece1fc662be757c",
-    "bought_at": 1794493249.660898,
+    "batch_id": "bdb21106ad7546e28cdcf86700d1afaa",
+    "bought_at": 1795259346.0625951,
     "by": "her",
     "category": "dairy",
-    "expires_at": 1794925249.660898,
+    "expires_at": 1795691346.0625951,
     "freshness": "fresh",
     "item_id": "egg",
     "name": "鸡蛋",
@@ -775,11 +1452,11 @@
     "wormed": false
    },
    {
-    "batch_id": "b5fd225535f341cea5da6d6ca3b6301c",
-    "bought_at": 1794493249.660898,
+    "batch_id": "c54caa7e782c467e897e915a77461f8b",
+    "bought_at": 1795259346.0625951,
     "by": "her",
     "category": "staple_food",
-    "expires_at": 1794925249.660898,
+    "expires_at": 1795691346.0625951,
     "freshness": "fresh",
     "item_id": "udon",
     "name": "乌冬面",
@@ -789,25 +1466,25 @@
   ],
   "log": [
    {
-    "at": 1794493249.66642,
+    "at": 1795259346.0745401,
     "kind": "dizzy",
     "text": "吃了坏掉的坏汤,晕乎乎的"
    },
    {
-    "at": 1794493249.665788,
+    "at": 1795259346.0737731,
     "kind": "coupon",
     "text": "用户给了一张买菜券"
    },
    {
-    "at": 1794493249.660898,
+    "at": 1795259346.0625951,
     "kind": "bought",
     "text": "用户买了菠菜×1、鸡蛋×6、乌冬面×1"
    }
   ],
-  "now": 1794493249.676576,
+  "now": 1795259346.0865338,
   "satiety": {
    "enabled": true,
-   "updated_at": 1794493249.66642,
+   "updated_at": 1795259346.0745401,
    "value": 60.0
   },
   "staples": [
@@ -816,7 +1493,7 @@
    "盐",
    "酱油"
   ],
-  "text": "冰箱:鸡蛋×6(11-12买的)、菠菜×1、乌冬面×1。米油盐酱油常备。\n买菜券 1/3 张。\n能买的:叶菜 菠菜/茼蒿/小葱/生菜;蔬菜 番茄/黄瓜/青椒/茄子/蘑菇/白菜/西蓝花/豆芽;根茎 胡萝卜/土豆/洋葱/白萝卜;蛋奶豆 鸡蛋/牛奶/豆腐/黄油/奶酪/味噌;肉和海鲜 牛肉/猪肉/鸡腿/虾/三文鱼/猪肉薄切;主食 乌冬面/面条;水果 草莓/苹果/柠檬。\n你还有点晕乎乎的,01:50 前后缓过来。\n饱食度 60%。",
+  "text": "冰箱:鸡蛋×6(11-21买的)、菠菜×1、乌冬面×1。米油盐酱油常备。\n买菜券 1/3 张。\n能买的:叶菜 菠菜/茼蒿/小葱/生菜;蔬菜 番茄/黄瓜/青椒/茄子/蘑菇/白菜/西蓝花/豆芽;根茎 胡萝卜/土豆/洋葱/白萝卜;蛋奶豆 鸡蛋/牛奶/豆腐/黄油/奶酪/味噌;肉和海鲜 牛肉/猪肉/鸡腿/虾/三文鱼/猪肉薄切;主食 乌冬面/面条;水果 草莓/苹果/柠檬。\n你还有点晕乎乎的,22:39 前后缓过来。\n饱食度 60%。",
   "who": "aster"
  },
  "fridge_kinds": {
@@ -826,16 +1503,16 @@
   },
   "dizzy": {
    "dish": "坏汤",
-   "since": 1794493249.66642,
-   "until": 1794502249.66642
+   "since": 1795259346.0745401,
+   "until": 1795268346.0745401
   },
   "items": [
    {
-    "batch_id": "864dbc0942364d71a21a146c945b283b",
-    "bought_at": 1794493249.660898,
+    "batch_id": "f0095655d7bd4f599fad22075783a32d",
+    "bought_at": 1795259346.0625951,
     "by": "her",
     "category": "leafy",
-    "expires_at": 1794666049.660898,
+    "expires_at": 1795432146.0625951,
     "freshness": "fresh",
     "item_id": "spinach",
     "name": "菠菜",
@@ -843,11 +1520,11 @@
     "wormed": false
    },
    {
-    "batch_id": "2cd7a6d1e7be43ed9ece1fc662be757c",
-    "bought_at": 1794493249.660898,
+    "batch_id": "bdb21106ad7546e28cdcf86700d1afaa",
+    "bought_at": 1795259346.0625951,
     "by": "her",
     "category": "dairy",
-    "expires_at": 1794925249.660898,
+    "expires_at": 1795691346.0625951,
     "freshness": "fresh",
     "item_id": "egg",
     "name": "鸡蛋",
@@ -855,11 +1532,11 @@
     "wormed": false
    },
    {
-    "batch_id": "b5fd225535f341cea5da6d6ca3b6301c",
-    "bought_at": 1794493249.660898,
+    "batch_id": "c54caa7e782c467e897e915a77461f8b",
+    "bought_at": 1795259346.0625951,
     "by": "her",
     "category": "staple_food",
-    "expires_at": 1794925249.660898,
+    "expires_at": 1795691346.0625951,
     "freshness": "fresh",
     "item_id": "udon",
     "name": "乌冬面",
@@ -873,13 +1550,13 @@
      "state": "none",
      "v": 0
     },
-    "batch_id": "d9b2021b173b4e9f829a86a94656bb8c",
-    "bought_at": 1794493849.70399,
+    "batch_id": "9e97bdc97348428b9416759a6642e521",
+    "bought_at": 1795259946.136471,
     "by": "her",
     "category": "fruit",
-    "expires_at": 1795098649.70399,
+    "expires_at": 1795864746.136471,
     "freshness": "fresh",
-    "item_id": "u_a7dadc9971",
+    "item_id": "u_c7be96a46c",
     "name": "柿子",
     "qty": 1,
     "wormed": false
@@ -887,30 +1564,30 @@
   ],
   "log": [
    {
-    "at": 1794493849.70399,
+    "at": 1795259946.136471,
     "kind": "bought",
     "text": "用户买了柿子×1"
    },
    {
-    "at": 1794493249.66642,
+    "at": 1795259346.0745401,
     "kind": "dizzy",
     "text": "吃了坏掉的坏汤,晕乎乎的"
    },
    {
-    "at": 1794493249.665788,
+    "at": 1795259346.0737731,
     "kind": "coupon",
     "text": "用户给了一张买菜券"
    },
    {
-    "at": 1794493249.660898,
+    "at": 1795259346.0625951,
     "kind": "bought",
     "text": "用户买了菠菜×1、鸡蛋×6、乌冬面×1"
    }
   ],
-  "now": 1794493849.7065449,
+  "now": 1795259946.139877,
   "satiety": {
    "enabled": true,
-   "updated_at": 1794493849.692214,
+   "updated_at": 1795259946.119458,
    "value": 98.5
   },
   "staples": [
@@ -919,7 +1596,7 @@
    "盐",
    "酱油"
   ],
-  "text": "冰箱:鸡蛋×5(11-12买的)、菠菜×1、乌冬面×1、柿子×1。米油盐酱油常备。\n买菜券 1/3 张。\n能买的:叶菜 菠菜/茼蒿/小葱/生菜;蔬菜 番茄/黄瓜/青椒/茄子/蘑菇/白菜/西蓝花/豆芽;根茎 胡萝卜/土豆/洋葱/白萝卜;蛋奶豆 鸡蛋/牛奶/豆腐/黄油/奶酪/味噌;肉和海鲜 牛肉/猪肉/鸡腿/虾/三文鱼/猪肉薄切;主食 乌冬面/面条;水果 草莓/苹果/柠檬/柿子。\n你还有点晕乎乎的,01:50 前后缓过来。\n饱食度 98%。",
+  "text": "冰箱:鸡蛋×5(11-21买的)、菠菜×1、乌冬面×1、柿子×1。米油盐酱油常备。\n买菜券 1/3 张。\n能买的:叶菜 菠菜/茼蒿/小葱/生菜;蔬菜 番茄/黄瓜/青椒/茄子/蘑菇/白菜/西蓝花/豆芽;根茎 胡萝卜/土豆/洋葱/白萝卜;蛋奶豆 鸡蛋/牛奶/豆腐/黄油/奶酪/味噌;肉和海鲜 牛肉/猪肉/鸡腿/虾/三文鱼/猪肉薄切;主食 乌冬面/面条;水果 草莓/苹果/柠檬/柿子。\n你还有点晕乎乎的,22:39 前后缓过来。\n饱食度 98%。",
   "who": "aster"
  },
  "fridge_off": {
@@ -929,16 +1606,16 @@
   },
   "dizzy": {
    "dish": "坏汤",
-   "since": 1794493249.66642,
-   "until": 1794502249.66642
+   "since": 1795259346.0745401,
+   "until": 1795268346.0745401
   },
   "items": [
    {
-    "batch_id": "864dbc0942364d71a21a146c945b283b",
-    "bought_at": 1794493249.660898,
+    "batch_id": "f0095655d7bd4f599fad22075783a32d",
+    "bought_at": 1795259346.0625951,
     "by": "her",
     "category": "leafy",
-    "expires_at": 1794666049.660898,
+    "expires_at": 1795432146.0625951,
     "freshness": "fresh",
     "item_id": "spinach",
     "name": "菠菜",
@@ -946,11 +1623,11 @@
     "wormed": false
    },
    {
-    "batch_id": "2cd7a6d1e7be43ed9ece1fc662be757c",
-    "bought_at": 1794493249.660898,
+    "batch_id": "bdb21106ad7546e28cdcf86700d1afaa",
+    "bought_at": 1795259346.0625951,
     "by": "her",
     "category": "dairy",
-    "expires_at": 1794925249.660898,
+    "expires_at": 1795691346.0625951,
     "freshness": "fresh",
     "item_id": "egg",
     "name": "鸡蛋",
@@ -958,11 +1635,11 @@
     "wormed": false
    },
    {
-    "batch_id": "b5fd225535f341cea5da6d6ca3b6301c",
-    "bought_at": 1794493249.660898,
+    "batch_id": "c54caa7e782c467e897e915a77461f8b",
+    "bought_at": 1795259346.0625951,
     "by": "her",
     "category": "staple_food",
-    "expires_at": 1794925249.660898,
+    "expires_at": 1795691346.0625951,
     "freshness": "fresh",
     "item_id": "udon",
     "name": "乌冬面",
@@ -976,13 +1653,13 @@
      "state": "none",
      "v": 0
     },
-    "batch_id": "d9b2021b173b4e9f829a86a94656bb8c",
-    "bought_at": 1794493849.70399,
+    "batch_id": "9e97bdc97348428b9416759a6642e521",
+    "bought_at": 1795259946.136471,
     "by": "her",
     "category": "fruit",
-    "expires_at": 1795098649.70399,
+    "expires_at": 1795864746.136471,
     "freshness": "fresh",
-    "item_id": "u_a7dadc9971",
+    "item_id": "u_c7be96a46c",
     "name": "柿子",
     "qty": 1,
     "wormed": false
@@ -990,30 +1667,30 @@
   ],
   "log": [
    {
-    "at": 1794493849.70399,
+    "at": 1795259946.136471,
     "kind": "bought",
     "text": "用户买了柿子×1"
    },
    {
-    "at": 1794493249.66642,
+    "at": 1795259346.0745401,
     "kind": "dizzy",
     "text": "吃了坏掉的坏汤,晕乎乎的"
    },
    {
-    "at": 1794493249.665788,
+    "at": 1795259346.0737731,
     "kind": "coupon",
     "text": "用户给了一张买菜券"
    },
    {
-    "at": 1794493249.660898,
+    "at": 1795259346.0625951,
     "kind": "bought",
     "text": "用户买了菠菜×1、鸡蛋×6、乌冬面×1"
    }
   ],
-  "now": 1794493849.709915,
+  "now": 1795259946.144819,
   "satiety": {
    "enabled": false,
-   "updated_at": 1794493849.692214,
+   "updated_at": 1795259946.119458,
    "value": 98.5
   },
   "staples": [
@@ -1022,20 +1699,68 @@
    "盐",
    "酱油"
   ],
-  "text": "冰箱:鸡蛋×5(11-12买的)、菠菜×1、乌冬面×1、柿子×1。米油盐酱油常备。\n买菜券 1/3 张。\n能买的:叶菜 菠菜/茼蒿/小葱/生菜;蔬菜 番茄/黄瓜/青椒/茄子/蘑菇/白菜/西蓝花/豆芽;根茎 胡萝卜/土豆/洋葱/白萝卜;蛋奶豆 鸡蛋/牛奶/豆腐/黄油/奶酪/味噌;肉和海鲜 牛肉/猪肉/鸡腿/虾/三文鱼/猪肉薄切;主食 乌冬面/面条;水果 草莓/苹果/柠檬/柿子。\n你还有点晕乎乎的,01:50 前后缓过来。",
+  "text": "冰箱:鸡蛋×5(11-21买的)、菠菜×1、乌冬面×1、柿子×1。米油盐酱油常备。\n买菜券 1/3 张。\n能买的:叶菜 菠菜/茼蒿/小葱/生菜;蔬菜 番茄/黄瓜/青椒/茄子/蘑菇/白菜/西蓝花/豆芽;根茎 胡萝卜/土豆/洋葱/白萝卜;蛋奶豆 鸡蛋/牛奶/豆腐/黄油/奶酪/味噌;肉和海鲜 牛肉/猪肉/鸡腿/虾/三文鱼/猪肉薄切;主食 乌冬面/面条;水果 草莓/苹果/柠檬/柿子。\n你还有点晕乎乎的,22:39 前后缓过来。",
   "who": "aster"
+ },
+ "jars": {
+  "cap": 3,
+  "goods": [],
+  "jars": [
+   {
+    "due_at": 1795519146.168111,
+    "freshness": "fresh",
+    "how": "sugar",
+    "how_word": "冰糖",
+    "item_id": "apple",
+    "item_name": "苹果",
+    "note": "给冬天",
+    "seal_key": "6f5608984b3f7d1a",
+    "sealed_at": 1795259946.168111,
+    "slot": 1,
+    "state": "sealed",
+    "who": "aster"
+   },
+   {
+    "due_at": null,
+    "freshness": null,
+    "how": null,
+    "how_word": null,
+    "item_id": null,
+    "item_name": null,
+    "note": "",
+    "seal_key": null,
+    "sealed_at": null,
+    "slot": 2,
+    "state": "empty",
+    "who": "aster"
+   },
+   {
+    "due_at": null,
+    "freshness": null,
+    "how": null,
+    "how_word": null,
+    "item_id": null,
+    "item_name": null,
+    "note": "",
+    "seal_key": null,
+    "sealed_at": null,
+    "slot": 3,
+    "state": "empty",
+    "who": "aster"
+   }
+  ]
  },
  "kitchen": {
   "cooking": [],
-  "now": 1794493849.690561,
+  "now": 1795259946.117252,
   "recent": [
    {
     "cancelled_at": null,
-    "created_at": 1794493249.6813738,
+    "created_at": 1795259346.0963259,
     "dish": "煎蛋",
     "duration_seconds": 300,
     "eaten_at": null,
-    "id": "41a2699947e042deacbbcf300ed219ca",
+    "id": "ed799b046d1d4444a9151afed0f74497",
     "ingredients": [
      {
       "freshness": "fresh",
@@ -1043,17 +1768,22 @@
       "qty": 1
      }
     ],
-    "menu_added_at": 1794493849.6862872,
-    "menu_row_id": "8e49816ec4184a35a8d07ffa88abf9f6",
+    "menu_added_at": 1795259946.1095319,
+    "menu_row_id": "36db7e37d2fc49c7a97005a731eb0b5b",
     "method": "fry",
+    "mishap_id": null,
+    "mishap_ver": null,
     "note": "",
     "outcome": "great",
+    "recipe_id": null,
+    "recipe_link": null,
+    "recipe_version": null,
     "remaining_seconds": 0,
-    "served_at": 1794493549.6813738,
-    "started_at": 1794493249.6813738,
+    "served_at": 1795259646.0963259,
+    "started_at": 1795259346.0963259,
     "status": "served",
     "who": "aster",
-    "woke_at": 1794493849.6879842,
+    "woke_at": 1795259946.1116428,
     "worm_state": null,
     "wormed_at": null
    }
@@ -1063,24 +1793,40 @@
  "meals": {
   "meals": [
    {
-    "at": 1794493849.692214,
-    "id": "c10c891d5a9740c79525c68fdbabd21b",
+    "at": 1795259946.119458,
+    "id": "d732cd493dae433fbfd5c317448de3ce",
     "meal": "茄汁滑蛋",
     "note": null
    }
   ],
-  "now": 1794493849.6953511,
-  "since": 1794409200.0,
+  "now": 1795259946.124682,
+  "since": 1795186800.0,
   "who": "aster"
+ },
+ "orders": {
+  "orders": [
+   {
+    "created_at": 1795259946.154999,
+    "his_note": "",
+    "id": "o-ab3fd876",
+    "identity": "hc-e0a19bc9",
+    "name": "蒸水蛋",
+    "session_id": "79d7a458c56547bd8098ddd1a6002161",
+    "state": "done",
+    "updated_at": 1795260546.17714,
+    "who": "aster"
+   }
+  ],
+  "text": ""
  },
  "potion_row_note": "回 30% 体力 · 困了就喝",
  "potions": {
   "enabled": true,
   "items": [
    {
-    "created_at": 1794493849.696176,
+    "created_at": 1795259946.125782,
     "memo": "困了就喝",
-    "menu_row_id": "95dae5cb15274bb499b678f26de60845",
+    "menu_row_id": "8ae2ca6c3d3d46c193c6a962d43e70e7",
     "note": "回 30% 体力 · 困了就喝",
     "pct": 30,
     "state": "pending",
@@ -1099,9 +1845,9 @@
   "enabled": false,
   "items": [
    {
-    "created_at": 1794493849.696176,
+    "created_at": 1795259946.125782,
     "memo": "困了就喝",
-    "menu_row_id": "95dae5cb15274bb499b678f26de60845",
+    "menu_row_id": "8ae2ca6c3d3d46c193c6a962d43e70e7",
     "note": "回 30% 体力 · 困了就喝",
     "pct": 30,
     "state": "pending",
@@ -1116,13 +1862,112 @@
   "note_fmt": "回 {pct}% 体力",
   "pct_min": 1
  },
+ "recipes": {
+  "categories": [
+   "水产",
+   "早餐",
+   "酱料",
+   "甜品",
+   "饮品",
+   "荤菜",
+   "半成品",
+   "汤",
+   "主食",
+   "素菜"
+  ],
+  "recipes": [
+   {
+    "aliases": [],
+    "category": "vegetable_dish",
+    "category_label": "素菜",
+    "id": "hc-bfa499af",
+    "items_text": "鸡蛋",
+    "main": [
+     {
+      "item": "egg",
+      "qty": 1
+     }
+    ],
+    "method": "boil",
+    "minutes": 10,
+    "name": "微波炉鸡蛋羹",
+    "optional": [],
+    "source": "HowToCook@58c1b9a dishes/vegetable_dish/鸡蛋羹/微波炉鸡蛋羹.md",
+    "staples": [
+     "水"
+    ],
+    "stopped": false
+   },
+   {
+    "aliases": [],
+    "category": "vegetable_dish",
+    "category_label": "素菜",
+    "id": "hc-39d30f34",
+    "items_text": "鸡蛋",
+    "main": [
+     {
+      "item": "egg",
+      "qty": 1
+     }
+    ],
+    "method": "steam",
+    "minutes": 15,
+    "name": "蒸箱鸡蛋羹",
+    "optional": [],
+    "source": "HowToCook@58c1b9a dishes/vegetable_dish/鸡蛋羹/蒸箱鸡蛋羹.md",
+    "staples": [
+     "食用盐",
+     "食用油",
+     "生抽"
+    ],
+    "stopped": false
+   },
+   {
+    "aliases": [],
+    "category": "breakfast",
+    "category_label": "早餐",
+    "id": "hc-518faeab",
+    "items_text": "鸡蛋",
+    "main": [
+     {
+      "item": "egg",
+      "qty": 1
+     }
+    ],
+    "method": "boil",
+    "minutes": 40,
+    "name": "韩国麻药鸡蛋",
+    "optional": [
+     {
+      "item": "scallion",
+      "qty": 1
+     }
+    ],
+    "source": "HowToCook@58c1b9a dishes/breakfast/韩国麻药鸡蛋.md",
+    "staples": [
+     "韩式酱油",
+     "日式味淋",
+     "白糖",
+     "芝麻油",
+     "辣椒"
+    ],
+    "stopped": false
+   }
+  ],
+  "source": {
+   "commit": "58c1b9af7900a9489c340bca39ef94a9a62314b1",
+   "license": "Unlicense(公共领域)",
+   "repo": "https://github.com/Anduin2017/HowToCook"
+  },
+  "total": 374
+ },
  "snacks": {
   "cap_max": 20,
   "cap_min": 0,
-  "day": "2026-11-12",
+  "day": "2026-11-21",
   "energy_enabled": true,
   "recent": [],
-  "resets_at": 1794510000.0,
+  "resets_at": 1795287600.0,
   "snacks": [
    {
     "cap": 3,
@@ -1206,10 +2051,10 @@
  "snacks_off": {
   "cap_max": 20,
   "cap_min": 0,
-  "day": "2026-11-12",
+  "day": "2026-11-21",
   "energy_enabled": false,
   "recent": [],
-  "resets_at": 1794510000.0,
+  "resets_at": 1795287600.0,
   "snacks": [
    {
     "cap": 3,
@@ -1289,5 +2134,56 @@
    }
   ],
   "who": "aster"
+ },
+ "vendor": {
+  "flower": null,
+  "flower_requests": [],
+  "mine": [],
+  "now": 1795260546.213032,
+  "on": true,
+  "today": {
+   "cap": 60,
+   "order_cap": 30,
+   "spent": 0
+  },
+  "visit": {
+   "arrive_at": 1795260546.211662,
+   "goods": [
+    {
+     "id": "hawthorn_stick",
+     "kind": "snack",
+     "left": 5,
+     "name": "山楂糖葫芦",
+     "price": 5,
+     "unit": "串"
+    },
+    {
+     "id": "strawberry_stick",
+     "kind": "snack",
+     "left": 3,
+     "name": "草莓糖葫芦",
+     "price": 8,
+     "unit": "串"
+    },
+    {
+     "id": "hawthorn",
+     "kind": "ingredient",
+     "left": 2,
+     "name": "山楂",
+     "price": 8,
+     "unit": "份"
+    }
+   ],
+   "id": "v1",
+   "leave_at": 1795263546.211662,
+   "left_s": 2999.9986300468445,
+   "name": "糖葫芦",
+   "vendor": "tanghulu",
+   "who": "卖糖葫芦的"
+  },
+  "wallet": {
+   "balance": 0,
+   "local": true
+  }
  }
 }

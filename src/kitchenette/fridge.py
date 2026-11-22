@@ -203,13 +203,22 @@ def resolve(name: str, *, gone: bool = False) -> str | None:
     return iid
 
 
-def canon(item_id: str) -> str:
+_ALIAS_DEPTH = 8          # an alias chain longer than this (or a loop) is ignored
+
+
+def canon(item_id: str, _depth: int = 0) -> str:
     """One identity per thing, for comparing: a recipe ingredient (v_ id) and an ingredient kind of the
-    same name that the human added are the same thing. While that kind is offered it represents both;
+    same name that the human added are the same thing; so are an old name of a recipe ingredient and
+    the name the recipe index uses now (泡好的粉丝 -> 粉丝). While that kind is offered it represents both;
     once removed, the recipe ingredient does (its old batches count too). Anything else is itself."""
     sid = str(item_id)
     from . import recipes
     if sid.startswith("v_"):
+        alias = recipes.vendor_alias(sid)
+        if alias is not None and alias != sid:
+            if _depth < _ALIAS_DEPTH:           # an old name of a recipe ingredient: the thing it is now
+                return canon(alias, _depth + 1)
+            log.warning("recipe ingredient alias chain too long or looping at %s", sid)
         it = recipes.vendor_item(sid)
         if it is None:
             return item_id
@@ -748,10 +757,7 @@ def toss_self(who: str, text: str, *, key: str, now: float | None = None) -> str
         conn.close()
 
 
-def buy_her(who: str, item_ids: list[str], now: float | None = None) -> dict:
-    """The human buys for the role: no coupon needed. Returns {added, text}."""
-    _check_viewer(who)
-    now = now or _now()
+def _her_ids(item_ids: list[str]) -> list[str]:
     ids: list[str] = []
     for iid in item_ids or []:
         it = item(iid)
@@ -762,19 +768,35 @@ def buy_her(who: str, item_ids: list[str], now: float | None = None) -> dict:
         raise FridgeError(t("her_buy_empty"), "empty")
     if len(ids) > _cfg().fridge_human_buy_max_items:
         raise FridgeError(t("her_buy_too_many", max=_cfg().fridge_human_buy_max_items), "too_many")
+    return ids
+
+
+def buy_her_in_tx(conn, who: str, item_ids: list[str], now: float) -> dict:
+    """buy_her inside a write transaction the caller holds (and commits or rolls back), for buying that
+    must happen together with other writes. Returns {added, text}."""
+    _check_viewer(who)
+    added = _add_batches(conn, who, _her_ids(item_ids), BY_HER, "her", now)
+    _log(conn, who, "bought", t("log_bought_her", names=_names_of(added)), now)
+    return {"added": added, "text": t("her_buy_ok", names=_names_of(added))}
+
+
+def buy_her(who: str, item_ids: list[str], now: float | None = None) -> dict:
+    """The human buys for the role: no coupon needed. Returns {added, text}."""
+    _check_viewer(who)
+    now = now or _now()
+    _her_ids(item_ids)                   # refuse before touching the database
     conn = _conn()
     try:
         conn.execute("BEGIN IMMEDIATE")
         try:
-            added = _add_batches(conn, who, ids, BY_HER, "her", now)
+            out = buy_her_in_tx(conn, who, item_ids, now)
         except FridgeError:
             conn.rollback()
             raise
-        _log(conn, who, "bought", t("log_bought_her", names=_names_of(added)), now)
         conn.commit()
     finally:
         conn.close()
-    return {"added": added, "text": t("her_buy_ok", names=_names_of(added))}
+    return out
 
 
 # ── coupons ─────────────────────────────────────────────────────────────

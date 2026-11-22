@@ -2,7 +2,7 @@
 
 [中文](README.md)
 
-> 🆕 **Installed the previous version?** [What this update adds, and how to upgrade →](docs/UPGRADE.md#upgrade-steps)
+> 🆕 **Installed the previous version?** [From 0.2.0 to 0.2.1: one command, your data moves over by itself →](docs/UPGRADE.md#upgrade-0.2.1)
 
 **Build your AI companion a little kitchen of his own, one that smells of real cooking. ✨**
 
@@ -42,13 +42,13 @@ He cooks each dish the way it is meant to be cooked, and he takes it seriously. 
 
 Every segment is worked out fresh from the pot's start time and duration. Scroll the card away, reload the page or open it on another device, and he is exactly where he should be at that moment. He never slacks off.
 
-**Besides the pots, he does three chores.** These are not on the cooking card: they play in a small panel at the top of the "vendor" and "plates" pages of the kitchen page (next section); nothing is drawn onto the kitchen picture. You see them only with those plays switched on (vendors and plates are off by default, see the upgrade below).
+**Besides the pots, he does three chores.** Washing up by hand is like cooking: it gets a washing card of its own in the chat, with the cook on its top edge going through the plates one by one. Buying from the vendor and loading the dishwasher play in a small panel at the top of the "vendor" and "plates" pages of the kitchen page (next section); nothing is drawn onto the kitchen picture. You see them only with those plays switched on (vendors and plates are off by default, see the upgrade below).
 
-<img src="docs/animation/chores.gif" width="660" alt="Three pixel animations side by side. Left: the cook in the headscarf calls the vendor at the window, hands over pocket money, takes a paper bag from a hand reaching in, and carries it back. Middle: the cook in the toque rolls up his sleeves, squeezes the soap, scrubs a plate, rinses it, shakes it, dries it and stacks it on the rack; the last part is a plate slipping out of his hands and breaking on the floor. Right: the cook in the headscarf loads the dishwasher, closes it, presses the button, it runs, and he opens it when done">
+<img src="docs/animation/chores.gif" width="660" alt="Three pixel animations side by side. Left: a vendor in a straw hat pushes his little stall cart in and rings a hand bell; the cook in the headscarf pays him two coins, takes a candied-haw skewer from the straw bundle on his counter and bites into it; then the vendor pushes the cart away. Middle: the cook in the toque rolls up his sleeves, squeezes the soap, scrubs a plate, rinses it, shakes it, dries it and stacks it on the rack; the last part is a plate slipping out of his hands and breaking on the floor. Right: the cook in the headscarf loads the dishwasher, closes it, presses the button, it runs, and he opens it when done">
 
-Left: buying from the vendor downstairs (calling him over, paying, taking the bag, carrying it back). Middle: washing up by hand (sleeves, soap, scrub, rinse, shake, dry, stack; now and then a plate breaks). Right: the dishwasher (load, close, start, running, done). In the GIF every part plays for 3 seconds; on the page a washing-up step lasts a seventh of each plate's time and the dishwasher runs for 8 seconds. When each part plays is in [`docs/ANIMATION.md`](docs/ANIMATION.md#chores-on-the-kitchen-page).
+Left: the vendor downstairs with his stall cart (pushing it in, ringing his bell; the cook walking over, paying him, taking a candied-haw skewer, biting into it and walking back; the vendor pushing his cart away). Middle: washing up by hand (sleeves, soap, scrub, rinse, shake, dry, stack; now and then a plate breaks). Right: the dishwasher (load, close, start, running, done). In the GIF every part plays for 3 seconds; on the washing card a step lasts a seventh of each plate's time (the sleeves are rolled up once, at the start), and on the page the dishwasher runs for 8 seconds. When each part plays is in [`docs/ANIMATION.md`](docs/ANIMATION.md#chores).
 
-The card is a single framework-free element, `<kitchenette-cooking-card>`: one tag on a page, see [`web/README.md`](web/README.md). Every segment, the image spec and how to swap in your own character are in [`docs/ANIMATION.md`](docs/ANIMATION.md).
+The card is a single framework-free element, `<kitchenette-cooking-card>`, and the washing card is `<kitchenette-washing-card>` from the same script: one tag on a page, see [`web/README.md`](web/README.md). Every segment, the image spec and how to swap in your own character are in [`docs/ANIMATION.md`](docs/ANIMATION.md).
 
 ---
 
@@ -58,31 +58,31 @@ Once installed, open `http://127.0.0.1:8765/page/` in a browser and step into th
 
 | Picking something up | Buying him groceries |
 |---|---|
-| <img src="docs/page/kitchen-page.png" width="320" alt="The kitchen page: the tomatoes from the fridge have been taken down and shown large under the picture, with the freshness and date of each batch"> | <img src="docs/page/kitchen-page-buy.png" width="320" alt="The kitchen page: the shopping sheet, ingredients listed by category with small pictures"> |
+| <img src="docs/page/kitchen-page.png" width="320" alt="The kitchen page: the tomatoes from the fridge have been taken down and shown large under the picture, with how fresh they are, until when, and who bought them when"> | <img src="docs/page/kitchen-page-buy.png" width="320" alt="The kitchen page: the shopping sheet, ingredients listed by category with small pictures"> |
 
 **The picture follows the hour.** The same kitchen is drawn three times, by day, at dusk and at night, and the page shows the one for the kitchen's clock (day 6:00–17:00, dusk 17:00–19:00, night the rest), fading slowly from one to the next. Nothing is laid over the picture: no labels, no fake light.
 
 <img src="docs/page/kitchen-page-lights.png" width="660" alt="The same kitchen three times side by side: by day with green trees outside the window, at dusk in a warm light, at night with the window dark and the lamps on; roses on the sill in all three, two filled jars on the counter, plates in the sink and a full drying rack">
 
-With some of the upgrade's plays switched on, the picture changes with them: the bunch bought from the vendor stands on the window sill in its vase (fresh, a little droopy and wilted each look different; no bunch, the sill stays empty); the three jars on the left of the counter stand empty or hold fruit or pickles; the sink fills with plates waiting to be washed, foams while he is washing, and what he washed stands on the drying rack for three hours. Tapping the flowers, a jar, the sink or the rack opens the matching page. When a vendor is downstairs, a line appears at the top of the page ("楼下有卖花的 · 还待 50 分钟 →", a flower seller is downstairs for another 50 minutes); tap it to see the goods.
+With some of the upgrade's plays switched on, the picture changes with them: the bunch bought from the vendor stands on the window sill in its vase (fresh, a little droopy and wilted each look different; no bunch, the sill stays empty); the three jars on the left of the counter stand empty or hold fruit or pickles (with jars switched off the three stand there empty and cannot be tapped); the sink fills with plates waiting to be washed, foams while he is washing, and what he washed stands on the drying rack for three hours. Tapping the flowers, a jar, the sink or the rack opens the matching page. When a vendor is downstairs, a line appears at the top of the page ("楼下有卖花的 · 还待 50 分钟 →", a flower seller is downstairs for another 50 minutes); tap it to see the goods.
 
 **A row of entrances under the hand**: one for each play that is switched on, none for those that are off. The first time an entrance appears it carries a small red 「新」 (new), which goes away once it has been opened (remembered by this device's browser).
 
 | Every play on | As installed (ten switched on) |
 |---|---|
-| <img src="docs/page/kitchen-page-entries.png" width="320" alt="The kitchen page scrolled down: under the hand a row of entrances, 食谱, 图鉴, 成就, 小贩, 零花钱, 盘子, 罐子, each with a small red 新; in the picture flowers on the sill, jars on the counter, plates in the sink and on the rack"> | <img src="docs/page/kitchen-page-default.png" width="320" alt="The kitchen page with the default switches: only three entrances, 食谱, 图鉴, 成就; in the picture the sill is empty, there are no jars, the sink and the rack are empty"> |
+| <img src="docs/page/kitchen-page-entries.png" width="320" alt="The kitchen page scrolled down: under the hand a row of entrances, 食谱, 图鉴, 成就, 小贩, 零花钱, 盘子, 罐子, each with a small red 新; in the picture flowers on the sill, jars on the counter, plates in the sink and on the rack"> | <img src="docs/page/kitchen-page-default.png" width="320" alt="The kitchen page with the default switches: only three entrances, 食谱, 图鉴, 成就; in the picture the sill is empty, three empty jars stand on the counter, the sink and the rack are empty"> |
 
 An entrance opens a sheet of paper that drops from the top; its pages can be switched between directly:
 
 | Recipes | Dish book | Achievements |
 |---|---|---|
-| <img src="docs/page/page-recipes.png" width="240" alt="The recipes page: dishes to try today, a search box for the public recipes, his recipe book with two collected pages and one of his own, each with a code, and at the bottom a box for someone else's code"> | <img src="docs/page/page-dex.png" width="240" alt="The dish book: one row per dish made, with how often it was made, made well and eaten, the best result, the method and the ingredients, and a comment to write on each"> | <img src="docs/page/page-achievements.png" width="240" alt="The achievements page: all of them in one column; the earned ones say how they were earned, the others say not yet"> |
+| <img src="docs/page/page-recipes.png" width="240" alt="The recipes page: dishes to try today (two the fridge can make, one a thing short), the public recipes searched for eggs, each with 想吃这个, 缺什么 and 写错了; the first one's 缺什么 is open and says the fridge has enough"> | <img src="docs/page/page-dex.png" width="240" alt="The dish book: a line with how many public recipes there are and how many were made; one row per dish made, its pixel dish on the left, the day it was first made, how often it was made, made well and eaten, the best result, the method and the ingredients, a comment to write, and 并页 for the unsorted ones; at the bottom three recipes collected and not made yet, as grey silhouettes"> | <img src="docs/page/page-achievements.png" width="240" alt="The achievements page: all of them in one column; the earned ones say how they were earned, the others say not yet"> |
 
 | Vendor | Pocket money | Plates | Jars |
 |---|---|---|---|
-| <img src="docs/page/page-vendor.png" width="180" alt="The vendor page: how long the flower seller stays, prices and stock of roses, bellflowers and dried osmanthus, each with a button to buy it for him; what he spent at the vendors today, his pocket money and giving some; the fresh roses on the sill; his wish for hyacinths, to agree to or not"> | <img src="docs/page/page-pocket.png" width="180" alt="The pocket money page: his balance and a box to give him some"> | <img src="docs/page/page-plates.png" width="180" alt="The plates page: how many in the sink, being washed, washed, broken and in the dishwasher, the switch for letting him wash, how many at a time"> | <img src="docs/page/page-jars.png" width="180" alt="The jars page: what is in each of the three jars with its slip, one empty; the jar treats on the snack shelf and how many a day"> |
+| <img src="docs/page/page-vendor.png" width="180" alt="The vendor page: how long the candied-haw seller stays; at the top the vendor behind his cart ringing his bell; prices and stock of two kinds of candied haws and haws, each with a button to buy it for him; what he spent at the vendors today and the two orders (one you treated him to, one he bought); his pocket money and giving some"> | <img src="docs/page/page-pocket.png" width="180" alt="The pocket money page: his balance and a box to give him some"> | <img src="docs/page/page-plates.png" width="180" alt="The plates page: at the top the cook by the open dishwasher; how many in the sink, being washed, washed, broken and in the dishwasher, the switch for letting him wash, how many at a time"> | <img src="docs/page/page-jars.png" width="180" alt="The jars page: what is in each of the three jars with its slip, one empty; the jar treats on the snack shelf and how many a day"> |
 
-The vendor and plates pages now also have a small panel at the top with the cook doing the chore (these four screenshots were taken before it was added; what it looks like is in the previous section).
+The vendor page now also has a small panel at the top with the chore playing (the vendor at his cart; the cook walking over when he buys), and the plates page one with the dishwasher (the vendor and plates screenshots above show it; how it moves is in the previous section). Washing up by hand does not play on that page but on the washing card in the chat.
 
 The page ships already built inside the package, so no node is needed; it can also be embedded in your own page with an `<iframe>` or in an app's web view.
 
@@ -125,7 +125,7 @@ Three things first:
 | Thing | In one line | Default | Needs | New for the role |
 |---|---|---|---|---|
 | Public recipes | 300-odd home dishes to look up | on | — | the `kitchen_recipes` tool |
-| Today you could try | three suggestions in the kitchen status | on | public recipes | — |
+| Today you could try | up to three suggestions in the kitchen status: two the fridge can make now, one a thing short | on | public recipes | — |
 | Cooking by a recipe | open a pot with a recipe id; buy what it lacks at once | on | public recipes | an optional `recipe` |
 | The role's recipe book | collected, adapted, its own | on | — | two markers |
 | Proficiency | new → practised → signature | on | — | — |
@@ -142,13 +142,15 @@ Three things first:
 | Plates | a dishwasher, or the role washes up | off | — | one marker |
 | Jars on the sill | fruit and vegetables turn into treats | off | — | one marker |
 
-| Buying from the vendor | Washing up by hand | The dishwasher |
+| The vendor at his cart | Washing up by hand | The dishwasher |
 |---|---|---|
-| <img src="docs/animation/chores-vendor.gif" width="240" alt="The cook at the window: waves the vendor over, hands coins to a hand reaching in, takes a steaming paper bag, carries it back"> | <img src="docs/animation/chores-wash.gif" width="240" alt="The cook at the sink: sleeves, soap, scrub, rinse, shake, dry, stack; then a plate slips, bounces up and breaks on the floor"> | <img src="docs/animation/chores-washer.gif" width="240" alt="The cook at the dishwasher: loads it, closes it, presses the button, it runs, he opens it when done"> |
+| <img src="docs/animation/chores-vendor.gif" width="240" alt="A vendor in a straw hat pushes his stall cart in and rings a hand bell; the cook pays him, takes a candied-haw skewer and bites into it; the vendor pushes the cart away"> | <img src="docs/animation/chores-wash.gif" width="240" alt="The cook at the sink: sleeves, soap, scrub, rinse, shake, dry, stack; then a plate slips, bounces up and breaks on the floor"> | <img src="docs/animation/chores-washer.gif" width="240" alt="The cook at the dishwasher: loads it, closes it, presses the button, it runs, he opens it when done"> |
 
-With vendors and plates switched on, the kitchen page plays these in the vendor and plates pages: calling the vendor over while one is downstairs, paying while his order is being charged (not when you treat him), taking the bag and carrying it back when it is delivered (not for a refunded order); washing up step by step through each plate's time, the dropped plate once a plate's time is up and it turns out broken (the page does not know beforehand which one will), and the dishwasher sequence when plates go into it.
+With vendors and plates switched on, the kitchen page plays these in the vendor and plates pages: the vendor pushing his cart in, then ringing his bell now and then and waiting behind his counter while he is downstairs, the cook walking over when an order is placed and paying while it is being charged (not when you treat him), the vendor handing it over when it is delivered and, for a snack, the cook taking a bite, then the cook walking back out (empty-handed for a refunded order), and the vendor pushing his cart away at the end of his visit (the tanghulu seller's cart has a straw bundle of candied haws, every other vendor's a crate of paper bags); and the dishwasher sequence when plates go into it. Washing up by hand plays on the washing card that the `[刷盘子]` line brings back into the chat: step by step through each plate's time, the dropped plate once a plate's time is up and it turns out broken (the card does not know beforehand which one will), and at the end how many were washed and how many broke.
 
-The switches are under `[play]` in `kitchenette.toml` (names and defaults in [`examples/play.toml`](examples/play.toml)). Every rule, marker and number is described in the Chinese README (section 这次升级) and in [`docs/UPGRADE.md`](docs/UPGRADE.md), which also has the before/after table and the four optional hooks (a wallet, a small model for the vendors, a weather reader, a dish-picture drawer). The new picture of the kitchen (three lights, the sill, the sink) is the one the kitchen page uses; a static page lets you switch the light, the flowers, the jars and the plates by hand: [`docs/play/index.html`](docs/play/index.html).
+The switches are under `[play]` in `kitchenette.toml` (names and defaults in [`examples/play.toml`](examples/play.toml)). Every rule, marker and number is described in the Chinese README (section 这次升级) and in [`docs/UPGRADE.md`](docs/UPGRADE.md), which also has the before/after table and the four optional hooks (a wallet, a small model for the vendors, a weather reader, a dish-picture drawer). The new picture of the kitchen (three lights, the sill, the sink) is the one the kitchen page uses; a static page lets you switch the light, the flowers, the jars and the plates by hand, online at <https://tsuru0805.github.io/munch-kitchenette/play/> (source: [`docs/play/index.html`](docs/play/index.html)).
+
+On the kitchen page, the recipes tab lets you rule out ingredients one at a time (dishes with them leave the suggestions and the search), stop a public recipe that has a mistake with "写错了" (and bring it back from the list of stopped ones), and, with cooking by a recipe on, see what a recipe lacks and buy all of it for him in one go ("替他买齐": worked out from the fridge at that moment, no coupon, never bought twice). The dish book shows each dish's picture when a drawer is configured ("重画" to draw it again, "换回旧图" to go back to an older one), otherwise one of the fourteen pixel dishes, with a grey silhouette for a dish collected and not made yet; an unsorted dish can be merged into a sorted page and taken back out.
 
 The recipes come from [Anduin2017/HowToCook](https://github.com/Anduin2017/HowToCook) (Unlicense), commit `58c1b9a`.
 
@@ -246,7 +248,7 @@ Tool descriptions, receipts and reminders are in Chinese and live in one file, [
 
 ## 🚧 Corners still under construction
 
-- There is no hosted demo. Install it and run the fast-forward walk above, wander around the kitchen page, or open the example page in [`web/examples/`](web/examples/) to see the card.
+- There is no hosted kitchen you can cook in; only the picture demo above is online. Install it and run the fast-forward walk above, wander around the kitchen page, or open the example page in [`web/examples/`](web/examples/) to see the cooking card and the washing card.
 
 ---
 
@@ -262,7 +264,7 @@ Tool descriptions, receipts and reminders are in Chinese and live in one file, [
 | [`docs/PAGE.md`](docs/PAGE.md) | The kitchen page: opening it, embedding it |
 | [`docs/API.md`](docs/API.md) | The endpoints a page uses |
 | [`docs/ANIMATION.md`](docs/ANIMATION.md) | Every segment of the cook, the image spec, using your own character |
-| [`web/README.md`](web/README.md) | Putting the card on your page |
+| [`web/README.md`](web/README.md) | Putting the cooking card and the washing card on your page |
 
 ---
 
@@ -281,6 +283,6 @@ The cook's body, face and way of moving come from [clawds-new-clothes](https://g
 
 - Code: [PolyForm Noncommercial 1.0.0](LICENSE), non-commercial.
 - Documentation: [CC BY-NC 4.0](LICENSE-CONTENT).
-- The cook's images and GIFs: CC BY-NC-SA 4.0, non-commercial only, including the settled stills, the dish pictures and the three chores (vendor, washing up, dishwasher; sources in [`clawd-engine-additions/states/chores/`](clawd-engine-additions/states/chores/)); credits in [`assets/clawd/ATTRIBUTION.md`](assets/clawd/ATTRIBUTION.md). The vendor never appears: only a hand and an awning outside the window.
+- The cook's images and GIFs: CC BY-NC-SA 4.0, non-commercial only, including the settled stills, the dish pictures and the three chores (the street vendor and his cart, washing up, dishwasher; sources in [`clawd-engine-additions/states/vendor/`](clawd-engine-additions/states/vendor/) and [`clawd-engine-additions/states/chores/`](clawd-engine-additions/states/chores/)); credits in [`assets/clawd/ATTRIBUTION.md`](assets/clawd/ATTRIBUTION.md). The vendor is a second Clawd in a straw hat, with a wooden stall cart.
 
 Scope by file is in [LICENSING.md](LICENSING.md) and [NOTICE](NOTICE). Commercial use needs a separate written license.

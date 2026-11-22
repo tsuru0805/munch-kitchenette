@@ -1,7 +1,7 @@
-// clawds-new-clothes · states/chores/_dishkit.cjs · sink / dishwasher / window props by tsuru0805 · unofficial Clawd fan work, Clawd belongs to Anthropic
+// clawds-new-clothes · states/chores/_dishkit.cjs · sink / dishwasher props by tsuru0805 · unofficial Clawd fan work, Clawd belongs to Anthropic
 // SPDX-FileCopyrightText: 2026 tsuru0805
 // SPDX-License-Identifier: MIT
-// 三组新动作共用的家伙:刷盘子(水槽、水龙头、盘子、海绵、毛巾、洗洁精、沥水架)、洗碗机、窗边小贩(窗、伸进来的手、纸袋、硬币)。
+// 两组家务共用的家伙:刷盘子(水槽、水龙头、盘子、海绵、毛巾、洗洁精、沥水架)、洗碗机。(小贩那一组在 states/vendor/,自带一套。)
 // 下划线开头,不登记成动作。坐标一律是引擎 300 画布;基线 g = ctx.baseline = 273。
 const K = require('../_kitchen.cjs');
 
@@ -10,8 +10,6 @@ const palette = {
   soapGreen: '#7cc28a', soapGreenDark: '#4f9a62', sponge: '#f4cf4a', spongeDark: '#d9a92f',
   plateFace: '#e4e9ea', plateEdge: '#a9b5b9', plateDirt: '#b46a2c', waterLight: '#9fd0df',
   machineBody: '#e9ece9', machineShade: '#c4cbc9', machineDark: '#59636a', machineIn: '#3a4248', lightOn: '#7fd36b', lightDone: '#ffd257',
-  windowSky: '#d6e7ea', windowSkyLow: '#e8f1ef', awningRed: '#d8584e',
-  vendorSleeve: '#5d7891', vendorSleeveDark: '#46607a', vendorHand: '#f0c39a', vendorHandShade: '#d9a77f'
 };
 
 // ── 手:用「画出来的左上角」写,换算成姿势坐标(引擎收尾时左手 x−10、右手 x+10、两只 y+5)──
@@ -162,38 +160,4 @@ function washer(ctx, o = {}) {
   }
 }
 
-// ── 窗边:窗在他右手边的墙上(paper 层,在他和他的手后面);窗外露一角小贩的条纹篷 ──
-function windowFrame(ctx, o = {}) {
-  const P = ctx.paper;
-  P.rect(235, 140, 65, 100, 'windowSky', 'window');
-  P.rect(235, 200, 65, 40, 'windowSkyLow');
-  // 条纹篷一角(小贩的车在楼下;只露篷,不画人)
-  if (o.awning !== false) {
-    for (let k = 0; k < 5; k++) P.rect(255 + k * 10, 145, 10, 15, k % 2 ? 'white' : 'awningRed', 'awning');
-    for (let k = 0; k < 5; k++) P.rect(255 + k * 10 + 0, 160, 5, 5, k % 2 ? 'white' : 'awningRed');
-  }
-  P.rect(230, 135, 70, 5, 'leather', 'window-top');
-  P.rect(230, 140, 5, 100, 'leather', 'window-post');
-  P.rect(280, 140, 5, 60, 'leatherLight');                      // 窗格
-  P.rect(225, 240, 75, 5, 'leatherLight', 'sill'); P.rect(225, 245, 75, 5, 'leatherDark');
-}
-// 从画面右边伸进来的手(带袖子):tip=手的左边 x;y 手顶;open 摊开掌心(收钱),hold 拿着东西(手指在上)
-function vendorHand(ctx, tip, y, o = {}) {
-  if (tip >= 300) return;
-  const L = ctx.props;
-  const sleeveX = tip + 15;
-  if (sleeveX < 300) { L.rect(sleeveX, y - 5, 300 - sleeveX, 20, 'vendorSleeve', 'vendor-sleeve'); L.rect(sleeveX, y - 5, 5, 20, 'vendorSleeveDark'); }
-  if (o.open) { L.rect(tip, y + 5, 15, 5, 'vendorHand', 'vendor-hand'); L.rect(tip, y + 10, 15, 5, 'vendorHandShade'); L.rect(tip + 10, y, 5, 5, 'vendorHand'); }
-  else { L.rect(tip, y, 15, 15, 'vendorHand', 'vendor-hand'); L.rect(tip, y + 10, 15, 5, 'vendorHandShade'); }
-}
-// 纸袋:左上角 (x,y),25×25;steamK 不为 null 时冒两缕热气
-function bag(ctx, x, y, layer = 'letter', steamK = null) {
-  const L = ctx[layer];
-  L.rect(x, y + 5, 25, 20, 'paper', 'bag'); L.rect(x, y, 25, 5, 'paperEdge'); L.rect(x + 20, y + 5, 5, 20, 'paperEdge');
-  L.rect(x + 10, y + 10, 5, 5, 'awningRed');
-  if (steamK !== null) for (let m = 0; m < 2; m++) { const ph = (steamK + m * 4) % 9; if (ph < 6) ctx.effects.rect(x + 5 + m * 10, y - 5 - ph * 5, 5, 5, 'puffWhite', 'bag-steam'); }
-}
-// 一枚硬币 10×10
-function coin(ctx, x, y, layer = 'letter') { ctx[layer].rect(x, y, 10, 10, 'gold', 'coin'); ctx[layer].rect(x, y, 5, 5, 'goldLight'); }
-
-module.exports = { palette, HL, HR, LEFT0, SINK_R, path, lerp, sink, rackPlates, bottleStanding, bottleHeld, disc, edge, sponge, towel, cuffs, bubbles, washer, windowFrame, vendorHand, bag, coin, K };
+module.exports = { palette, HL, HR, LEFT0, SINK_R, path, lerp, sink, rackPlates, bottleStanding, bottleHeld, disc, edge, sponge, towel, cuffs, bubbles, washer, K };

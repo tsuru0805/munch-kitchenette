@@ -8,20 +8,23 @@
 // the right moment instead of replaying anything.
 import {
   apiProbe, asKitchenError, notFound, probeFromSession, type KitchenFetchError, type KitchenProbe, type KitchenSession,
-  type KitchenSettlement, type ProbeFn,
+  type KitchenSettleMissing, type KitchenSettlement, type ProbeFn,
 } from "./api";
 import {
-  EXIT_MS, OUTCOME_WAIT_MS, cookProgress, fmtHM, fmtRemaining, isFailOutcome, kitchenPhase, phaseIsLive, pickTimeZone, revealAtMs,
+  EXIT_MS, OUTCOME_WAIT_MS, cookProgress, fmtHM, fmtRemaining, kitchenPhase, phaseIsLive, pickTimeZone, revealAtMs,
   spriteOnStage,
   type KitchenFacts, type KitchenOutcome, type KitchenPhase,
 } from "./cookPhase";
 import { assetKey, cookSegment, outfitFor, parseMethod } from "./cookSegments";
 import { STAGE_PX, type SpriteManifest } from "./manifest";
-import { drawSettle, poseFor, settleKeys } from "./settle";
+import { StillCache, drawSettle, frameStill, poseFor, settleKeys } from "./settle";
+import { fullestLines, settleLines, settleView, type SettleFacts, type SettleLine, type SettleView } from "./settleCard";
 import { CLAWD_MANIFEST } from "./manifest.generated";
-import { acquireSeat, onSeatFree, releaseSeat, seatFree } from "./seats";
+import { SeatClaim } from "./seats";
+import {
+  Base, DEFAULT_ASSETS, DEFAULT_FONTS, blobs, broken, checkPack, dropLayer, ensureFonts, h, preload, setText, withSlash, type Layer,
+} from "./cardKit";
 import { isFirstSeen, markSeen } from "./seen";
-import { SERIF_RARE_RANGE } from "./serifRange.generated";
 import { springFrames } from "./spring";
 import { stringsFor, type CardStrings } from "./strings";
 import { CARD_CSS } from "./styles";
@@ -36,124 +39,6 @@ const CROSSFADE_MS = 120;
 /** Fully below the cut line (8 px extra so no sub-pixel sliver shows) */
 const HIDDEN_Y = STAGE_PX + 8;
 
-// Where this script lives; the default asset and font folders are found relative to it
-// (web/dist/kitchenette-cooking-card.js -> assets/clawd/ and web/fonts/).
-const SCRIPT_URL: string = import.meta.url;
-const DEFAULT_ASSETS = new URL("../../assets/clawd/", SCRIPT_URL).href;
-const DEFAULT_FONTS = new URL("../fonts/", SCRIPT_URL).href;
-
-// The numerals: two small files, loaded as soon as a card appears.
-const DISPLAY_FONTS: [family: string, file: string][] = [
-  ["Kitchenette Bodoni 11", "BodoniModa11pt-Regular.woff2"],
-  ["Kitchenette Bodoni 28", "BodoniModa28pt-Regular.woff2"],
-];
-// The text face, "Kitchenette Serif". A font already on the device comes first: the system Songti, or an
-// installed copy of the bundled typeface (Noto Serif SC, also published as Source Han Serif). Only when
-// none of them exists does the browser download the bundled file, and then only the part a character on
-// the card needs: `common` for most text, `rare` for the Han characters listed in SERIF_RARE_RANGE.
-const SERIF_FAMILY = "Kitchenette Serif";
-const SERIF_FONTS: { weight: string; file: string; local: string[] }[] = [
-  {
-    weight: "400",
-    file: "NotoSerifSC-Regular",
-    local: ["Songti SC Regular", "STSongti-SC-Regular", "NotoSerifSC-Regular", "NotoSerifCJKsc-Regular", "SourceHanSerifSC-Regular"],
-  },
-  {
-    weight: "700",
-    file: "NotoSerifSC-Bold",
-    local: ["Songti SC Bold", "STSongti-SC-Bold", "NotoSerifSC-Bold", "NotoSerifCJKsc-Bold", "SourceHanSerifSC-Bold"],
-  },
-];
-const fontsLoaded = new Set<string>();
-
-/** Registers the font files with the document (once per folder). A missing file only means the next font in the list shows. */
-function ensureFonts(base: string): void {
-  if (fontsLoaded.has(base) || typeof FontFace === "undefined") return;
-  fontsLoaded.add(base);
-  for (const [family, file] of DISPLAY_FONTS) {
-    const face = new FontFace(family, `url("${base}${file}") format("woff2")`, { display: "swap" });
-    document.fonts.add(face);
-    face.load().catch(() => {});
-  }
-  // Not loaded here: the browser fetches a serif part by itself when text on a card needs it
-  for (const { weight, file, local } of SERIF_FONTS) {
-    const locals = local.map((name) => `local("${name}")`).join(", ");
-    const src = (part: string): string => `${locals}, url("${base}${file}.${part}.woff2") format("woff2")`;
-    document.fonts.add(new FontFace(SERIF_FAMILY, src("common"), { weight, display: "swap" }));
-    // Added second so that it is the one asked first for the characters it lists
-    document.fonts.add(new FontFace(SERIF_FAMILY, src("rare"), { weight, display: "swap", unicodeRange: SERIF_RARE_RANGE }));
-  }
-}
-
-// Image bytes, fetched once per URL. Each layer then gets its own object URL: a fresh URL is a fresh
-// image to the browser, so an animated clip always starts from its first frame when it comes on.
-const blobs = new Map<string, Blob>();
-const loading = new Map<string, Promise<void>>();
-/** Files that turned out not to exist: they are not asked for again, and their segment shows an empty stage */
-const broken = new Set<string>();
-
-function preload(url: string): Promise<void> {
-  let p = loading.get(url);
-  if (!p) {
-    p = fetch(url)
-      .then((r) => {
-        if (!r.ok) {
-          broken.add(url);
-          return;
-        }
-        return r.blob().then((b) => {
-          blobs.set(url, b);
-        });
-      })
-      .catch(() => {
-        // Not fetchable (file://, a cross-origin host without CORS): the <img> loads the URL directly instead
-      });
-    loading.set(url, p);
-  }
-  return p;
-}
-
-// Is the sprite pack there at all? Asked once per folder, with one file, before anything else is requested.
-// A folder that is not there gets exactly that one request: the card then shows no cook and only counts down.
-interface Pack {
-  state: "checking" | "ok" | "missing";
-  ready: Promise<void>;
-}
-const packs = new Map<string, Pack>();
-
-function imageLoads(url: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => resolve(true);
-    img.onerror = () => resolve(false);
-    img.src = url;
-  });
-}
-
-function checkPack(folder: string, probeUrl: string): Pack {
-  let pack = packs.get(folder);
-  if (!pack) {
-    const entry: Pack = { state: "checking", ready: Promise.resolve() };
-    entry.ready = fetch(probeUrl)
-      .then(async (r) => {
-        if (r.ok) blobs.set(probeUrl, await r.blob());
-        entry.state = r.ok ? "ok" : "missing";
-      })
-      // fetch itself is not possible here (file://, no CORS): see whether an <img> can load the file
-      .catch(() => imageLoads(probeUrl).then((ok) => void (entry.state = ok ? "ok" : "missing")));
-    loading.set(probeUrl, entry.ready);
-    packs.set(folder, entry);
-    pack = entry;
-  }
-  return pack;
-}
-
-interface Layer {
-  url: string;
-  img: HTMLImageElement;
-  objectUrl: string | null;
-}
-
 interface PotState {
   id: string;
   dish: string;
@@ -167,20 +52,23 @@ interface PotState {
   outcome: { v: KitchenOutcome | null; atMs: number } | undefined;
   /** the settled card, once the backend sent one */
   settlement?: KitchenSettlement | null;
+  /** why there is none, when the backend said so */
+  settleMissing?: KitchenSettleMissing | null;
+  /** a read with the pot's final state came back (from the backend, not from the data the card was given) */
+  settleAnswered: boolean;
+  /** a bad egg ruined the pot the moment it was started */
+  ruined: boolean;
 }
 
-/** Settled stills already drawn (as data URLs) by the URLs of their pictures; "" = being drawn */
-const settleCache = new Map<string, string>();
+interface Still {
+  url: string;
+  /** size of the cropped picture in canvas pixels */
+  w: number;
+  h: number;
+}
 
-const h = <K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, parent?: Node): HTMLElementTagNameMap[K] => {
-  const el = document.createElement(tag);
-  el.className = cls;
-  parent?.appendChild(el);
-  return el;
-};
-
-// Importable outside a browser too (a server render, a test runner): there the class is never instantiated
-const Base: typeof HTMLElement = typeof HTMLElement === "undefined" ? (class {} as unknown as typeof HTMLElement) : HTMLElement;
+/** Settled stills already drawn (as data URLs), by the URLs of their pictures */
+const settleCache = new StillCache<Still>();
 
 export class KitchenetteCookingCard extends Base {
   static observedAttributes = ["api-base", "session-id", "assets", "fonts", "lang", "timezone"];
@@ -208,13 +96,15 @@ export class KitchenetteCookingCard extends Base {
   #serverTz = "";
   #packWatched = false;
   #preloaded = false;
+  /** Settled stills this appearance of the card has asked for (a failed one is asked again on the next) */
+  #stillsTried = new Set<string>();
 
   // ── sprite ──
   #layers: Layer[] = [];
   #stillImg: HTMLImageElement | null = null;
-  #seat: ReturnType<typeof acquireSeat> | null = null;
-  #seatWanted = false;
-  #offSeatFree: (() => void) | null = null;
+  #seat = new SeatClaim(() => {
+    if (this.#pot) this.#render();
+  });
   #slide: Animation | null = null;
   #lastSpritePhase: KitchenPhase | null = null;
   #reduced: MediaQueryList | null = null;
@@ -235,7 +125,11 @@ export class KitchenetteCookingCard extends Base {
   #track!: HTMLElement;
   #fill!: HTMLElement;
   #foot!: HTMLElement;
-  #settle!: HTMLElement;
+  #pic!: HTMLElement;
+  #picImg!: HTMLImageElement;
+  #lines!: HTMLElement;
+  #chips!: HTMLElement;
+  #sizer!: HTMLElement;
   #wrap!: HTMLElement;
 
   constructor() {
@@ -254,12 +148,25 @@ export class KitchenetteCookingCard extends Base {
     h("div", "shadow", this.#frame);
     this.#card = h("div", "card", this.#frame);
     this.#card.setAttribute("role", "group");
+    // The settled card's picture column (him with the dish), left of a dashed line; hidden otherwise
+    this.#pic = h("div", "pic", this.#card);
+    this.#pic.setAttribute("aria-hidden", "true");
+    this.#pic.hidden = true;
+    this.#picImg = h("img", "pic-img", this.#pic);
+    this.#picImg.alt = "";
+    this.#picImg.draggable = false;
+    this.#picImg.hidden = true;
     const sym = h("div", "sym", this.#card);
     sym.setAttribute("aria-hidden", "true");
     this.#symText = h("span", "sym-text", sym);
     this.#symEn = h("span", "sym-en", sym);
     const body = h("div", "body", this.#card);
-    const top = h("div", "top", body);
+    // What shows, and (settled cards only) an invisible copy of the fullest settled card in the same place:
+    // the card takes the taller of the two, so its height is the same before and after its lines arrive
+    const content = h("div", "content", body);
+    this.#sizer = h("div", "sizer", body);
+    this.#sizer.setAttribute("aria-hidden", "true");
+    const top = h("div", "top", content);
     const left = h("div", "left", top);
     this.#eyebrow = h("div", "eyebrow", left);
     this.#dish = h("div", "dish", left);
@@ -267,11 +174,13 @@ export class KitchenetteCookingCard extends Base {
     const right = h("div", "right", top);
     this.#clockEl = h("div", "clock", right);
     this.#stateWord = h("div", "state-word", right);
-    this.#track = h("div", "track", body);
+    this.#track = h("div", "track", content);
     this.#fill = h("div", "fill", this.#track);
-    this.#foot = h("div", "foot", body);
-    this.#settle = h("div", "settle", body);
-    this.#settle.hidden = true;
+    this.#lines = h("div", "lines", content);
+    this.#lines.hidden = true;
+    this.#chips = h("div", "chips", content);
+    this.#chips.hidden = true;
+    this.#foot = h("div", "foot", content);
   }
 
   // ── public API ──
@@ -284,7 +193,7 @@ export class KitchenetteCookingCard extends Base {
     this.#session = s;
     if (!this.isConnected) return;
     if (s && this.#pot && this.#pot.id === s.id) {
-      this.#take(probeFromSession(s)); // same pot: only its status / outcome can be news
+      this.#take(probeFromSession(s), false); // same pot: only its status / outcome can be news
       this.#render();
     } else this.#mount();
   }
@@ -395,7 +304,11 @@ export class KitchenetteCookingCard extends Base {
     this.#serverTz = "";
     this.#packWatched = false;
     this.#preloaded = false;
-    this.#card.classList.remove("failed");
+    this.#stillsTried = new Set();
+    this.#card.classList.remove("failed", "settled");
+    this.#pic.hidden = true;
+    this.#lines.hidden = true;
+    this.#chips.hidden = true;
   }
 
   #mount(): void {
@@ -417,8 +330,11 @@ export class KitchenetteCookingCard extends Base {
       .then((r) => {
         if (token !== this.#loadToken) return;
         if (r.timezone) this.#serverTz = r.timezone;
-        if (r.session) this.#begin(r.session);
-        else this.#fail(notFound());
+        if (r.session) {
+          this.#begin(r.session);
+          this.#take(r, true); // the same answer may already carry the settled card
+          this.#render();
+        } else this.#fail(notFound());
       })
       .catch((e: unknown) => {
         if (token === this.#loadToken) this.#fail(asKitchenError(e), e);
@@ -467,8 +383,10 @@ export class KitchenetteCookingCard extends Base {
       firstSeen: isFirstSeen(String(s.id)),
       cancelledSeenAtMs: undefined,
       outcome: undefined,
+      settleAnswered: false,
+      ruined: false,
     };
-    this.#take(probeFromSession(s));
+    this.#take(probeFromSession(s), false);
     this.#wrap.hidden = false;
     this.#render();
     if (this.#phase && phaseIsLive(this.#phase)) this.#tick = setInterval(() => this.#render(), TICK_MS);
@@ -481,13 +399,17 @@ export class KitchenetteCookingCard extends Base {
     return apiProbe(new URL(base, document.baseURI).href, () => this.getAttribute("token"));
   }
 
-  #take(r: KitchenProbe): void {
+  /** fromRead = the answer came from the backend (the data a card was given does not settle anything) */
+  #take(r: KitchenProbe, fromRead: boolean): void {
     const pot = this.#pot;
     if (r.timezone) this.#serverTz = r.timezone;
     if (!pot) return;
     if (r.status === "cancelled") pot.cancelledSeenAtMs ??= this.#clock();
     else if (r.status === "served") pot.outcome ??= { v: r.outcome, atMs: this.#clock() };
+    else if (r.status === "ruined") pot.ruined = true;
     if (r.settlement) pot.settlement ??= r.settlement;
+    if (r.settleMissing) pot.settleMissing = r.settleMissing;
+    if (fromRead && (r.status === "served" || r.status === "ruined")) pot.settleAnswered = true;
   }
 
   #check(fresh: boolean): void {
@@ -498,7 +420,7 @@ export class KitchenetteCookingCard extends Base {
     probe(pot.id, fresh)
       .then((r) => {
         if (token !== this.#loadToken || this.#pot !== pot) return;
-        this.#take(r);
+        this.#take(r, true);
         this.#render();
       })
       .catch(() => {
@@ -525,7 +447,8 @@ export class KitchenetteCookingCard extends Base {
     if (!pot) return;
     const nowMs = this.#clock();
     const facts = this.#facts(pot);
-    const phase = kitchenPhase(facts, nowMs);
+    // A ruined pot was never on the fire: its card is final from the start
+    const phase: KitchenPhase = pot.ruined ? "done" : kitchenPhase(facts, nowMs);
     this.#phase = phase;
     // Seen only once the entrance is over (or was never needed): a card removed mid-entrance plays it again from the start
     if (phase !== "enter") markSeen(pot.id);
@@ -536,7 +459,7 @@ export class KitchenetteCookingCard extends Base {
 
     // Reading back from the backend. While the pot is cooking: once now, then every 15 s (visible pages only),
     // to notice a cancelled pot. Each time "cooking" flips (due, or cancelled) one more read happens at once.
-    const cooking = !cancelled && nowMs < dueMs;
+    const cooking = !cancelled && !pot.ruined && nowMs < dueMs;
     const pollKey = `${cooking}|${visible}`;
     if (pollKey !== this.#pollKey) {
       this.#pollKey = pollKey;
@@ -548,7 +471,7 @@ export class KitchenetteCookingCard extends Base {
     // Due, on screen since before it was due, outcome still unknown: ask more often (skipping caches)
     // until it arrives or the wait runs out, at which point the pot is served as "ok".
     const awaiting =
-      !cancelled && pot.outcome === undefined && pot.mountedAtMs < dueMs && nowMs >= dueMs && nowMs < dueMs + OUTCOME_WAIT_MS;
+      !cancelled && !pot.ruined && pot.outcome === undefined && pot.mountedAtMs < dueMs && nowMs >= dueMs && nowMs < dueMs + OUTCOME_WAIT_MS;
     if (awaiting !== this.#awaiting) {
       this.#awaiting = awaiting;
       clearInterval(this.#outcomePoll);
@@ -567,21 +490,13 @@ export class KitchenetteCookingCard extends Base {
       firstSeen: pot.firstSeen, sinceRevealMs, outcome: pot.outcome?.v ?? null, method: parseMethod(pot.method),
       sessionId: pot.id,
     });
-    this.#segment = segment;
-    // A pot with a settlement: once served, the cook stays on the card holding the dish (the settled still)
-    // instead of walking off; the still is the same picture from then on, whenever the card is shown.
-    const settled = !!pot.settlement && pot.outcome !== undefined && !pot.cancelledSeenAtMs
-      && (phase === "exit" || phase === "done");
-    if (settled) {
-      const last = `${parseMethod(pot.method)}_${isFailOutcome(pot.outcome?.v ?? null) ? "fail" : "serve"}_last`;
-      this.#segment = last;
-      this.#renderSprite("serve", outfit, last, visible);
-    } else this.#renderSprite(phase, outfit, segment, visible);
+    this.#segment = pot.ruined ? null : segment;
+    this.#renderSprite(phase, outfit, this.#segment, visible);
 
     // The card
     const t = { ...stringsFor(this.getAttribute("lang")), ...this.#strings };
     const p = cookProgress(pot.startedAt, pot.durationSec, nowMs);
-    const onFire = !cancelled && p.remainingSec > 0;
+    const onFire = !cancelled && !pot.ruined && p.remainingSec > 0;
     const served = t.served(pot.outcome?.v ?? null);
     // Clock times are written in the backend's time zone when it says one, else the card's `timezone`
     // attribute, else the visitor's device: the card and the backend's own notes then name the same hour.
@@ -590,9 +505,21 @@ export class KitchenetteCookingCard extends Base {
     const due = fmtHM(pot.startedAt + pot.durationSec, tz);
     const duration = t.minutes(pot.durationSec);
     const remaining = fmtRemaining(p.remainingSec);
+    // Once the cook has gone (or never came), a done pot's card turns into the settled card
+    const view = settleView({
+      done: !cancelled && (pot.ruined || phase === "done"),
+      ruined: pot.ruined,
+      settlement: pot.settlement,
+      missing: pot.settleMissing,
+      answered: pot.settleAnswered,
+      canRead: this.#activeProbe() !== null,
+    });
+    const settledFace = view.kind !== "plain";
+    this.#card.classList.toggle("settled", settledFace);
     setText(this.#symText, t.symbol);
     setText(this.#symEn, t.symbolLabel);
-    setText(this.#eyebrow, t.eyebrow);
+    // "Done" above the dish, except on a ruined pot (its outcome line says what happened)
+    setText(this.#eyebrow, settledFace && !pot.ruined ? t.settleEyebrow(t.eyebrow) : t.eyebrow);
     setText(this.#dish, pot.dish);
     setText(this.#note, pot.note);
     this.#note.hidden = !pot.note;
@@ -600,26 +527,21 @@ export class KitchenetteCookingCard extends Base {
     this.#clockEl.hidden = !onFire;
     this.#stateWord.hidden = onFire;
     if (onFire) setText(this.#clockEl, remaining);
-    else setText(this.#stateWord, cancelled ? t.cancelled : served);
+    else setText(this.#stateWord, cancelled ? t.cancelled : pot.ruined ? t.settleOutcome("ruined") : served);
     this.#track.hidden = !onFire;
     if (onFire) this.#fill.style.width = `${Math.round(p.progress * 1000) / 10}%`;
     setText(
       this.#foot,
-      cancelled ? t.footCancelled(start) : onFire ? t.footCooking(start, duration, due) : t.footServed(start, duration, due),
+      cancelled ? t.footCancelled(start)
+        : pot.ruined ? t.footRuined(start)
+        : onFire ? t.footCooking(start, duration, due)
+        : settledFace ? t.footSettled(start, duration)
+        : t.footServed(start, duration, due),
     );
-    // The settled lines: proficiency, the mishap (or "no mishaps", only when the backend knows there was
-    // none), and the stamps. Only once served, only what the backend sent.
-    const st = !onFire && !cancelled && phase !== "stir" ? pot.settlement ?? null : null;
-    const settleText = st
-      ? [
-          st.proficiency ? t.settleTier(st.proficiency.tier, st.proficiency.toNext) : "",
-          st.mishap ? (st.mishap.state === "none" ? t.settleSmooth : st.mishap.text ?? "") : "",
-          st.stamps.join(" · "),
-        ].filter(Boolean).join("\n")
-      : "";
-    this.#settle.hidden = !settleText;
-    setText(this.#settle, settleText);
-    const label = cancelled ? t.ariaCancelled(pot.dish) : onFire ? t.ariaCooking(pot.dish, remaining) : t.ariaServed(pot.dish, served);
+    const said = this.#renderSettled(view, t, outfit);
+    const label = cancelled ? t.ariaCancelled(pot.dish)
+      : onFire ? t.ariaCooking(pot.dish, remaining)
+      : t.ariaServed(pot.dish, settledFace ? said || t.settleEyebrow(t.eyebrow) : served);
     if (this.#card.getAttribute("aria-label") !== label) this.#card.setAttribute("aria-label", label);
 
     // After the final state: no timers at all
@@ -628,6 +550,86 @@ export class KitchenetteCookingCard extends Base {
       this.#tick = undefined;
     }
   }
+
+  // ── the settled card: the picture on the left, the lines on the right ──
+
+  /** Draws the settled parts of the card for this view; returns the lines read out for screen readers */
+  #renderSettled(view: SettleView, t: CardStrings, outfit: string): string {
+    const facts = view.kind === "settled" ? view.facts : null;
+    this.#pic.hidden = view.kind === "plain";
+    const still = facts ? this.#stillFor(outfit, facts) : null;
+    this.#picImg.hidden = !still;
+    if (still) {
+      if (this.#picImg.dataset.url !== still.url) {
+        this.#picImg.dataset.url = still.url;
+        this.#picImg.src = still.url;
+      }
+    }
+    const { lines, stamps } = facts ? settleLines(facts, t) : { lines: [], stamps: [] };
+    fillLines(this.#lines, this.#chips, lines, stamps);
+    this.#lines.hidden = lines.length === 0;
+    this.#chips.hidden = stamps.length === 0;
+    // The reserved height (every settled card, so they are all one height): the same dish name, note and
+    // time line, with the fullest set of lines
+    if (view.kind !== "plain") this.#renderSizer(t);
+    return [...lines.map((l) => `${l.label} ${l.text}${l.sub ? `,${l.sub}` : ""}`), ...stamps].join(",");
+  }
+
+  #renderSizer(t: CardStrings): void {
+    const pot = this.#pot;
+    if (!pot) return;
+    const full = fullestLines(t);
+    const eyebrow = pot.ruined ? t.eyebrow : t.settleEyebrow(t.eyebrow);
+    const key = JSON.stringify([eyebrow, pot.dish, pot.note, this.#foot.textContent, full]);
+    if (this.#sizer.dataset.key === key) return;
+    this.#sizer.dataset.key = key;
+    this.#sizer.replaceChildren();
+    const left = h("div", "left", h("div", "top", this.#sizer));
+    h("div", "eyebrow", left).textContent = eyebrow;
+    h("div", "dish", left).textContent = pot.dish;
+    if (pot.note) h("div", "note", left).textContent = pot.note;
+    fillLines(h("div", "lines", this.#sizer), h("div", "chips", this.#sizer), full.lines, full.stamps);
+    h("div", "foot", this.#sizer).textContent = this.#foot.textContent;
+  }
+
+  /** The still for a settled card: him in the pose for the outcome, with the dish; the plain standing pose when the outcome is not known */
+  #stillFor(outfit: string, f: SettleFacts): Still | null {
+    if (!this.#packReady(outfit, false)) return null;
+    const pose = f.outcome ? poseFor(f.outcome) : null;
+    const keys = pose ? settleKeys(outfit, pose, f.icon) : [assetKey(outfit, "base")];
+    const urls = keys.map((k) => this.#assetUrl(k));
+    if (urls.some((u) => !u)) return null;
+    const cacheKey = urls.join("|");
+    const load = (u: string) => new Promise<HTMLImageElement>((ok, no) => {
+      const im = new Image();
+      im.crossOrigin = "anonymous";
+      im.onload = () => ok(im);
+      im.onerror = no;
+      im.src = u;
+    });
+    // A picture that is missing (an older sprite pack) or did not load leaves the column empty; the card
+    // asks again the next time it is put on the page
+    return settleCache.get(cacheKey, this.#stillsTried, async () => {
+      const [poseImg, front, dish] = await Promise.all(urls.map((u) => load(u!)));
+      const c = document.createElement("canvas");
+      if (pose) {
+        if (!drawSettle(c, pose, outfit, { pose: poseImg, front, dish })) return null;
+      } else {
+        const ctx = c.getContext("2d");
+        if (!ctx) return null;
+        c.width = poseImg.naturalWidth;
+        c.height = poseImg.naturalHeight;
+        ctx.drawImage(poseImg, 0, 0);
+      }
+      const cut = frameStill(c);
+      return cut ? { url: cut.toDataURL("image/png"), w: cut.width, h: cut.height } : null;
+    }, this.#onStill);
+  }
+
+  /** A still this card waits for is drawn (or failed): one function per card, so waiting is registered once */
+  #onStill = (): void => {
+    if (this.isConnected && this.#pot) this.#render();
+  };
 
   // ── sprite: slide in / out, the cut line, cross-fading between clips ──
 
@@ -648,7 +650,7 @@ export class KitchenetteCookingCard extends Base {
    * Is the sprite pack there? The first card to ask sends one request for one file; until the answer is
    * in, and for good when the answer is no, nothing else is requested and the stage stays empty.
    */
-  #packReady(outfit: string): boolean {
+  #packReady(outfit: string, preloadClips = true): boolean {
     const folder = this.#assetsFolder();
     const file = this.#manifest.files[assetKey(outfit, "base")] ?? Object.values(this.#manifest.files)[0];
     if (file === undefined) return false;
@@ -660,7 +662,7 @@ export class KitchenetteCookingCard extends Base {
         if (token === this.#loadToken && this.#pot) this.#render();
       });
     }
-    if (pack.state === "ok" && !this.#preloaded) {
+    if (pack.state === "ok" && preloadClips && !this.#preloaded) {
       this.#preloaded = true;
       this.#preloadPot();
     }
@@ -681,29 +683,7 @@ export class KitchenetteCookingCard extends Base {
   }
 
   #wantSeat(wanted: boolean): void {
-    if (wanted === this.#seatWanted) return;
-    this.#seatWanted = wanted;
-    if (wanted) {
-      const revoke = (): void => {
-        // A newer card took the seat: back to the still pose, and wait for a free one
-        this.#seat = null;
-        if (this.#pot) this.#render();
-      };
-      // Mounting takes a seat (newest first); after losing it, only a free seat is taken, nobody is pushed out
-      this.#seat = acquireSeat(revoke);
-      this.#offSeatFree = onSeatFree(() => {
-        if (this.#seat || !seatFree()) return;
-        this.#seat = acquireSeat(revoke);
-        if (this.#pot) this.#render();
-      });
-    } else {
-      this.#offSeatFree?.();
-      this.#offSeatFree = null;
-      if (this.#seat) {
-        releaseSeat(this.#seat);
-        this.#seat = null;
-      }
-    }
+    this.#seat.want(wanted);
   }
 
   #clearSprite(): void {
@@ -717,36 +697,6 @@ export class KitchenetteCookingCard extends Base {
     this.#stage.hidden = true;
   }
 
-  #settleUrl(outfit: string, st: KitchenSettlement): string | null {
-    const pose = poseFor(st.outcome);
-    if (!pose) return null;
-    const keys = settleKeys(outfit, pose, st.icon);
-    const urls = keys.map((k) => this.#assetUrl(k));
-    if (urls.some((u) => !u)) return null;
-    const cacheKey = urls.join("|");
-    const hit = settleCache.get(cacheKey);
-    if (hit !== undefined) return hit || null;
-    settleCache.set(cacheKey, "");
-    const load = (u: string) => new Promise<HTMLImageElement>((ok, no) => {
-      const im = new Image();
-      im.crossOrigin = "anonymous";
-      im.onload = () => ok(im);
-      im.onerror = no;
-      im.src = u;
-    });
-    Promise.all(urls.map((u) => load(u!)))
-      .then(([poseImg, front, dish]) => {
-        const c = document.createElement("canvas");
-        if (!drawSettle(c, pose, outfit, { pose: poseImg, front, dish })) return;
-        settleCache.set(cacheKey, c.toDataURL("image/png"));
-        if (this.#pot) this.#render();
-      })
-      .catch(() => {
-        // A picture is missing (an older sprite pack): the ordinary last frame stays
-      });
-    return null;
-  }
-
   #renderSprite(phase: KitchenPhase, outfit: string, segment: string | null, visible: boolean): void {
     if (spriteOnStage(phase) && segment && !this.#packReady(outfit)) {
       // No sprite pack (yet, or at all): no cook. The phase is not recorded, so an entrance that is still
@@ -755,10 +705,7 @@ export class KitchenetteCookingCard extends Base {
       this.#clearSprite();
       return;
     }
-    let url = segment ? this.#assetUrl(assetKey(outfit, segment)) : null;
-    // The last frame of a served pot with a settlement: the settled still (him holding the dish), once its
-    // pictures are loaded; until then, or if they are missing, the ordinary last frame
-    if (url && segment?.endsWith("_last") && this.#pot?.settlement) url = this.#settleUrl(outfit, this.#pot.settlement) ?? url;
+    const url = segment ? this.#assetUrl(assetKey(outfit, segment)) : null;
     const baseUrl = this.#assetUrl(assetKey(outfit, "base"));
     if (!spriteOnStage(phase) || !segment || !url) {
       this.#wantSeat(false);
@@ -795,7 +742,7 @@ export class KitchenetteCookingCard extends Base {
       }
     }
 
-    const playable = !still && this.#seat !== null;
+    const playable = !still && this.#seat.held;
     if (!playable) {
       for (const l of this.#layers) dropLayer(l);
       this.#layers = [];
@@ -847,17 +794,25 @@ export class KitchenetteCookingCard extends Base {
   }
 }
 
-function dropLayer(l: Layer): void {
-  l.img.remove();
-  if (l.objectUrl) URL.revokeObjectURL(l.objectUrl);
-}
-
-function setText(el: HTMLElement, text: string): void {
-  if (el.textContent !== text) el.textContent = text;
-}
-
-function withSlash(url: string): string {
-  return url.endsWith("/") ? url : `${url}/`;
+/** Writes the lines and stamps of a settled card into their two boxes (only when they changed) */
+function fillLines(linesEl: HTMLElement, chipsEl: HTMLElement, lines: SettleLine[], stamps: string[]): void {
+  const key = JSON.stringify([lines, stamps]);
+  if (linesEl.dataset.key === key) return;
+  linesEl.dataset.key = key;
+  linesEl.replaceChildren();
+  for (const l of lines) {
+    const row = h("div", `line line-${l.key}`, linesEl);
+    h("div", "line-label", row).textContent = l.label;
+    const v = h("div", "line-value", row);
+    h("span", "line-text", v).textContent = l.text;
+    if (l.bar !== undefined && l.bar !== null) {
+      const bar = h("span", "line-bar", v);
+      h("span", "line-bar-fill", bar).style.width = `${Math.round(l.bar * 1000) / 10}%`;
+    }
+    if (l.sub) h("div", "line-sub", v).textContent = l.sub;
+  }
+  chipsEl.replaceChildren();
+  for (const s of stamps) h("span", "chip", chipsEl).textContent = s;
 }
 
 export const TAG = "kitchenette-cooking-card";

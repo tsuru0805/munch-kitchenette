@@ -11,9 +11,10 @@ const pack = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "assets",
 test("the built-in registry is complete and matches assets/clawd/ both ways", () => {
   expect(missingKeys(CLAWD_MANIFEST)).toEqual([]);
   expect(missingChoreKeys(CLAWD_MANIFEST)).toEqual([]);
-  // plus, optional, the settled stills (five poses, four with a front layer), the chores (17 clips, three
-  // of them with a still last frame) and the 14 × 2 dish pictures
-  expect(CHORE_SEGMENTS).toHaveLength(20);
+  // plus, optional, the settled stills (five poses, four with a front layer), the chores (washing up and the
+  // dishwasher: 13 clips, two with a still last frame; the vendor: 2 looks x (11 clips, four with a still last
+  // frame, and a standing still)) and the 14 × 2 dish pictures
+  expect(CHORE_SEGMENTS).toHaveLength(15 + 2 * 16);
   expect(Object.keys(CLAWD_MANIFEST.files)).toHaveLength(
     CLAWD_MANIFEST.outfits.length * (requiredSegments().length + 9 + CHORE_SEGMENTS.length) + 28,
   );

@@ -1259,24 +1259,42 @@ def mark_ready(name: str) -> int:
 
 # ═══════════ the page ═══════════
 
+# How long after a visit ends the page still reads it (as `ended`, with the role's orders on it): long enough for
+# the page to finish showing an order already under way and to show the vendor pushing his cart away. Nothing can
+# be bought from an ended visit: buying and treating go through live_visit.
+ENDED_GRACE_S = 120
+
+
 def overview(who: str, now: float | None = None) -> dict:
     now = now or clock.now()
-    out: dict = {"on": play.on("vendor"), "now": now, "visit": None, "mine": [],
+    out: dict = {"on": play.on("vendor"), "now": now, "visit": None, "ended": None, "mine": [],
                  "today": {}, "wallet": {"local": wallet_is_local(), "balance": _balance(wallet(), who)}}
     conn = db.connect()
     try:
         out["today"] = {"spent": spent_today(conn, who, kitchen_day(now)), "cap": _cfg().vendor_day_max,
                         "order_cap": _cfg().vendor_order_max}
-        v = live_visit(conn, now)
-        if v is not None:
+        v, gone = live_visit(conn, now), None
+        if v is None:
+            r = conn.execute("SELECT * FROM vendor_visits WHERE leave_at<=? AND leave_at>? ORDER BY leave_at DESC LIMIT 1",
+                             (now, now - ENDED_GRACE_S)).fetchone()
+            gone = _visit_row(r) if r else None
+            if gone is not None:
+                vd = VENDORS[gone["vendor"]]
+                out["ended"] = {"id": gone["id"], "vendor": gone["vendor"], "name": vd["name"], "who": vd["who"],
+                                "arrive_at": gone["arrive_at"], "leave_at": gone["leave_at"],
+                                "goods": [{k: g[k] for k in ("id", "name", "kind", "unit")} for g in gone["goods"]]}
+        else:
             vd = VENDORS[v["vendor"]]
             out["visit"] = {"id": v["id"], "vendor": v["vendor"], "name": vd["name"], "who": vd["who"],
                             "arrive_at": v["arrive_at"], "leave_at": v["leave_at"], "left_s": max(0.0, v["leave_at"] - now),
                             "goods": [{k: g[k] for k in ("id", "name", "kind", "unit", "price", "left")}
                                       for g in goods_left(conn, v)]}
-            out["mine"] = [{k: r[k] for k in ("id", "item_name", "qty", "total", "payer", "state", "created_at", "updated_at")}
+        shown = v or gone
+        if shown:
+            out["mine"] = [{k: r[k] for k in ("id", "item_id", "item_name", "kind", "qty", "total", "payer", "state",
+                                              "created_at", "updated_at")}
                            for r in conn.execute("SELECT * FROM vendor_orders WHERE visit_id=? AND who=?"
-                                                 " ORDER BY created_at", (v["id"], who))]
+                                                 " ORDER BY created_at", (shown["id"], who))]
         out["flower"] = _sill(conn, who, now)
     finally:
         conn.close()

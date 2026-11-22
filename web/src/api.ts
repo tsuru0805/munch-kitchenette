@@ -17,7 +17,8 @@ export interface KitchenSession {
   duration_seconds: number;
   /** epoch seconds */
   started_at: number;
-  status?: "cooking" | "served" | "cancelled";
+  /** ruined = a bad egg spoilt the pot the moment it was started: never cooked, nothing served */
+  status?: "cooking" | "served" | "cancelled" | "ruined";
   served_at?: number | null;
   cancelled_at?: number | null;
   remaining_seconds?: number;
@@ -32,11 +33,15 @@ export interface KitchenSession {
  * written once and never changed. Present only when the backend has it.
  */
 export interface KitchenSettlement {
+  /** great | ok | burnt | spoiled | ruined */
   outcome: string;
   /** follow = cooked by a recipe; changed = by a recipe, changed; free = no recipe */
   link: string;
-  /** null when proficiency is switched off */
-  proficiency: { tier: string; n: number; toNext: number | null } | null;
+  /**
+   * null when proficiency is switched off. `nextTier` names the tier after this one (null at the top);
+   * `tierFrom` is the count this tier started at (for the short bar; null when the backend did not say).
+   */
+  proficiency: { tier: string; n: number; toNext: number | null; nextTier?: string | null; tierFrom?: number | null } | null;
   /** null = not shown (switched off, or not known); state none = nothing happened, had = what happened */
   mishap: { state: "none" | "had" | "unknown"; text: string | null } | null;
   stamps: string[];
@@ -56,7 +61,11 @@ export function parseSettlement(v: unknown): KitchenSettlement | null {
     outcome: typeof s.outcome === "string" ? s.outcome : "",
     link: typeof s.link === "string" ? s.link : "free",
     proficiency: pr && typeof pr.tier === "string"
-      ? { tier: pr.tier, n: typeof pr.n === "number" ? pr.n : 0, toNext: typeof pr.to_next === "number" ? pr.to_next : null }
+      ? {
+          tier: pr.tier, n: typeof pr.n === "number" ? pr.n : 0, toNext: typeof pr.to_next === "number" ? pr.to_next : null,
+          nextTier: typeof pr.next_tier === "string" && pr.next_tier ? pr.next_tier : null,
+          tierFrom: typeof pr.tier_from === "number" ? pr.tier_from : null,
+        }
       : null,
     mishap: state ? { state, text: typeof mi!.text === "string" ? mi!.text : null } : null,
     icon: typeof s.icon === "string" ? s.icon : "",
@@ -64,9 +73,30 @@ export function parseSettlement(v: unknown): KitchenSettlement | null {
   };
 }
 
+/**
+ * Why a pot has no settled card, when the backend said so ({has: false, why}). legacy = served before the
+ * upgrade: only the outcome of that time may be known (`legacyOutcome`, null when it is not known any more).
+ * Other reasons: not_settled, cancelled, feature_off, no_session, error.
+ */
+export interface KitchenSettleMissing {
+  why: string;
+  legacyOutcome: string | null;
+}
+
+/** The `settlement` object of an answer when it says there is none; null otherwise */
+export function parseSettleMissing(v: unknown): KitchenSettleMissing | null {
+  if (!v || typeof v !== "object") return null;
+  const s = v as Record<string, unknown>;
+  if (s.has !== false) return null;
+  const oc = typeof s.legacy_outcome === "string" && SETTLE_OUTCOMES.has(s.legacy_outcome) ? s.legacy_outcome : null;
+  return { why: typeof s.why === "string" ? s.why : "", legacyOutcome: oc };
+}
+
+const SETTLE_OUTCOMES = new Set(["great", "ok", "burnt", "spoiled", "ruined"]);
+
 export interface KitchenProbe {
   /** null = the backend does not know this pot */
-  status: "cooking" | "served" | "cancelled" | null;
+  status: "cooking" | "served" | "cancelled" | "ruined" | null;
   outcome: KitchenOutcome | null;
   /** The whole pot, when the source has it (lets a card that was only given an id fill itself in) */
   session?: KitchenSession | null;
@@ -74,6 +104,8 @@ export interface KitchenProbe {
   timezone?: string;
   /** The settled card, when the source has one */
   settlement?: KitchenSettlement | null;
+  /** Why there is no settled card, when the source says so */
+  settleMissing?: KitchenSettleMissing | null;
 }
 
 /** fresh = true skips any cache (used right after the pot is due, when a cached answer may still say "cooking") */
@@ -88,7 +120,7 @@ export function parseOutcome(v: unknown): KitchenOutcome | null {
 
 export function probeFromSession(s: KitchenSession | null | undefined): KitchenProbe {
   if (!s) return { status: null, outcome: null, session: null };
-  const status = s.status === "served" || s.status === "cancelled" || s.status === "cooking" ? s.status : null;
+  const status = s.status === "served" || s.status === "cancelled" || s.status === "cooking" || s.status === "ruined" ? s.status : null;
   return { status, outcome: parseOutcome(s.outcome), session: s };
 }
 
@@ -139,13 +171,17 @@ export interface KitchenAnswer {
   /** The time zone the server keeps its clock times in (an IANA name); "" when it has none set */
   timezone: string;
   settlement: KitchenSettlement | null;
+  settleMissing: KitchenSettleMissing | null;
 }
 
 /** Turns the body of GET /api/kitchen?session_id= into an answer; anything unexpected reads as "no pot, no time zone" */
 export function parseAnswer(body: unknown): KitchenAnswer {
   const b = (body && typeof body === "object" ? body : {}) as { session?: unknown; timezone?: unknown; settlement?: unknown };
   const session = b.session && typeof b.session === "object" ? (b.session as KitchenSession) : null;
-  return { session, timezone: typeof b.timezone === "string" ? b.timezone : "", settlement: parseSettlement(b.settlement) };
+  return {
+    session, timezone: typeof b.timezone === "string" ? b.timezone : "",
+    settlement: parseSettlement(b.settlement), settleMissing: parseSettleMissing(b.settlement),
+  };
 }
 
 /**
@@ -154,6 +190,14 @@ export function parseAnswer(body: unknown): KitchenAnswer {
  */
 export async function fetchKitchen(base: string, sessionId: string, token?: string | null): Promise<KitchenAnswer> {
   const url = `${base.replace(/\/+$/, "")}/api/kitchen?session_id=${encodeURIComponent(sessionId)}`;
+  return parseAnswer(await getJson(url, token));
+}
+
+/**
+ * GET a JSON answer from the backend with an optional Bearer token; rejects with a KitchenFetchError that
+ * says why (see KitchenErrorKind). Shared by the cooking card and the washing card.
+ */
+export async function getJson(url: string, token?: string | null): Promise<unknown> {
   let r: Response;
   try {
     r = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
@@ -174,7 +218,7 @@ export async function fetchKitchen(base: string, sessionId: string, token?: stri
   if (r.status === 404) throw fail("not_found", r.status);
   if (!r.ok) throw fail("server", r.status);
   try {
-    return parseAnswer(await r.json());
+    return await r.json();
   } catch {
     throw fail("bad_response", r.status);
   }
@@ -209,7 +253,10 @@ export function apiProbe(base: string, token?: string | null | (() => string | n
       });
     }
     const answer = await hit.p;
-    return { ...probeFromSession(answer.session), timezone: answer.timezone, settlement: answer.settlement };
+    return {
+      ...probeFromSession(answer.session), timezone: answer.timezone, settlement: answer.settlement,
+      settleMissing: answer.settleMissing,
+    };
   };
 }
 

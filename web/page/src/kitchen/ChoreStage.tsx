@@ -83,7 +83,7 @@ export function ChoreStage({ pick, testID }: { pick: (nowMs: number) => ChoreCli
     return () => clearInterval(t);
   }, [moving]);
   const src = clip && segment ? CHORE_ART[clip.outfit]?.[segment as ChoreSegment] : undefined;
-  const still = !segment || segment.endsWith("_last") || segment === "base";
+  const still = !segment || segment.endsWith("_last") || segment.endsWith("_still") || segment === "base";
   const run = clip ? `${clip.outfit}/${segment}/${clip.run}` : "";
   const shown = useRunSource(still ? undefined : src, run);
   if (!clip || !src) return null;

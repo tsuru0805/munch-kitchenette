@@ -232,37 +232,57 @@ def emit(who: str, kind: str, text: str = "", *, body: str = "", payload: dict |
     """
     if config.get().notify_mode == "none" and _notifier is None:
         return None
-    now = now or clock.now()
-    payload = dict(payload or {})
     conn = db.connect()
     try:
         conn.execute("BEGIN IMMEDIATE")
-        if key is not None:
-            if conn.execute("SELECT 1 FROM once_keys WHERE key=?", (f"note:{key}",)).fetchone():
-                conn.rollback()
-                return None
-            conn.execute("INSERT INTO once_keys (key, at, result) VALUES (?,?,'')", (f"note:{key}", now))
-        if kind in MERGE:
-            render_body, render_text = MERGE[kind]
-            row = conn.execute("SELECT id, payload_json FROM notes WHERE who=? AND kind=? AND taken_at IS NULL"
-                               " AND pushed_at IS NULL ORDER BY id DESC LIMIT 1", (who, kind)).fetchone()
-            events = (json.loads(row["payload_json"]).get("events", []) if row else []) + [payload]
-            merged = json.dumps({**payload, "events": events}, ensure_ascii=False)
-            if row:
-                conn.execute("UPDATE notes SET text=?, body=?, payload_json=? WHERE id=?",
-                             (render_text(events), render_body(events), merged, row["id"]))
-                conn.commit()
-                return row["id"]
-            text, body, stored = render_text(events), render_body(events), merged
-        else:
-            stored = json.dumps(payload, ensure_ascii=False)
-        cur = conn.execute(
-            "INSERT INTO notes (who, kind, text, body, payload_json, dedupe_key, created_at)"
-            " VALUES (?,?,?,?,?,?,?)", (who, kind, text, body or text, stored, key, now))
+        nid = emit_in_tx(conn, who, kind, text, body=body, payload=payload, key=key, now=now)
         conn.commit()
-        return cur.lastrowid
+        return nid
     finally:
         conn.close()
+
+
+def emit_in_tx(conn, who: str, kind: str, text: str = "", *, body: str = "", payload: dict | None = None,
+               key: str | None = None, now: float | None = None) -> int | None:
+    """emit inside a write transaction the caller holds and commits (or rolls back): the note is written
+    together with what it tells, so the two exist both or neither. Pushing it is flush's job, after the
+    commit; a push that fails is tried again by the next flush (the note stays unpushed until then)."""
+    if config.get().notify_mode == "none" and _notifier is None:
+        return None
+    now = now or clock.now()
+    payload = dict(payload or {})
+    if key is not None:
+        if conn.execute("SELECT 1 FROM once_keys WHERE key=?", (f"note:{key}",)).fetchone():
+            return None
+        conn.execute("INSERT INTO once_keys (key, at, result) VALUES (?,?,'')", (f"note:{key}", now))
+    if kind in MERGE:
+        render_body, render_text = MERGE[kind]
+        # only into a note no flush has taken to send: once offered, a note's content is frozen
+        row = conn.execute("SELECT id, payload_json FROM notes WHERE who=? AND kind=? AND taken_at IS NULL"
+                           " AND pushed_at IS NULL AND claim_token IS NULL ORDER BY id DESC LIMIT 1",
+                           (who, kind)).fetchone()
+        events = (json.loads(row["payload_json"]).get("events", []) if row else []) + [payload]
+        merged = json.dumps({**payload, "events": events}, ensure_ascii=False)
+        if row:
+            conn.execute("UPDATE notes SET text=?, body=?, payload_json=? WHERE id=?",
+                         (render_text(events), render_body(events), merged, row["id"]))
+            return row["id"]
+        text, body, stored = render_text(events), render_body(events), merged
+    else:
+        stored = json.dumps(payload, ensure_ascii=False)
+    cur = conn.execute(
+        "INSERT INTO notes (who, kind, text, body, payload_json, dedupe_key, created_at)"
+        " VALUES (?,?,?,?,?,?,?)", (who, kind, text, body or text, stored, key, now))
+    return cur.lastrowid
+
+
+def flush_quietly() -> None:
+    """flush for after a response (a background task): a failure is logged, never turned into an error for
+    a request that already succeeded; what was not pushed is tried again by the next flush."""
+    try:
+        flush()
+    except Exception as e:  # noqa: BLE001
+        log.warning("pushing notes failed; the next flush tries again: %r", e)
 
 
 def pending(who: str) -> list[dict]:
@@ -284,9 +304,9 @@ def take(who: str, now: float | None = None) -> list[dict]:
     try:
         conn.execute("BEGIN IMMEDIATE")
         rows = [_row(r) for r in conn.execute(
-            "SELECT * FROM notes WHERE who=? AND taken_at IS NULL AND pushed_at IS NULL ORDER BY id",
-            (who,)).fetchall()]
-        conn.executemany("UPDATE notes SET taken_at=? WHERE id=?", [(now, r["id"]) for r in rows])
+            "SELECT * FROM notes WHERE who=? AND taken_at IS NULL AND pushed_at IS NULL"
+            " AND (claim_token IS NULL OR claim_at < ?) ORDER BY id", (who, now - CLAIM_S)).fetchall()]
+        conn.executemany("UPDATE notes SET taken_at=?, claim_token=NULL WHERE id=?", [(now, r["id"]) for r in rows])
         conn.commit()
         return rows
     finally:
@@ -312,42 +332,91 @@ def in_quiet_hours(now: float | None = None) -> bool:
     return False
 
 
+# A flush that took notes to send and then died (the process stopped mid-way): after this long another
+# flush may take them again. Longer than any delivery should take (the webhook gives up after 10 s).
+CLAIM_S = 300.0
+
+
+def _claim(now: float, who: str) -> tuple[str, list[dict]]:
+    """Take one role's notes to send, under the write lock, right before sending them: each is marked with
+    a fresh token, so another flush (or a merge, or the queue) leaves it alone until it is sent or let go.
+    Taken one role at a time, just before its delivery, so a slow delivery to one role never lets another
+    flush take (and send again) what this flush has not reached yet. Returns the token and the notes."""
+    import uuid
+    token = uuid.uuid4().hex
+    conn = db.connect()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        rows = [_row(r) for r in conn.execute(
+            "SELECT * FROM notes WHERE who=? AND pushed_at IS NULL AND taken_at IS NULL"
+            " AND (claim_token IS NULL OR claim_at < ?) ORDER BY id", (who, now - CLAIM_S)).fetchall()]
+        conn.executemany("UPDATE notes SET claim_token=?, claim_at=? WHERE id=?", [(token, now, r["id"]) for r in rows])
+        conn.commit()
+    finally:
+        conn.close()
+    return token, rows
+
+
+def _settle(token: str, ids: list[int], now: float, sent: bool, state: str) -> None:
+    """After one delivery: sent = marked pushed; otherwise let go, to be offered again. Only notes this
+    flush still holds are touched."""
+    conn = db.connect()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        if sent:
+            conn.executemany("UPDATE notes SET pushed_at=?, push_state=?, claim_token=NULL WHERE id=? AND claim_token=?",
+                             [(now, state, i, token) for i in ids])
+        else:
+            conn.executemany("UPDATE notes SET push_state=?, claim_token=NULL, claim_at=NULL WHERE id=? AND claim_token=?",
+                             [(state, i, token) for i in ids])
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def flush(now: float | None = None) -> dict:
     """Push notes that have not been pushed yet, one delivery per role. Held (and retried on the
-    next call) during quiet hours or while the role is asleep; NOT_SENT is retried too."""
+    next call) during quiet hours or while the role is asleep.
+
+    Each role's notes are taken right before they are sent (see _claim), so two flushes at once never send the same note, and a
+    note being sent is never merged into: something told meanwhile gets a note of its own. SENT marks
+    them pushed. UNKNOWN, and a delivery that raised (a connection broken half-way), count as delivered
+    too and are not sent again: a duplicate is worse than a miss (push_state keeps "unknown" / "raised").
+    Only NOT_SENT lets them go, to be offered on the next flush."""
     out = {"pushed": 0, "deferred": 0, "failed": 0}
     pusher = _pusher()
     if pusher is None:
         return out
+    fixed = now
     now = now or clock.now()
     conn = db.connect()
     try:
-        rows = [_row(r) for r in conn.execute(
-            "SELECT * FROM notes WHERE pushed_at IS NULL AND taken_at IS NULL ORDER BY id").fetchall()]
+        # roles in the order of their oldest waiting note
+        counts = {r["who"]: r["n"] for r in conn.execute(
+            "SELECT who, COUNT(*) AS n, MIN(id) AS first FROM notes WHERE pushed_at IS NULL AND taken_at IS NULL"
+            " GROUP BY who ORDER BY first").fetchall()}
     finally:
         conn.close()
-    by_role: dict[str, list[dict]] = {}
-    for r in rows:
-        by_role.setdefault(r["who"], []).append(r)
     quiet = in_quiet_hours(now)
-    for who, notes in by_role.items():
-        if quiet or sleep.is_asleep(who, now):
-            out["deferred"] += len(notes)
+    held = {w for w in counts if quiet or sleep.is_asleep(w, now)}
+    out["deferred"] = sum(counts[w] for w in held)
+    for who in counts:
+        if who in held:
             continue
+        at = fixed or clock.now()           # the moment of taking, not of starting: earlier roles may have been slow
+        token, notes = _claim(at, who)
+        if not notes:
+            continue                         # sent, taken or being sent by another flush meanwhile
         try:
             res = pusher.deliver(who, notes)
         except Exception as e:  # noqa: BLE001
             log.warning("notifier raised; treating as delivered: %r", e)
-            res = UNKNOWN
+            res = "raised"
+        ids = [n["id"] for n in notes]
         if res == NOT_SENT:
+            _settle(token, ids, at, False, NOT_SENT)
             out["failed"] += len(notes)
-            continue
-        conn = db.connect()
-        try:
-            conn.executemany("UPDATE notes SET pushed_at=?, push_state=? WHERE id=?",
-                             [(now, res, n["id"]) for n in notes])
-            conn.commit()
-        finally:
-            conn.close()
-        out["pushed"] += len(notes)
+        else:
+            _settle(token, ids, at, True, res if res in (SENT, UNKNOWN) else "raised")
+            out["pushed"] += len(notes)
     return out

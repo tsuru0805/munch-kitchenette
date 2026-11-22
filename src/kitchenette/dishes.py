@@ -10,11 +10,14 @@
 - When washing starts, how many, how long each and which one breaks are all fixed; reading it later,
   restarting the server, nothing draws again. Turning "let the role wash" off midway: plates already
   washed count, the rest go into the dishwasher. The role hears it is done on its next turn (a note).
+- The washing plays in the chat, on a washing card: the [刷盘子] that started it hands back the card
+  (:func:`card_for_key`), and the card reads the washing back while it goes on (:func:`job_detail`).
 """
 from __future__ import annotations
 
 import hashlib
 import json
+import secrets
 import uuid
 
 from . import clock, config, db, notify, play
@@ -27,6 +30,16 @@ KIND_DONE = "dishwash.done"
 
 def _h(seed: str) -> float:
     return int(hashlib.sha1(seed.encode()).hexdigest()[:8], 16) / 0xFFFFFFFF
+
+
+_rng = secrets.SystemRandom()
+
+
+def roll_breaks(n: int, rate: float) -> list[int]:
+    """Which of n plates will break (0-based), drawn once when the washing starts from the system's private
+    randomness and kept only in the database: nothing public (the washing's id included) lets anyone work it
+    out beforehand. A washing started before this keeps the plan it was stored with."""
+    return [i for i in range(n) if _rng.random() < rate]
 
 
 def settings(conn, who: str) -> dict:
@@ -127,7 +140,7 @@ def start(who: str, *, key: str, now: float | None = None) -> str:
             return tp("wash_empty")
         ids = sink[:n]
         jid = uuid.uuid4().hex[:12]
-        brk = [i for i in range(n) if _h(f"break:{jid}:{i}") < cfg.dishwash_break_rate]
+        brk = roll_breaks(n, cfg.dishwash_break_rate)
         per = float(cfg.dishwash_seconds_per_plate)
         conn.execute("INSERT INTO wash_jobs (id, who, key, dish_ids_json, per_s, break_idx_json, started_at, state)"
                      " VALUES (?,?,?,?,?,?,?,?)", (jid, who, key, json.dumps(ids), per, json.dumps(brk), now, "running"))
@@ -139,6 +152,42 @@ def start(who: str, *, key: str, now: float | None = None) -> str:
         conn.close()
 
 
+ATT_KIND = "kitchen_washing"      # kind of the washing-card attachment a [刷盘子] that started a washing returns
+
+
+def card_for_key(conn, key: str) -> dict | None:
+    """The washing card of the washing this marker started: only the facts fixed when it started. Which
+    plate is being washed is worked out by whoever shows the card (start + i × per_s); which ones broke, a
+    stop midway and the final counts are read back with :func:`job_detail`. None when this marker started
+    nothing (an empty sink, a washing already going on, the role not allowed to wash)."""
+    job = conn.execute("SELECT * FROM wash_jobs WHERE key=?", (key,)).fetchone()
+    if job is None:
+        return None
+    return {"kind": ATT_KIND, "job_id": job["id"], "who": job["who"],
+            "n": len(json.loads(job["dish_ids_json"])), "per_s": job["per_s"], "started_at": job["started_at"]}
+
+
+def job_detail(conn, job_id: str, now: float) -> dict | None:
+    """The washing card reading back one washing: its state and each plate's (washing / clean / broken /
+    machine) with the moment it was done. A plate's result is only here once its time is up (until then it
+    is still "washing"), so which one will break is never told beforehand. None = no such washing."""
+    job = conn.execute("SELECT * FROM wash_jobs WHERE id=?", (job_id,)).fetchone()
+    if job is None:
+        return None
+    ids = json.loads(job["dish_ids_json"])
+    rows = {r["id"]: r for r in conn.execute(
+        f"SELECT id, state, done_at FROM dishes WHERE id IN ({','.join('?' * len(ids))})", ids).fetchall()} if ids else {}
+    counts = {s: 0 for s in (WASHING, CLEAN, BROKEN, MACHINE)}
+    plates = []
+    for i, did in enumerate(ids):
+        r = rows.get(did)
+        st = r["state"] if r is not None and r["state"] in counts else CLEAN
+        counts[st] += 1
+        plates.append({"i": i, "state": st, "done_at": r["done_at"] if r is not None else None})
+    return {"now": now, "id": job["id"], "who": job["who"], "state": job["state"], "started_at": job["started_at"],
+            "per_s": job["per_s"], "n": len(ids), "ended_at": job["ended_at"], "counts": counts, "dishes": plates}
+
+
 def view(conn, who: str, now: float) -> dict:
     counts = {s: 0 for s in (SINK, WASHING, CLEAN, BROKEN, MACHINE)}
     for r in conn.execute("SELECT state, COUNT(*) n FROM dishes WHERE who=? GROUP BY state", (who,)).fetchall():
@@ -148,7 +197,8 @@ def view(conn, who: str, now: float) -> dict:
     if job:
         # breaks: which of the plates already washed broke (0-based, in washing order). Which ones will break
         # is fixed when the washing starts, but a plate's result is only told once its time is up: a plate
-        # still to come is never in this list. The page plays the dropped plate when it reads one here.
+        # still to come is never in this list. (The washing itself plays on the washing card in the chat,
+        # which reads one washing with job_detail.)
         # machine_at: when a plate last went into the dishwasher (null = never), for the loading-the-dishwasher clip.
         last = min(now, job["ended_at"]) if job["ended_at"] is not None else now
         j = {"id": job["id"], "state": job["state"], "started_at": job["started_at"], "per_s": job["per_s"],

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>kitchenette-cooking-card · example</title>
+<title>kitchenette-cooking-card · kitchenette-washing-card · example</title>
 <style>
   :root { color-scheme: light; }
   body { margin: 0; background: #FAF9F5; color: #2A3550; font: 14px/1.5 -apple-system, "Segoe UI", "PingFang SC", "Noto Sans SC", sans-serif; }
@@ -30,7 +30,7 @@
 </head>
 <body>
 <main>
-  <h1>Cooking card</h1>
+  <h1>Cooking card · washing card</h1>
   <p class="sub">Local sample data and a clock you can speed up. Nothing here talks to a server. · 本页只用假数据，不连任何服务。<br><a href="gallery.html">Every clip, both outfits → 全部分段</a></p>
 
   <fieldset><legend>Method · 做法</legend><div class="row" id="methods"></div></fieldset>
@@ -45,6 +45,18 @@
     </div>
     <div id="clock"></div>
   </fieldset>
+  <fieldset><legend>Settled card · 结算卡</legend>
+    <div class="row">
+      <button id="settle" aria-pressed="true">Settled card on · 结算卡开着</button>
+      <button id="samples">Five settled cards · 五张做好的</button>
+    </div>
+  </fieldset>
+  <fieldset><legend>Washing up · 刷盘子卡 (outfit as above · 衣服同上)</legend>
+    <div class="row" id="washes"></div>
+    <div class="row" style="margin-top:6px">
+      <button id="wash-skip">Skip to 2 s before the next plate · 跳到下一只到点前 2 秒</button>
+    </div>
+  </fieldset>
   <fieldset><legend>Words and colours · 文字与配色</legend>
     <div class="row">
       <button id="lang" aria-pressed="false">English words</button>
@@ -56,7 +68,7 @@
 </main>
 
 <script type="module">
-import { COOK_METHODS, METHOD_LABEL, outfitFor } from "../dist/kitchenette-cooking-card.js";
+import { COOK_METHODS, METHOD_LABEL, outfitFor, parseAnswer, parseWashRead } from "../dist/kitchenette-cooking-card.js";
 
 // ── a clock that can run fast ──
 let speed = 1, baseReal = performance.now(), baseVirtual = Date.now();
@@ -65,18 +77,58 @@ function setSpeed(s) { baseVirtual = now(); baseReal = performance.now(); speed 
 function jump(ms) { baseVirtual += ms; }
 
 // ── local stand-in for the backend: what each pot's outcome will be, and which pots were cancelled ──
-const pots = new Map();      // id -> { dueMs, outcome }
+const pots = new Map();      // id -> { dueMs, outcome, settlement }
 const cancelled = new Set();
 const probe = async (id) => {
   if (cancelled.has(id)) return { status: "cancelled", outcome: null };
   const p = pots.get(id);
   if (!p) return { status: null, outcome: null };
-  return now() >= p.dueMs ? { status: "served", outcome: p.outcome } : { status: "cooking", outcome: null };
+  if (p.outcome === "ruined") return { status: "ruined", outcome: null, ...settledPart(p) };
+  if (now() < p.dueMs) return { status: "cooking", outcome: null };
+  return { status: "served", outcome: p.outcome, ...settledPart(p) };
 };
+// What the backend's settled card would say (the same shape as GET /api/kitchen's `settlement`), read the
+// way the card reads it. Without it (switched off) the card stays as it always was.
+function settledPart(p) {
+  if (!p.settlement) return {};
+  const a = parseAnswer({ settlement: p.settlement });
+  return { settlement: a.settlement, settleMissing: a.settleMissing };
+}
+const ICON = { "番茄炒蛋": "stirfry", "味噌汤": "soup", "蛋包饭": "friedrice", "乌冬面": "noodles", "煎蛋": "friedegg" };
+/** A plain settlement for a pot cooked on this page: first time, no recipe */
+function sampleSettlement(dish, outcome) {
+  return {
+    has: true, outcome, link: "free", icon: ICON[dish] ?? "",
+    proficiency: outcome === "ruined" ? null : { tier: "生疏", n: 1, to_next: 2, next_tier: "拿手", tier_from: 0 },
+    mishap: outcome === "burnt" || outcome === "spoiled" || outcome === "ruined" ? null : { state: "none", text: "一路顺利" },
+    stamps: outcome === "ruined" ? [] : [{ key: "first", text: "第一次做" }],
+  };
+}
+// The five outcomes as a backend with every switch on would settle them
+const SAMPLES = [
+  { dish: "番茄炒蛋", outcome: "great", method: "stirfry", settlement: {
+    has: true, outcome: "great", link: "follow", icon: "stirfry",
+    proficiency: { tier: "拿手", n: 5, to_next: 3, next_tier: "招牌", tier_from: 3 },
+    mishap: { state: "none", text: "一路顺利" }, stamps: [{ key: "follow", text: "照谱做成" }] } },
+  { dish: "味噌汤", outcome: "ok", method: "boil", settlement: {
+    has: true, outcome: "ok", link: "free", icon: "soup",
+    proficiency: { tier: "招牌", n: 9, to_next: null, next_tier: null, tier_from: 8 },
+    mishap: { state: "had", text: "盐罐子盖没拧紧，多抖进去一点。" }, stamps: [] } },
+  { dish: "番茄炒蛋", outcome: "burnt", method: "stirfry", settlement: {
+    has: true, outcome: "burnt", link: "free", icon: "stirfry",
+    proficiency: { tier: "生疏", n: 1, to_next: 2, next_tier: "拿手", tier_from: 0 },
+    mishap: { state: "had", text: "炒的时候油溅到手背上，烫了一下。" }, stamps: [{ key: "first", text: "第一次做" }] } },
+  { dish: "乌冬面", outcome: "spoiled", method: "boil", settlement: {
+    has: true, outcome: "spoiled", link: "changed", icon: "noodles",
+    proficiency: { tier: "生疏", n: 2, to_next: 1, next_tier: "拿手", tier_from: 0 },
+    mishap: null, stamps: [] } },
+  { dish: "煎蛋", outcome: "ruined", method: "fry", settlement: {
+    has: true, outcome: "ruined", link: "free", icon: "friedegg", proficiency: null, mishap: null, stamps: [] } },
+];
 
-const state = { method: "stirfry", outfit: "toque", outcome: "great", lang: "zh", theme: "light" };
+const state = { method: "stirfry", outfit: "toque", outcome: "great", lang: "zh", theme: "light", settle: true };
 const OUTFITS = ["toque", "scarf"];
-const OUTCOMES = [["great", "Great · 很好"], ["ok", "OK · 普通"], ["burnt", "Burnt · 糊了"], ["spoiled", "Spoiled · 坏了"]];
+const OUTCOMES = [["great", "Great · 很好"], ["ok", "OK · 普通"], ["burnt", "Burnt · 糊了"], ["spoiled", "Spoiled · 坏了"], ["ruined", "Ruined · 毁了"]];
 const PRESETS = [
   { key: "fresh", label: "Just started, 10 min · 刚下锅", make: (t) => ({ dish: "番茄炒蛋", note: "少放盐", duration_seconds: 600, started_at: t - 2 }) },
   { key: "soon", label: "Done in 8 s · 8 秒后出锅", make: (t) => ({ dish: "味噌汤", note: "", duration_seconds: 60, started_at: t - 52 }) },
@@ -94,8 +146,9 @@ const chat = document.getElementById("chat");
 function add(preset, over = {}) {
   const o = { ...state, ...over };
   const id = idFor(preset.key, o.outfit);
-  const session = { id, method: o.method, status: "cooking", ...preset.make(now() / 1000) };
-  pots.set(id, { dueMs: (session.started_at + session.duration_seconds) * 1000, outcome: o.outcome });
+  const session = { id, method: o.method, status: o.outcome === "ruined" ? "ruined" : "cooking", ...preset.make(now() / 1000), ...(o.session ?? {}) };
+  const settlement = !state.settle ? null : "settlement" in over ? over.settlement : sampleSettlement(session.dish, o.outcome);
+  pots.set(id, { dueMs: (session.started_at + session.duration_seconds) * 1000, outcome: o.outcome, settlement });
 
   const box = document.createElement("div");
   box.className = "sample";
@@ -153,17 +206,105 @@ document.getElementById("skip").onclick = () => {
   for (const [id, p] of pots) if (!cancelled.has(id) && p.dueMs > now()) latest = Math.max(latest, p.dueMs);
   if (latest) jump(latest - 8000 - now());
 };
-document.getElementById("clear").onclick = () => { chat.replaceChildren(); pots.clear(); cancelled.clear(); };
+document.getElementById("settle").onclick = (e) => {
+  state.settle = !state.settle;
+  e.currentTarget.setAttribute("aria-pressed", String(state.settle));
+  e.currentTarget.textContent = state.settle ? "Settled card on · 结算卡开着" : "Settled card off · 结算卡关着";
+};
+// Five history cards, one per outcome, in the order great / ok / burnt / spoiled / ruined from the top
+document.getElementById("samples").onclick = () => {
+  const history = PRESETS.find((p) => p.key === "done");
+  for (const s of [...SAMPLES].reverse()) {
+    add(history, { method: s.method, outcome: s.outcome, settlement: state.settle ? s.settlement : null, session: { dish: s.dish, note: "", duration_seconds: 1200 } });
+  }
+};
+// ── washing up: a local stand-in for GET /api/dishes/jobs/<id> ──
+const washes = new Map();    // id -> { startedAt, perS, n, broken: [plate…], stopAt: null | seconds, fail }
+/** What the backend would answer now: a plate's result only once its time is up, the rest into the dishwasher when stopped */
+const washProbe = async (id) => {
+  const w = washes.get(id);
+  if (!w) return null;
+  if (w.fail) throw new Error("the kitchen server cannot be reached");
+  const at = now() / 1000;
+  const byTime = w.startedAt + w.n * w.perS;
+  const stopped = w.stopAt !== null && w.stopAt < byTime && at >= w.stopAt;
+  const end = stopped ? w.stopAt : byTime;
+  const dishes = [];
+  const counts = { washing: 0, clean: 0, broken: 0, machine: 0 };
+  for (let i = 0; i < w.n; i++) {
+    const due = w.startedAt + (i + 1) * w.perS;
+    const state = due <= Math.min(at, end) ? (w.broken.includes(i) ? "broken" : "clean") : stopped ? "machine" : "washing";
+    counts[state]++;
+    dishes.push({ i, state, done_at: state === "washing" ? null : state === "machine" ? end : due });
+  }
+  const state = stopped ? "stopped" : at >= byTime ? "done" : "running";
+  return parseWashRead({ now: at, id, who: "companion", state, started_at: w.startedAt, per_s: w.perS, n: w.n,
+    ended_at: state === "running" ? null : end, counts, dishes, timezone: "" });
+};
+const WASH_PRESETS = [
+  { key: "fresh", label: "3 plates, 1 min each · 刚开刷 3 只", make: (t) => ({ startedAt: t - 1, perS: 60, n: 3, broken: [] }) },
+  { key: "break", label: "Plate 2 will break · 第 2 只会碎", make: (t) => ({ startedAt: t - 50, perS: 60, n: 3, broken: [1] }) },
+  { key: "last", label: "The last one breaks · 最后一只碎", make: (t) => ({ startedAt: t - 110, perS: 60, n: 2, broken: [1] }) },
+  { key: "done", label: "From history · 历史卡", make: (t) => ({ startedAt: t - 3600, perS: 120, n: 4, broken: [2] }) },
+  { key: "fail", label: "Can't read back · 补读不通", make: (t) => ({ startedAt: t - 1, perS: 60, n: 2, broken: [], fail: true }) },
+];
+function addWash(preset) {
+  const id = idFor(`wash-${preset.key}`, state.outfit);
+  const w = { stopAt: null, fail: false, ...preset.make(now() / 1000) };
+  washes.set(id, w);
+  const box = document.createElement("div");
+  box.className = "sample";
+  const head = document.createElement("div");
+  head.className = "head";
+  const label = document.createElement("span");
+  label.textContent = `刷盘子 · ${state.outfit} · ${preset.label}`;
+  const stop = document.createElement("button");
+  stop.textContent = "Stop · 让他停下";
+  stop.onclick = () => { if (w.stopAt === null) w.stopAt = now() / 1000; };   // the card notices on its next read
+  head.append(label, stop);
+  const bubble = document.createElement("div");
+  bubble.className = "bubble";
+  bubble.textContent = "[刷盘子]";
+  const card = document.createElement("kitchenette-washing-card");
+  card.clock = now;
+  card.probe = washProbe;
+  card.washing = { kind: "kitchen_washing", job_id: id, who: "companion", n: w.n, per_s: w.perS, started_at: w.startedAt };
+  if (state.lang === "en") card.setAttribute("lang", "en");
+  if (state.theme === "dark") card.setAttribute("theme", "dark");
+  const st = document.createElement("div");
+  st.className = "state";
+  box.append(head, bubble, card, st);
+  chat.prepend(box);
+  return card;
+}
+for (const p of WASH_PRESETS) {
+  const b = document.createElement("button");
+  b.textContent = p.label;
+  b.onclick = () => addWash(p);
+  document.getElementById("washes").append(b);
+}
+document.getElementById("wash-skip").onclick = () => {
+  // Bring the washing started last to 2 seconds before its next plate is due
+  let latest = null;
+  for (const w of washes.values()) if (!latest || w.startedAt > latest.startedAt) latest = w;
+  if (!latest) return;
+  const t = now() / 1000;
+  const next = latest.startedAt + (Math.floor(Math.max(0, t - latest.startedAt) / latest.perS) + 1) * latest.perS;
+  if (next <= latest.startedAt + latest.n * latest.perS) jump((next - 2 - t) * 1000);
+};
+
+const CARDS = "kitchenette-cooking-card, kitchenette-washing-card";
+document.getElementById("clear").onclick = () => { chat.replaceChildren(); pots.clear(); cancelled.clear(); washes.clear(); };
 document.getElementById("lang").onclick = (e) => {
   state.lang = state.lang === "en" ? "zh" : "en";
   e.currentTarget.setAttribute("aria-pressed", String(state.lang === "en"));
-  for (const c of chat.querySelectorAll("kitchenette-cooking-card")) state.lang === "en" ? c.setAttribute("lang", "en") : c.removeAttribute("lang");
+  for (const c of chat.querySelectorAll(CARDS)) state.lang === "en" ? c.setAttribute("lang", "en") : c.removeAttribute("lang");
 };
 document.getElementById("theme").onclick = (e) => {
   state.theme = state.theme === "dark" ? "light" : "dark";
   e.currentTarget.setAttribute("aria-pressed", String(state.theme === "dark"));
   document.body.classList.toggle("dark", state.theme === "dark");
-  for (const c of chat.querySelectorAll("kitchenette-cooking-card")) state.theme === "dark" ? c.setAttribute("theme", "dark") : c.removeAttribute("theme");
+  for (const c of chat.querySelectorAll(CARDS)) state.theme === "dark" ? c.setAttribute("theme", "dark") : c.removeAttribute("theme");
 };
 paint();
 
@@ -171,13 +312,13 @@ const clockEl = document.getElementById("clock");
 setInterval(() => {
   clockEl.textContent = `${new Date(now()).toLocaleTimeString()} · ×${speed}`;
   for (const box of chat.querySelectorAll(".sample")) {
-    const c = box.querySelector("kitchenette-cooking-card");
+    const c = box.querySelector(CARDS);
     box.querySelector(".state").textContent = `phase ${c.phase ?? "–"} · clip ${c.segment ?? "–"}`;
   }
 }, 250);
 
 // For scripted walkthroughs of this page
-window.demo = { add, PRESETS, state, setSpeed, jump, now, cancel: (id) => cancelled.add(id) };
+window.demo = { add, PRESETS, SAMPLES, state, setSpeed, jump, now, cancel: (id) => cancelled.add(id), addWash, WASH_PRESETS, washes };
 </script>
 </body>
 </html>

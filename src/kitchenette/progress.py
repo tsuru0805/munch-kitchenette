@@ -205,7 +205,7 @@ def settlement(conn, sid: str) -> dict | None:
 def _recipe_name(st: dict) -> str:
     if st.get("book") == "recipe" and st.get("recipe_id"):
         from . import recipes
-        r = recipes.get(st["recipe_id"])
+        r = recipes.get(st["recipe_id"], st.get("recipe_version"))
         if r:
             return r["name"]
     return st["dish"]
@@ -272,8 +272,12 @@ def card(conn, sid: str) -> dict:
         n = st["after_n"]
         nxt = cfg.recipes_skilled_at if n < cfg.recipes_skilled_at else (
             cfg.recipes_signature_at if n < cfg.recipes_signature_at else None)
+        # where this tier started (the card's short bar runs from there) and the name of the next one
+        idx = 0 if n < cfg.recipes_skilled_at else (1 if n < cfg.recipes_signature_at else 2)
+        frm = (0, cfg.recipes_skilled_at, cfg.recipes_signature_at)[idx]
         out["proficiency"] = {"tier": st["after_tier"], "n": n, "before_tier": st["before_tier"],
-                              "to_next": (nxt - n) if nxt else None}
+                              "to_next": (nxt - n) if nxt else None,
+                              "next_tier": TIER_NAMES[idx + 1] if nxt else None, "tier_from": frm}
     else:
         out["proficiency"] = None
     if play.on("mishaps") and st["outcome"] != "ruined":
@@ -303,14 +307,14 @@ def on_eat_in_tx(conn, who: str, sess_id: str | None, outcome: str, key: str, no
     transaction. Returns the sentence for the receipt, or None."""
     if not sess_id or outcome not in FIRST_OK_OUTCOMES or not play.on("new_dish_bonus"):
         return None
-    s = conn.execute("SELECT recipe_id, recipe_link, wormed_at, dish FROM cook_sessions WHERE id=?",
+    s = conn.execute("SELECT recipe_id, recipe_version, recipe_link, wormed_at, dish FROM cook_sessions WHERE id=?",
                      (sess_id,)).fetchone()
     if s is None or s["recipe_link"] != LINK_FOLLOW or not s["recipe_id"] or s["wormed_at"]:
         return None
     name = s["dish"]
     from . import book
     try:
-        ref = book.resolve_ref(conn, who, s["recipe_id"])
+        ref = book.resolve_ref(conn, who, s["recipe_id"], version=s["recipe_version"])
         name = ref["name"] if ref else name
     except Exception:  # noqa: BLE001
         pass

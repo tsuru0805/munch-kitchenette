@@ -50,10 +50,10 @@ def plate(pose, hands):
         mid, bottom, tilt = (l["x"] + r["x"] + 20) / 2, l["y"] + 5, 0
     elif pose == "ok":       # flat on the right hand, a little outside it
         mid, bottom, tilt = r["x"] + 35, r["y"] + 5, 0
-    elif pose == "burnt":    # held out far on the left hand
-        mid, bottom, tilt = l["x"] - 15, l["y"] + 5, 0
-    else:                    # spoiled: the left hand hangs, the plate tips outwards
-        mid, bottom, tilt = l["x"] - 15, l["y"] + 5, 3
+    elif pose == "burnt":    # held out on the left hand (kept inside the card's picture frame, x 45-285)
+        mid, bottom, tilt = l["x"] - 10, l["y"] + 5, 0
+    else:                    # spoiled: the left hand hangs, the plate tips outwards (inside the frame too)
+        mid, bottom, tilt = l["x"] - 5, l["y"] + 5, 3
     spec = {"bottom_center": [cx(mid), cy(bottom)], "max_width": 140, "max_height": 100}
     if tilt:
         # Not rotated (that would break the pixel cells): column by column, away from the hand, one cell

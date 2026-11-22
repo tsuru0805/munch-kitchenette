@@ -63,6 +63,7 @@ Answer 2xx when you have it. Anything else, or no connection, and the same
 notes are offered again on the next scan. If the connection breaks half-way
 the notes count as delivered: a duplicate "your dish is ready" is worse than
 a missed one, and the dish is on the menu either way.
+Two scans running at once never offer the same note.
 
 Typical use: the receiver starts a turn of the model with `text` as the
 input, so the companion reacts on its own when the pot is done.
@@ -94,6 +95,8 @@ class ToMyChat:
 
 notify.set_notifier(ToMyChat())
 ```
+
+Return from `deliver` within 5 minutes: after that, another scan may take the same notes again and send them a second time.
 
 ## Pictures for ingredient kinds
 
@@ -208,7 +211,7 @@ webhook_token = ""               # 可选的口令
  "notes": [{"id": 3, "kind": "kitchen.served", "text": "…", "body": "…", "payload": {"dish": "番茄炒蛋", "session_id": "…"}}]}
 ```
 
-收到了就回 2xx。回别的、或者根本连不上，下一次检查时同样的话会再发一遍。如果连接半路断了，这些话算作已送达：重复说一遍「饭好了」比漏说一遍更糟，反正菜已经在菜单上了。
+收到了就回 2xx。回别的、或者根本连不上，下一次检查时同样的话会再发一遍。如果连接半路断了，这些话算作已送达：重复说一遍「饭好了」比漏说一遍更糟，反正菜已经在菜单上了。两次检查同时跑也不会把同一条发两遍。
 
 常见用法：接收端拿 `text` 当输入替模型开一轮，这样锅一好，他自己就会有反应。
 
@@ -236,6 +239,8 @@ class ToMyChat:
 
 notify.set_notifier(ToMyChat())
 ```
+
+`deliver` 请在 5 分钟内返回：超过之后，另一次检查可能把同样的话重新领走、再发一遍。
 
 ## 给新添的食材画小图
 

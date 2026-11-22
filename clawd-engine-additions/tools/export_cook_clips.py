@@ -37,7 +37,8 @@ FRAME_BYTES = 300 * 300 * 4
 CREDIT = (
     "Adapted from clawds-new-clothes (https://github.com/CharlieLuinaris/clawds-new-clothes): "
     "Clawd animation & engine by Luin Luinaris (https://github.com/luinluinaris), postie concept & pixel corrections "
-    "by Charlie Luinaris. Chef outfits & cooking moves by tsuru0805 for munch-kitchenette. "
+    "by Charlie Luinaris. Chef and street vendor outfits, cooking and chore moves, and the street vendor's cart "
+    "by tsuru0805 for munch-kitchenette. "
     "Unofficial fan work. Clawd (c) Anthropic. Art CC BY-NC-SA 4.0."
 )
 XMP = (

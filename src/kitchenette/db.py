@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import os
 import sqlite3
+import threading
+import time
 
 from . import clock, config
 
@@ -370,9 +372,51 @@ CREATE TABLE IF NOT EXISTS wallet_local (           -- the built-in pocket-money
 # Columns added to tables that already existed before the upgrade (older databases get them on open).
 _ADDED_COLUMNS = (("cook_sessions", "recipe_id", "TEXT"), ("cook_sessions", "recipe_version", "INTEGER"),
                   ("cook_sessions", "recipe_link", "TEXT"), ("cook_sessions", "mishap_id", "TEXT"),
-                  ("cook_sessions", "mishap_ver", "INTEGER"))
+                  ("cook_sessions", "mishap_ver", "INTEGER"),
+                  # a push being sent: which flush has these notes, since when (notify.flush)
+                  ("notes", "claim_token", "TEXT"), ("notes", "claim_at", "REAL"))
 
 _initialized: set[str] = set()
+_init_lock = threading.Lock()      # one thread of this process sets a database up at a time
+
+
+def _wal(conn: sqlite3.Connection, deadline_s: float = 10.0) -> None:
+    """Write-ahead logging (once set it stays with the file). Switching a new database to it needs the file
+    to itself, and SQLite answers "database is locked" at once instead of waiting when another connection is
+    setting it up at the same moment (several worker processes on a first start): wait a little and look again."""
+    end = time.monotonic() + deadline_s
+    pause = 0.02
+    while True:
+        try:
+            if str(conn.execute("PRAGMA journal_mode").fetchone()[0]).lower() != "wal":
+                conn.execute("PRAGMA journal_mode=WAL")
+            return
+        except sqlite3.OperationalError as e:
+            if "locked" not in str(e) or time.monotonic() > end:
+                raise
+            time.sleep(pause)
+            pause = min(pause * 2, 0.25)
+
+
+def _set_up(conn: sqlite3.Connection) -> None:
+    """Tables, added columns, first-run keys. All of it under the database's write lock, taken before
+    anything is looked at: several connections (threads, or several worker processes on a fresh install)
+    may open the same new database at once, and only one of them may add a column; the others wait, then
+    find it there and add nothing."""
+    conn.executescript("BEGIN IMMEDIATE;\n" + SCHEMA)     # the transaction stays open past the script
+    try:
+        for table, col, decl in _ADDED_COLUMNS:
+            if col not in {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
+        # Worms only grow on dishes served (and fruit spoiled) after the database was created.
+        now = clock.now()
+        conn.execute("INSERT OR IGNORE INTO once_keys (key, at, result) VALUES ('worm_since', ?, '')", (now,))
+        conn.execute("INSERT OR IGNORE INTO once_keys (key, at, result) VALUES ('fruit_worm_since', ?, '')", (now,))
+        conn.commit()
+    except BaseException:
+        if conn.in_transaction:
+            conn.rollback()
+        raise
 
 
 def path() -> str:
@@ -384,19 +428,21 @@ def connect() -> sqlite3.Connection:
     os.makedirs(os.path.dirname(os.path.abspath(p)) or ".", exist_ok=True)
     conn = sqlite3.connect(p, timeout=10)
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA busy_timeout=5000")
+    try:
+        conn.execute("PRAGMA busy_timeout=5000")
+        _wal(conn)
+    except BaseException:
+        conn.close()
+        raise
     if p not in _initialized:
-        conn.executescript(SCHEMA)
-        for table, col, decl in _ADDED_COLUMNS:
-            if col not in {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}:
-                conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
-        # Worms only grow on dishes served (and fruit spoiled) after the database was created.
-        now = clock.now()
-        conn.execute("INSERT OR IGNORE INTO once_keys (key, at, result) VALUES ('worm_since', ?, '')", (now,))
-        conn.execute("INSERT OR IGNORE INTO once_keys (key, at, result) VALUES ('fruit_worm_since', ?, '')", (now,))
-        conn.commit()
-        _initialized.add(p)
+        with _init_lock:
+            if p not in _initialized:
+                try:
+                    _set_up(conn)
+                except BaseException:
+                    conn.close()
+                    raise
+                _initialized.add(p)
     return conn
 
 

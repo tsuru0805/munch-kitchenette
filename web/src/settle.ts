@@ -21,14 +21,14 @@ export const PLATES: Record<string, Record<Exclude<SettlePose, "ruined">, PlateS
   toque: {
     great: { bottomCenter: [306, 270] },
     ok: { bottomCenter: [466, 510] },
-    burnt: { bottomCenter: [146, 510] },
-    spoiled: { bottomCenter: [136, 520], tiltEvery: 3 },
+    burnt: { bottomCenter: [156, 510] },
+    spoiled: { bottomCenter: [156, 520], tiltEvery: 3 },
   },
   scarf: {
     great: { bottomCenter: [306, 330] },
     ok: { bottomCenter: [466, 510] },
-    burnt: { bottomCenter: [146, 510] },
-    spoiled: { bottomCenter: [136, 520], tiltEvery: 3 },
+    burnt: { bottomCenter: [156, 510] },
+    spoiled: { bottomCenter: [156, 520], tiltEvery: 3 },
   },
 };
 
@@ -90,4 +90,91 @@ export function drawSettle(
   }
   if (imgs.front) ctx.drawImage(imgs.front, 0, 0);
   return true;
+}
+
+// ── showing the still inside the card's left column ──
+//
+// Every settled still is shown through the same frame of the engine canvas, at the same scale, so the
+// five poses stand the same size with their feet on one line, whichever pose and dish a card has; the frame
+// sits in the middle of the column, top to bottom.
+// The frame holds every still of the built-in pack (five poses x fourteen dishes x two outfits; measured
+// from the pictures, and the dish positions are checked by a test). To keep it narrow enough for the cook
+// to be shown large, the props were drawn closer to him: the ruined pot's pot and lid
+// (states/settle/settle-ruined.cjs), and the burnt and spoiled plates (PLATES above). Its left edge is the
+// ok pose's left hand and the ruined pose's left hand, its right edge the burnt pose's drop of sweat; its
+// top the sparkles over the dish held up, its bottom the feet line.
+
+/** The frame on the 720 x 720 engine canvas: on the cell grid, its bottom on the feet line (SRC_LINE_Y) */
+export const PIC_FRAME = { x: 96, y: 150, w: 480, h: 410 } as const;
+/** One engine cell = 4 CSS px (the cook's body 96 px wide) */
+export const PIC_SCALE = 0.4;
+/** On a narrow card (under PIC_NARROW_BELOW_PX wide) every still is shown at this scale instead: 3 CSS px a cell */
+export const PIC_SCALE_NARROW = 0.3;
+export const PIC_NARROW_BELOW_PX = 360;
+/** Space above and below the frame inside the column (CSS px) */
+export const PIC_PAD_Y = 8;
+
+/** Size of the frame as shown, and the width of the picture column (CSS px), at a scale */
+export function picBox(scale: number): { w: number; h: number; col: number; minH: number } {
+  const w = PIC_FRAME.w * scale;
+  const h = PIC_FRAME.h * scale;
+  return { w, h, col: Math.ceil(w), minH: Math.ceil(h) + 2 * PIC_PAD_Y };
+}
+
+/** Cuts the frame out of a drawn still (the same frame for every pose). Null when there is no 2D context. */
+export function frameStill(src: CanvasImageSource): HTMLCanvasElement | null {
+  const out = document.createElement("canvas");
+  out.width = PIC_FRAME.w;
+  out.height = PIC_FRAME.h;
+  const o = out.getContext("2d");
+  if (!o) return null;
+  o.imageSmoothingEnabled = false;
+  o.drawImage(src, PIC_FRAME.x, PIC_FRAME.y, PIC_FRAME.w, PIC_FRAME.h, 0, 0, PIC_FRAME.w, PIC_FRAME.h);
+  return out;
+}
+
+/**
+ * The drawn stills, shared by every card on the page, by the URLs of their pictures. A still that failed to
+ * load (a picture missing, a network hiccup) is not given up for good: each card asks again once, the next
+ * time it is put on the page (`tried` is that card's own list for its current appearance).
+ */
+export class StillCache<T> {
+  #m = new Map<string, { state: "loading"; waiting: Set<() => void> } | { state: "failed" } | { state: "ready"; value: T }>();
+
+  /**
+   * The still when it is ready, else null; starts loading it when nobody is, and either nobody tried yet or it
+   * failed and this card has not tried in this appearance. While it is loading (started by this card or by
+   * another one), `done` is kept and called once when the load settles, so every card waiting for the same
+   * pictures draws itself again.
+   */
+  get(key: string, tried: Set<string>, load: () => Promise<T | null>, done: () => void): T | null {
+    const e = this.#m.get(key);
+    if (e?.state === "ready") return e.value;
+    if (e?.state === "loading") {
+      e.waiting.add(done);
+      return null;
+    }
+    if (e?.state === "failed" && tried.has(key)) return null;
+    tried.add(key);
+    const entry = { state: "loading" as const, waiting: new Set([done]) };
+    this.#m.set(key, entry);
+    load()
+      .then((v) => this.#m.set(key, v === null ? { state: "failed" } : { state: "ready", value: v }))
+      .catch(() => this.#m.set(key, { state: "failed" }))
+      .finally(() => {
+        for (const fn of entry.waiting) {
+          try {
+            fn();
+          } catch {
+            // one card failing to redraw does not keep the others from it
+          }
+        }
+      });
+    return null;
+  }
+
+  /** For tests */
+  state(key: string): "loading" | "failed" | "ready" | undefined {
+    return this.#m.get(key)?.state;
+  }
 }

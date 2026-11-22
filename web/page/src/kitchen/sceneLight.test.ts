@@ -20,16 +20,18 @@ describe("the light", () => {
 });
 
 describe("the pieces", () => {
-  test("nothing switched on: the empty picture", () => {
-    expect(scenePieces("day", none)).toEqual([]);
+  test("nothing switched on: the empty picture with the three jars standing empty (no flowers, no plates)", () => {
+    expect(scenePieces("day", none)).toEqual(["day_jars_1", "day_jars_4", "day_jars_7"]);
+    expect(scenePieces("night", none)).toEqual(["night_jars_1", "night_jars_4", "night_jars_7"]);
   });
   test("one bunch on the sill: its kind and how it looks, in the light of the hour; a kind without a picture leaves the sill empty", () => {
-    expect(scenePieces("day", { ...none, flower: { variety: "sunflower", state: "fresh" } })).toEqual(["day_fl1_1"]);
-    expect(scenePieces("dusk", { ...none, flower: { variety: "rose", state: "droopy" } })).toEqual(["dusk_fl1_5"]);
-    expect(scenePieces("night", { ...none, flower: { variety: "narcissus", state: "wilted" } })).toEqual(["night_fl2_9"]);
-    expect(scenePieces("day", { ...none, flower: { variety: "lily", state: "fresh" } })).toEqual([]);
+    const fl = (light: "day" | "dusk" | "night", f: { variety: string; state: string }) => scenePieces(light, { ...none, flower: f }).filter((k) => !k.includes("_jars_"));
+    expect(fl("day", { variety: "sunflower", state: "fresh" })).toEqual(["day_fl1_1"]);
+    expect(fl("dusk", { variety: "rose", state: "droopy" })).toEqual(["dusk_fl1_5"]);
+    expect(fl("night", { variety: "narcissus", state: "wilted" })).toEqual(["night_fl2_9"]);
+    expect(fl("day", { variety: "lily", state: "fresh" })).toEqual([]);
     for (const v of Object.keys(FLOWER_PIECE)) for (const s of ["fresh", "droopy", "wilted"]) {
-      expect(scenePieces("day", { ...none, flower: { variety: v, state: s } })).toHaveLength(1);
+      expect(fl("day", { variety: v, state: s })).toHaveLength(1);
     }
   });
   test("the jars: empty, fruit (sugar / honey), pickles (salt), by slot from the left", () => {
@@ -42,10 +44,11 @@ describe("the pieces", () => {
   test("the rack and the sink: none / a few / many, foam while washing", () => {
     expect([0, 1, 3, 4, 20].map(fullness)).toEqual([0, 1, 1, 2, 2]);
     expect(sinkLook({ sink: 5, washing: 2, rack: 0 })).toBe(3);
-    expect(scenePieces("night", { ...none, plates: { sink: 0, washing: 0, rack: 0 } })).toEqual(["night_dish_1", "night_dish_4"]);
-    expect(scenePieces("day", { ...none, plates: { sink: 2, washing: 0, rack: 6 } })).toEqual(["day_dish_3", "day_dish_5"]);
-    expect(scenePieces("day", { ...none, plates: { sink: 9, washing: 0, rack: 1 } })).toEqual(["day_dish_2", "day_dish_6"]);
-    expect(scenePieces("day", { ...none, plates: { sink: 0, washing: 1, rack: 0 } })).toEqual(["day_dish_1", "day_dish_7"]);
+    const pl = (light: "day" | "night", p: { sink: number; washing: number; rack: number }) => scenePieces(light, { ...none, plates: p }).filter((k) => k.includes("_dish_"));
+    expect(pl("night", { sink: 0, washing: 0, rack: 0 })).toEqual(["night_dish_1", "night_dish_4"]);
+    expect(pl("day", { sink: 2, washing: 0, rack: 6 })).toEqual(["day_dish_3", "day_dish_5"]);
+    expect(pl("day", { sink: 9, washing: 0, rack: 1 })).toEqual(["day_dish_2", "day_dish_6"]);
+    expect(pl("day", { sink: 0, washing: 1, rack: 0 })).toEqual(["day_dish_1", "day_dish_7"]);
   });
   test("plates on the rack come from the last washing: so far while it runs, all of it for a while after, none later", () => {
     expect(rackCount(null, 1000)).toBe(0);

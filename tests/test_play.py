@@ -114,7 +114,7 @@ def test_the_index_has_no_steps_and_names_its_source():
     assert len(data["list"]) > 300
     assert data["source"]["repo"] == "https://github.com/Anduin2017/HowToCook"
     keys = set().union(*(r.keys() for r in data["list"]))
-    assert keys <= {"id", "name", "aliases", "main", "optional", "staples", "method", "minutes", "category",
+    assert keys <= {"id", "version", "name", "aliases", "main", "optional", "staples", "method", "minutes", "category",
                     "category_label", "source"}
 
 
@@ -147,7 +147,9 @@ def test_today_you_could_try_is_in_the_status_and_stays_the_same_all_day(clock):
         return text[text.index("今天"):]
     first = picks()
     assert first.startswith(("今天可以试试(冰箱里的料够):", "今天料够的只有这一道:"))
-    assert "西红柿炒鸡蛋" in first or "蒸水蛋" in first
+    ready = first.split("还差一点就能做:")[0]
+    used = re.findall(r"— (.+?) · ", ready)
+    assert used and all(set(u.replace("×2", "").split("、")) <= {"番茄", "鸡蛋"} for u in used)
     clock["now"] += 600
     assert picks() == first
 
@@ -244,6 +246,7 @@ def test_the_settled_card_is_fixed_at_serving(clock):
     c = TestClient(create_app(scheduler=False, with_mcp=False))
     card = c.get("/api/kitchen", params={"session_id": sid}).json()["settlement"]
     assert card["has"] and card["proficiency"]["tier"] == "生疏" and card["proficiency"]["to_next"] == 2
+    assert card["proficiency"]["next_tier"] == "拿手" and card["proficiency"]["tier_from"] == 0
     assert card["mishap"]["state"] in ("none", "had")
     assert {s["key"] for s in card["stamps"]} == {"first"}
     # later pots do not change this one's card
@@ -252,6 +255,10 @@ def test_the_settled_card_is_fixed_at_serving(clock):
         cook("煮蛋", ["鸡蛋"])
         serve(clock, 10)
     assert c.get("/api/kitchen", params={"session_id": sid}).json()["settlement"] == card
+    # the fourth pot is past the first tier: its bar starts at skilled_at and names the tier after that
+    last = settle_rows()[-1]["session_id"]
+    pr = c.get("/api/kitchen", params={"session_id": last}).json()["settlement"]["proficiency"]
+    assert pr["tier"] == "拿手" and pr["next_tier"] == "招牌" and pr["tier_from"] == 3 and pr["to_next"] == 4
 
 
 def test_new_dish_bonus_once_per_recipe(clock):
@@ -567,6 +574,95 @@ def test_a_washing_stopped_midway_tells_only_the_plates_washed_before_it_stopped
     assert v["job"]["state"] == "stopped" and v["job"]["breaks"] == [0]
 
 
+def test_starting_a_washing_hands_the_chat_a_washing_card(clock):
+    play_on("dishwash")
+    dishes.set_settings(A, self_wash=True, quota=2)
+    for i in range(3):
+        menu.add(f"饭{i}", "her", A)
+        menu.eat(A, f"饭{i}")
+    mid = uuid.uuid4().hex
+    r = reply("[刷盘子]", mid=mid)[0]
+    assert r.ok and len(r.attachments) == 1
+    card = r.attachments[0]
+    assert card["kind"] == "kitchen_washing" and card["who"] == A and card["n"] == 2
+    assert card["per_s"] == 120 and card["started_at"] == clock["now"] and card["job_id"]
+    # the same reply again: the same card, nothing started twice
+    again = reply("[刷盘子]", mid=mid)[0]
+    assert again.attachments == [card]
+    # already washing: the receipt is that washing's progress, no new card
+    busy = one("[刷盘子]")
+    assert busy.ok and busy.text.startswith("正在刷") and busy.attachments == []
+    # over REST too, in the receipts of POST /api/inline
+    client = TestClient(create_app(scheduler=False, with_mcp=False))
+    body = client.post("/api/inline", json={"who": A, "text": "[刷盘子]", "message_id": mid}).json()
+    assert body["receipts"][0]["attachments"] == [card]
+
+
+def test_a_marker_that_starts_no_washing_has_no_card(clock):
+    play_on("dishwash")
+    dishes.set_settings(A, self_wash=True)
+    r = one("[刷盘子]")                          # an empty sink
+    assert r.text == "水槽里没有盘子。" and r.attachments == []
+    dishes.set_settings(A, self_wash=False)
+    assert one("[刷盘子]").attachments == []      # plates go into the dishwasher: nothing to wash
+    assert one("[吃 不存在的菜]").attachments == []
+
+
+def test_the_washing_card_reads_one_washing_back(clock):
+    """What the card plays from: each plate's result only once its time is up; the end; a stop midway."""
+    play_on("dishwash")
+    config.override(dishwash_break_rate=1.0)          # every plate breaks
+    dishes.set_settings(A, self_wash=True)
+    for i in range(3):
+        menu.add(f"饭{i}", "her", A)
+        menu.eat(A, f"饭{i}")
+    jid = one("[刷盘子]").attachments[0]["job_id"]
+    client = TestClient(create_app(scheduler=False, with_mcp=False))
+    start = clock["now"]
+
+    def read():
+        res = client.get(f"/api/dishes/jobs/{jid}")
+        assert res.status_code == 200
+        return res.json()
+    j = read()
+    assert j["state"] == "running" and j["n"] == 3 and j["per_s"] == 120 and j["started_at"] == start
+    assert [d["state"] for d in j["dishes"]] == ["washing"] * 3 and "timezone" in j
+    clock["now"] = start + 119
+    assert read()["counts"]["broken"] == 0           # not told before its time
+    clock["now"] = start + 120
+    j = read()
+    assert [d["state"] for d in j["dishes"]] == ["broken", "washing", "washing"]
+    assert j["dishes"][0]["done_at"] == start + 120 and j["counts"] == {"washing": 2, "clean": 0, "broken": 1, "machine": 0}
+    clock["now"] = start + 121
+    dishes.set_settings(A, self_wash=False)            # stopped: the other two go into the dishwasher
+    j = read()
+    assert j["state"] == "stopped" and j["ended_at"] == start + 121
+    assert j["counts"] == {"washing": 0, "clean": 0, "broken": 1, "machine": 2}
+    assert client.get("/api/dishes/jobs/nope").status_code == 404
+
+
+def test_the_washing_card_reads_a_finished_washing_and_one_stopped_by_the_switch(clock):
+    play_on("dishwash")
+    dishes.set_settings(A, self_wash=True)
+    for i in range(2):
+        menu.add(f"饭{i}", "her", A)
+        menu.eat(A, f"饭{i}")
+    jid = one("[刷盘子]").attachments[0]["job_id"]
+    client = TestClient(create_app(scheduler=False, with_mcp=False))
+    clock["now"] += 2 * 120 + 5
+    j = client.get(f"/api/dishes/jobs/{jid}").json()
+    assert j["state"] == "done" and j["ended_at"] == j["started_at"] + 240
+    assert j["counts"]["washing"] == 0 and j["counts"]["clean"] + j["counts"]["broken"] == 2
+    # a second washing, then the whole feature switched off: the card still reads it, and it was stopped
+    menu.add("饭2", "her", A)
+    menu.eat(A, "饭2")
+    jid2 = one("[刷盘子]").attachments[0]["job_id"]
+    config.override(play_dishwash=False)
+    clock["now"] += 10
+    j = client.get(f"/api/dishes/jobs/{jid2}").json()
+    assert j["state"] == "stopped" and j["counts"]["machine"] == 1
+
+
 def test_the_page_reads_when_an_order_last_changed(clock):
     play_on("vendor")
     _visit(clock, "chestnut", seed=3)
@@ -576,9 +672,112 @@ def test_the_page_reads_when_an_order_last_changed(clock):
     assert mine[0]["state"] == vendor.DELIVERED and mine[0]["updated_at"] >= mine[0]["created_at"]
 
 
+def test_the_page_still_reads_a_visit_for_a_short_while_after_it_ends(clock):
+    # so it can finish showing an order under way and show the vendor leaving; nothing can be bought from it
+    play_on("vendor")
+    v = _visit(clock, "chestnut", seed=3)
+    o = vendor.treat(A, "roast_chestnut", 1, request_id="r1")
+    ov = vendor.overview(A)
+    assert ov["ended"] is None and ov["visit"]["id"] == v["id"]
+    assert ov["mine"][0]["kind"] == "snack" and ov["mine"][0]["item_id"] == "roast_chestnut"
+    clock["now"] = v["leave_at"] + 5
+    ov = vendor.overview(A)
+    assert ov["visit"] is None and ov["ended"]["id"] == v["id"] and ov["ended"]["vendor"] == "chestnut"
+    assert [m["id"] for m in ov["mine"]] == [o["id"]]
+    assert {"name", "kind"} <= set(ov["ended"]["goods"][0])
+    with pytest.raises(vendor.VendorError):
+        vendor.treat(A, "roast_chestnut", 1, request_id="r2")
+    clock["now"] = v["leave_at"] + vendor.ENDED_GRACE_S + 1
+    ov = vendor.overview(A)
+    assert ov["visit"] is None and ov["ended"] is None and ov["mine"] == []
+
+
 def test_about_one_plate_in_twenty_breaks():
-    n = sum(1 for i in range(4000) if dishes._h(f"break:job:{i}") < 0.05)
+    n = len(dishes.roll_breaks(4000, 0.05))
     assert 140 < n < 260
+    assert dishes.roll_breaks(50, 0.0) == [] and dishes.roll_breaks(5, 1.0) == [0, 1, 2, 3, 4]
+
+
+def _sink(n: int, who: str = A) -> None:
+    """n plates in the sink, as n meals would leave them (without eating n meals)."""
+    dishes.set_settings(who, self_wash=True)
+    conn = db.connect()
+    try:
+        for i in range(n):
+            dishes.produce_in_tx(conn, who, f"eat:test:{uuid.uuid4().hex}", f"饭{i}", clock_now())
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def clock_now() -> float:
+    from kitchenette import clock as clock_mod
+    return clock_mod.now()
+
+
+def _plan(jid: str) -> list[int]:
+    conn = db.connect()
+    try:
+        return json.loads(conn.execute("SELECT break_idx_json FROM wash_jobs WHERE id=?", (jid,)).fetchone()[0])
+    finally:
+        conn.close()
+
+
+def test_which_plates_break_cannot_be_worked_out_from_the_washing_id(clock, monkeypatch):
+    """The plan is drawn from private randomness when the washing starts and only kept in the database."""
+    play_on("dishwash")
+    config.override(dishwash_break_rate=0.5)
+    draws = iter([0.9, 0.1, 0.9, 0.1, 0.9, 0.1])
+
+    class Fixed:
+        def random(self):
+            return next(draws)
+    monkeypatch.setattr(dishes, "_rng", Fixed())
+    _sink(6)
+    jid = one("[刷盘子]").attachments[0]["job_id"]
+    assert _plan(jid) == [1, 3, 5]                     # whatever the private draw says, nothing else
+    monkeypatch.setattr(dishes, "_rng", dishes.secrets.SystemRandom())   # (not undo(): that would take the clock too)
+    clock["now"] += 6 * 120 + 1
+    service.scan_all()
+    _sink(40)
+    jid2 = one("[刷盘子]").attachments[0]["job_id"]
+    assert _plan(jid2) != [i for i in range(40) if dishes._h(f"break:{jid2}:{i}") < 0.5]   # 1 in 2**40 to collide
+
+
+def test_a_washing_started_before_keeps_the_plan_it_was_stored_with(clock):
+    """A washing already in the database (its plan drawn the old way) is played from what was stored."""
+    play_on("dishwash")
+    config.override(dishwash_break_rate=0.0)          # nothing would break if it were drawn now
+    _sink(2)
+    jid = one("[刷盘子]").attachments[0]["job_id"]
+    conn = db.connect()
+    try:
+        conn.execute("UPDATE wash_jobs SET break_idx_json=? WHERE id=?", (json.dumps([0]), jid))
+        conn.commit()
+    finally:
+        conn.close()
+    clock["now"] += 2 * 120 + 1
+    client = TestClient(create_app(scheduler=False, with_mcp=False))
+    j = client.get(f"/api/dishes/jobs/{jid}").json()
+    assert [d["state"] for d in j["dishes"]] == ["broken", "clean"]
+
+
+def test_the_washing_card_reads_only_washings_of_roles_this_server_serves(clock):
+    """The readback skips the feature switch, never the role boundary: another role's washing is not there."""
+    play_on("dishwash")
+    _sink(2, who=B)
+    jid = one("[刷盘子]", who=B).attachments[0]["job_id"]
+    client = TestClient(create_app(scheduler=False, with_mcp=False))
+    assert client.get(f"/api/dishes/jobs/{jid}").status_code == 200
+    config.override(roles_allowed=[A])
+    clock["now"] += 3 * 120
+    assert client.get(f"/api/dishes/jobs/{jid}").status_code == 404
+    conn = db.connect()
+    try:                                               # and nothing was settled for it on the way
+        assert conn.execute("SELECT state FROM wash_jobs WHERE id=?", (jid,)).fetchone()[0] == "running"
+        assert conn.execute("SELECT COUNT(*) FROM dishes WHERE job_id=? AND state='washing'", (jid,)).fetchone()[0] == 2
+    finally:
+        conn.close()
 
 
 # ── jars ────────────────────────────────────────────────────────────────

@@ -4,7 +4,7 @@
 
 `<kitchenette-cooking-card>` shows one pot in a chat: a ticket-stub card that counts down in real time, with a small cook working on its top edge. It is a plain custom element with no framework and no runtime dependencies; one script file, one tag.
 
-What the cook does and when is described in [`docs/ANIMATION.md`](../docs/ANIMATION.md).
+What the cook does and when is described in [`docs/ANIMATION.md`](../docs/ANIMATION.md). The same script also brings the washing card, `<kitchenette-washing-card>`: see [The washing card](#the-washing-card).
 
 ## Use it
 
@@ -140,7 +140,60 @@ To use your own font instead, set `--kitchenette-font-serif` to it: the bundled 
 
 ## The settled still
 
-When the backend has the settled card switched on (`[play] settle_card`), its answer for a served pot carries a `settlement` (see [`docs/API.md`](../docs/API.md)). The card then keeps the cook on its top edge after serving, holding the dish — one of fourteen kinds of dish picture, picked by the backend from the dish's name — in a pose for how it turned out (great, ok, burnt, spoiled; a ruined pot shows the spilt pan), and writes a few lines under the times: the proficiency, the mishap ("一路顺利" only when it is known nothing happened and the dish did not burn or spoil) and the stamps. The still is put together in the browser from three pictures of the sprite pack (`settle_<pose>.png`, the dish, `settle_<pose>_front.png`); a pack without them shows the ordinary last frame. Without a settlement the card behaves as before.
+When the backend has the settled card switched on (`[play] settle_card`), its answer for a served pot carries a `settlement` (see [`docs/API.md`](../docs/API.md)). Once the cook has served and gone, the card turns into the settled card: on the left, inside the card and behind a dashed line, a still of the cook holding the dish — one of fourteen kinds of dish picture, picked by the backend from the dish's name — in a pose for how it turned out (great, ok, burnt, spoiled; a ruined pot shows him staring at the spilt pan); every pose is shown through the same frame at the same scale (one engine cell = 4 px; 3 px on a card narrower than 360 px), the frame in the middle of the column, so the cook is always the same size with his feet on one line. On the right: "小厨房 · 做好了", the dish, then one line per fact with its small title on the left — 成色 (the outcome), 熟练 (the tier, a short bar, and how many more pots to the next tier, by name), 意外 (the mishap, at most two lines; "一路顺利" only when it is known nothing happened and the dish did not burn or spoil) — a stamp when there is one, and the time line. A fact the backend did not send is left out, never guessed. A ruined pot has only its outcome line; a pot served before the upgrade shows only the outcome it had, when that is still known. Until the settlement has been read the card shows the same layout with only the dish (a failed read is tried again the next time the card is shown); every settled card keeps the height of the fullest one, so nothing on the page moves when its lines arrive. The still is put together in the browser from three pictures of the sprite pack (`settle_<pose>.png`, the dish, `settle_<pose>_front.png`); without them the left column stays empty. Without a settlement (the backend has it switched off) the card behaves as before. The words are in [`src/strings.ts`](src/strings.ts) (`settleLabelOutcome`, `settleTierName`, `settleToNext`, …); an override of the 0.2.0 `settleTier` still works and writes the tier on one line.
+
+## The washing card
+
+`<kitchenette-washing-card>` shows one washing-up in a chat: the same ticket-stub card, with the cook at the sink on its top edge going through the plates in real time. It comes in the same script file as the cooking card (loading the script registers both), shares its fonts, sprite pack, colours and the page-wide limit of two moving cooks, and can sit next to cooking cards. What the cook does and when is described in [`docs/ANIMATION.md`](../docs/ANIMATION.md#chores).
+
+A `[刷盘子]` line that started a washing brings the card back with its receipt (`attachments` in the answer of `POST /api/inline`, see [`docs/CONNECT.md`](../docs/CONNECT.md)):
+
+```html
+<kitchenette-washing-card id="wash" api-base="https://kitchen.example.com" token="a-token-for-browsers"></kitchenette-washing-card>
+<script type="module">
+  document.getElementById("wash").washing = {
+    kind: "kitchen_washing", job_id: "wj_01", who: "companion", n: 3, per_s: 120, started_at: 1767225600,
+  };
+</script>
+```
+
+The attachment carries only what was fixed when the washing started: `job_id`, `n` (plates), `per_s` (seconds each) and `started_at` (epoch seconds). The card plays from these against its clock at once. Which plates broke, whether the washing was stopped midway and how many ended up clean, broken or in the dishwasher, it reads back from `GET <api-base>/api/dishes/jobs/<job_id>`. Without `washing`, a card with `api-base` and `job-id` fetches the washing by id first.
+
+**Reading back.** The cook comes on once the backend has answered for the first time. The card reads when it appears, again about 1.2 seconds after each plate is due (to learn whether it broke), and at least every 15 seconds, only while the page is visible, and once more at once when the page comes back to the foreground. It stops reading when the backend says the washing is done or stopped, or when it is 30 seconds past its end by time and still has not been told. Without `api-base` or `probe`, the card plays by time alone: every plate is washed, nothing breaks, no counts are written. When the first read fails (or the backend does not know the washing), it does the same and keeps trying; once a read has worked, later reads that fail are ignored.
+
+While washing, the card writes the time left, which plate of how many, a progress line, and "17:03 开刷 · 3 只 · 约 6 分钟 · 17:09 刷完". Once over it reads 刷完了 (done) or 停下了 (stopped), and, once the backend has said so, how many were washed, broke and went into the dishwasher; it never guesses them. The clock times follow the same rule as the cooking card's (see "Clock times"; the backend's zone comes with its answer).
+
+**When a card given only `job-id` cannot read it**, it stays on the page and says why in one line, and fires `kitchenette-error` with the same `detail` as the cooking card:
+
+| The line on the card | `detail.kind` |
+|---|---|
+| Can't load this washing-up: the kitchen server can't be reached. | `unreachable` |
+| Can't load this washing-up: the browser blocked the request. This page is not on the kitchen server's list of allowed sites. | `blocked` |
+| Can't load this washing-up: the kitchen server refused it. The token is missing or wrong. | `unauthorized` |
+| Can't load this washing-up: the kitchen server has no washing-up with this id. | `not_found` |
+| Can't load this washing-up: the kitchen server answered with an error (status 500). | `server` |
+| Can't load this washing-up: the kitchen server's answer was not understood. | `bad_response` |
+
+It tries again when the page comes back to the foreground, or when you change `api-base` or `job-id`. The words can be replaced through `strings.loadFailed`.
+
+| Attribute | |
+|---|---|
+| `api-base` | Base URL of the kitchenette backend, to read the washing back. |
+| `job-id` | The washing to fetch, when no `washing` object is given. |
+| `token` | Sent as `Authorization: Bearer <token>`, read each time. Use a token meant for the browser. |
+| `timezone` | As on the cooking card. |
+| `assets`, `fonts` | As on the cooking card. |
+| `lang` | `en` for English words on the card; anything else (or nothing) gives the original Chinese. |
+| `theme` | `dark` for the dark palette. |
+
+| Property | |
+|---|---|
+| `washing` | The attachment. Assigning one with the same `job_id` changes nothing; a different one starts the card over. |
+| `probe` | `async (jobId, fresh) => read \| null`: where the card reads the washing back, instead of `api-base`. It resolves to what `parseWashRead` makes of the backend's answer, or `null` when there is no such washing. |
+| `clock` | `() => epoch milliseconds`. Defaults to `Date.now`. |
+| `manifest` | The sprite registry. A pack without the `dish_*` clips shows no cook: the card only counts down. |
+| `strings` | An object overriding any of the words on the card (see [`src/washStrings.ts`](src/washStrings.ts)). |
+| `phase`, `segment`, `outfit`, `result` | Read-only: `wait` / `wash` / `exit` / `done`, which clip is on, which outfit this washing wears, the backend's latest answer (null before the first). |
 
 ## Try it locally
 
@@ -149,7 +202,7 @@ node web/scripts/serve.mjs          # serves the repository root on http://127.0
 node web/scripts/serve.mjs 9000     # the same on another port
 ```
 
-- `http://127.0.0.1:8123/web/examples/` — sample pots, every method, both outfits, every outcome, and a clock you can run at ×10 or ×60 or skip to 8 seconds before a pot is done. Nothing on the page talks to a server.
+- `http://127.0.0.1:8123/web/examples/` — sample pots, every method, both outfits, every outcome, and a clock you can run at ×10 or ×60 or skip to 8 seconds before a pot is done; sample washings too (a plate that breaks, the last one breaking, one from history, one that cannot read back), each with a button to stop it midway. Nothing on the page talks to a server.
 - `http://127.0.0.1:8123/web/examples/gallery.html` — every clip in the pack.
 
 Any static file server pointed at the repository root works as well.
@@ -175,6 +228,9 @@ npm run manifest     # after adding or removing files in assets/clawd/
 | `src/seats.ts`, `src/seen.ts` | At most two cooks animate at once; which pots this page has already seen. |
 | `src/strings.ts`, `src/styles.ts`, `src/spring.ts` | The words, the stylesheet, the entrance bounce. |
 | `src/serifRange.generated.ts`, `scripts/subset_serif.py` | Which characters are in the `rare` part of the bundled serif, and the script that cuts the four font files from Noto Serif SC. |
+| `src/cardKit.ts` | What both cards share: where the sprite pack and the fonts are, font registration, the image cache, the one-request check that a pack is there. |
+| `src/washSegments.ts`, `src/washFace.ts` | The washing card: which clip plays and whether the cook is on stage; what the card says. Pure functions. |
+| `src/washElement.ts`, `src/washApi.ts`, `src/washStrings.ts` | The washing card's element, reading a washing back from the backend, its words. |
 
 ---
 
@@ -182,7 +238,7 @@ npm run manifest     # after adding or removing files in assets/clawd/
 
 `<kitchenette-cooking-card>` 在聊天里显示一锅饭：一张票根样子的长条卡，按真实时间倒数，小厨师站在卡的上沿干活。它是一个普通的自定义元素，不依赖任何前端框架，没有运行时依赖：一个脚本文件，一个标签。
 
-小厨师每一段在做什么、什么时候播，见 [`docs/ANIMATION.md`](../docs/ANIMATION.md#卡上的小厨师)。
+小厨师每一段在做什么、什么时候播，见 [`docs/ANIMATION.md`](../docs/ANIMATION.md#卡上的小厨师)。同一个脚本里还有刷盘子卡 `<kitchenette-washing-card>`：见[刷盘子卡](#刷盘子卡)。
 
 ## 怎么用
 
@@ -318,7 +374,60 @@ kitchenette-cooking-card {
 
 ## 结算定格
 
-后端开着结算卡（`[play] settle_card`）时，出锅那一锅的回答里多一个 `settlement`（见 [`docs/API.md`](../docs/API.md)）。卡片收到它，出锅后小厨师就留在卡片上沿，举着这道菜——十四类菜的小图之一，后端按菜名挑——姿势跟着成色走（很好 / 普通 / 糊了 / 坏了；毁掉的锅是打翻的锅），时间那行下面再写几行：熟练度、小意外（确认没出、而且没糊没坏才写「一路顺利」）、印章。定格图在浏览器里用素材包里的三张图拼出来（`settle_<姿势>.png`、菜、`settle_<姿势>_front.png`）；素材包里没有这几张，就照旧停在最后一帧。没有 `settlement` 时，卡片和以前一样。
+后端开着结算卡（`[play] settle_card`）时，出锅那一锅的回答里多一个 `settlement`（见 [`docs/API.md`](../docs/API.md)）。出锅、小厨师端完碗收回之后，卡片换成结算卡：左边在卡片里面、隔一道竖虚线，是小厨师举着这道菜的定格图——十四类菜的小图之一，后端按菜名挑——姿势跟着成色走（很好 / 普通 / 糊了 / 坏了；毁掉的锅是对着打翻的锅发愣）；五种姿势用同一个画框、同一个比例（一格 4px；卡宽不到 360px 时一格 3px），画框在左栏里上下居中，小厨师一样大、脚底对齐。右边是「小厨房 · 做好了」、菜名，然后一行一项，左边是小标题：成色；熟练（档位、一根短进度条、再做几次升下一档，说出下一档的名字）；意外（最多两行；确认没出、而且没糊没坏才写「一路顺利」）；有印章时一枚方框小章；最下面是时间。后端没给的那一项不显示，也不替它猜。毁掉的锅只有成色一行；升级前做的旧锅只显示当时的成色（查不回就不写）。结算还没读回来时，卡是同样的版面、只有菜名（读失败了，下次这张卡出现在屏幕上再读一次）；每张结算卡都按最满的那种留高度，读回来前后页面上的东西不会挪动。定格图在浏览器里用素材包里的三张图拼出来（`settle_<姿势>.png`、菜、`settle_<姿势>_front.png`）；素材包里没有这几张，左栏就空着。没有 `settlement`（后端关着结算卡）时，卡片和以前一样。卡上的字在 [`src/strings.ts`](src/strings.ts)（`settleLabelOutcome`、`settleTierName`、`settleToNext` 等）；0.2.0 的 `settleTier` 仍然可以覆盖，覆盖了就照旧把档位写成一行。
+
+## 刷盘子卡
+
+`<kitchenette-washing-card>` 在聊天里显示一趟刷盘子：同样一张票根样子的卡，小厨师站在卡的上沿，按真实时间一只一只刷。它和做饭卡在同一个脚本文件里（引入脚本就两个都登记好了），字体、素材、配色、同一页最多两个小厨师在动的规矩都共用，可以和做饭卡放在一起。小厨师每一段在做什么、什么时候播，见 [`docs/ANIMATION.md`](../docs/ANIMATION.md#家务)。
+
+开始刷的那一行 `[刷盘子]` 会随回执带回这张卡（`POST /api/inline` 回答里的 `attachments`，见 [`docs/CONNECT.md`](../docs/CONNECT.md)）：
+
+```html
+<kitchenette-washing-card id="wash" api-base="https://kitchen.example.com" token="给浏览器用的口令"></kitchenette-washing-card>
+<script type="module">
+  document.getElementById("wash").washing = {
+    kind: "kitchen_washing", job_id: "wj_01", who: "companion", n: 3, per_s: 120, started_at: 1767225600,
+  };
+</script>
+```
+
+这张卡只带开刷那一刻就定下的事：`job_id`、`n`（几只）、`per_s`（每只几秒）、`started_at`（秒）。卡拿到就按自己的钟开始放。哪只碎了、有没有被中途叫停、最后几只刷干净几只碎了几只进了洗碗机，卡从 `GET <api-base>/api/dishes/jobs/<job_id>` 读回来。没给 `washing` 时，写了 `api-base` 和 `job-id` 的卡会先按 id 去取。
+
+**补读。** 后端第一次回话之后小厨师才上台。卡出现时读一次；每只盘子到点后约 1.2 秒再读一次（看它碎没碎）；至少每 15 秒读一次；只在页面看得见的时候读，回到前台的那一刻马上读一次。后端说刷完了或停下了，就不再读；按时间早该刷完、过了 30 秒还没听到，也不再读。没有 `api-base` 也没有 `probe` 时，卡只按时间放：每只都刷完，一只都不碎，也不写几只。第一次就读不到（或者后端说没有这一趟）时也先这样放，同时接着试；读到过一次之后，后面再有读取失败就不管它。
+
+刷的时候，卡上写还剩多久、第几只 / 共几只、一条进度线，以及「17:03 开刷 · 3 只 · 约 6 分钟 · 17:09 刷完」。刷完写「刷完了」或「停下了」，后端说了之后再写刷了几只、碎了几只、几只进了洗碗机，绝不替它猜。钟点按哪个时区写，和做饭卡的规矩一样（见「钟点」；后端的时区随回答一起来）。
+
+**只给了 `job-id`、却读不到时**，卡留在页面上用一行字说原因，同时发出和做饭卡一样的 `kitchenette-error` 事件：
+
+| 卡上那一行 | `detail.kind` |
+|---|---|
+| 取不到这一趟刷盘子：连不上厨房服务。 | `unreachable` |
+| 取不到这一趟刷盘子：浏览器拦下了这次读取，厨房服务的跨站名单里没有这个页面。 | `blocked` |
+| 取不到这一趟刷盘子：厨房服务拒绝了，口令没带或不对。 | `unauthorized` |
+| 取不到这一趟刷盘子：厨房服务里没有这一趟。 | `not_found` |
+| 取不到这一趟刷盘子：厨房服务出错了（状态码 500）。 | `server` |
+| 取不到这一趟刷盘子：厨房服务的回答看不懂。 | `bad_response` |
+
+页面回到前台时，或者你改了 `api-base`、`job-id` 时，卡会再试一次。那一行字可以用 `strings.loadFailed` 换成自己的。
+
+| 标签上能写的 | |
+|---|---|
+| `api-base` | 后端地址，用来读回这一趟。 |
+| `job-id` | 没给 `washing` 对象时，要取的那一趟。 |
+| `token` | 每次请求带上 `Authorization: Bearer <token>`，每次现读。请用给浏览器用的口令。 |
+| `timezone` | 同做饭卡。 |
+| `assets`、`fonts` | 同做饭卡。 |
+| `lang` | 写 `en` 时卡上的字是英文；不写或写别的是原本的中文。 |
+| `theme` | 写 `dark` 用深色配色。 |
+
+| 用脚本设置的 | |
+|---|---|
+| `washing` | 那张卡（附件）。用同一个 `job_id` 再赋一次什么都不变；换了就整张卡重新开始。 |
+| `probe` | `async (jobId, fresh) => 读回的结果 \| null`：不想用 `api-base` 时，卡从这里读回这一趟。返回 `parseWashRead` 处理过的后端回答，没有这一趟时返回 `null`。 |
+| `clock` | `() => 毫秒时间戳`，默认 `Date.now`。 |
+| `manifest` | 素材登记表。素材包里没有 `dish_*` 这几段时台上没有小厨师，卡只倒数。 |
+| `strings` | 改卡上任何一处文字（见 [`src/washStrings.ts`](src/washStrings.ts)）。 |
+| `phase`、`segment`、`outfit`、`result` | 只读：`wait` / `wash` / `exit` / `done`、台上在播哪一段、这一趟穿哪套衣服、后端最近一次的回答（第一次回话之前是 null）。 |
 
 ## 在自己电脑上看
 
@@ -327,7 +436,7 @@ node web/scripts/serve.mjs          # 把仓库根目录开在 http://127.0.0.1:
 node web/scripts/serve.mjs 9000     # 换一个端口
 ```
 
-- `http://127.0.0.1:8123/web/examples/`：假数据的样例，能选做法、衣服、出锅结果，时间可以 ×10、×60 快进，也可以直接跳到出锅前 8 秒。页面不连任何服务。
+- `http://127.0.0.1:8123/web/examples/`：假数据的样例，能选做法、衣服、出锅结果，时间可以 ×10、×60 快进，也可以直接跳到出锅前 8 秒；也有刷盘子卡的样例（中间碎一只的、最后一只碎的、历史卡、补读不通的），每张都能按按钮让他中途停下。页面不连任何服务。
 - `http://127.0.0.1:8123/web/examples/gallery.html`：整套素材的每一段。
 
 用别的静态文件服务器指向仓库根目录也一样。
@@ -353,3 +462,6 @@ npm run manifest     # assets/clawd/ 里增删文件之后重新生成登记表
 | `src/seats.ts`、`src/seen.ts` | 同一页最多两个小厨师在动；这个页面见过哪些锅。 |
 | `src/strings.ts`、`src/styles.ts`、`src/spring.ts` | 卡上的字、样式表、出场的回弹。 |
 | `src/serifRange.generated.ts`、`scripts/subset_serif.py` | 随包宋体的 `rare` 部分有哪些字；从 Noto Serif SC 切出四个字体文件的脚本。 |
+| `src/cardKit.ts` | 两张卡共用的：素材和字体在哪、登记字体、图片缓存、只发一次请求确认素材包在不在。 |
+| `src/washSegments.ts`、`src/washFace.ts` | 刷盘子卡：这一刻播哪一段、小厨师在不在台上；卡上写什么。纯函数。 |
+| `src/washElement.ts`、`src/washApi.ts`、`src/washStrings.ts` | 刷盘子卡的元素本身、从后端读回一趟、卡上的字。 |

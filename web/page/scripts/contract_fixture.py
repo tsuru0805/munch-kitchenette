@@ -88,6 +88,16 @@ def main() -> None:
         conn.commit()
         conn.close()
         out["vendor"] = get("/api/vendor", who=WHO)
+        good = out["vendor"]["visit"]["goods"][0]
+        c.post("/api/vendor/treat", json={"who": WHO, "item_id": good["id"], "qty": 1, "request_id": "contract-1"})
+        out["ledger"] = get("/api/vendor/ledger", who=WHO)
+        out["missing"] = get("/api/recipes/missing", who=WHO, recipe="hc-d9b1068d")   # 西红柿炒鸡蛋: no tomato in the fridge
+        c.put("/api/recipes/hc-d9b1068d/stop", json={"stopped": True, "why": "写错了"})
+        out["stopped"] = get("/api/recipes/stopped")
+        out["prefs"] = c.put("/api/prefs", json={"who": WHO, "dislike": ["spinach"]}).json()
+        out["prefs_add"] = c.post("/api/prefs/dislike", json={"who": WHO, "item": "egg"}).json()
+        out["prefs_remove"] = c.delete("/api/prefs/dislike/spinach", params={"who": WHO}).json()
+        out["buy_missing"] = c.post("/api/recipes/buy_missing", json={"who": WHO, "recipe": "hc-d9b1068d", "op_id": "contract-buy-1"}).json()
         out["about_play"] = get("/api/about")
         config.override(**{f"play_{k}": v for k, v in defaults.items()})
         out["features_default"] = get("/api/features")

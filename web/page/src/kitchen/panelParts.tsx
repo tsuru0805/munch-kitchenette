@@ -1,17 +1,24 @@
 // Small shared parts: one cut-out picture, a thumbnail, a row, and the "refresh failed" line.
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Image, Pressable, StyleSheet, Text, View, type ImageStyle, type StyleProp } from "react-native";
+import { useAuthedSource } from "./authedImage";
 import { artRef, type AnyArt } from "./kindArt";
 import { KC, KF } from "./kitchenTheme";
 
-/** One picture; when there is none, or the server's one could not be fetched, the fallback (a character card) is drawn instead of an empty box */
+/**
+ * One picture; when there is none, or the server's one could not be fetched, the fallback (a character card)
+ * is drawn instead of an empty box. A picture the server gives out only with the token is fetched with it
+ * first (authedImage.ts); the fallback stands in until it is there.
+ */
 export function ArtImage({ art, style, fallback = null }: { art: AnyArt | null; style: StyleProp<ImageStyle>; fallback?: ReactNode }) {
   const src = art ? artRef(art).src : null;
-  const key = src && typeof src === "object" && "uri" in src ? String(src.uri) : String(art);
-  const [failedKey, setFailedKey] = useState<string | null>(null);
-  useEffect(() => setFailedKey(null), [key]);       // a new picture (the version goes up after a redraw): try again
-  if (!src || failedKey === key) return <>{fallback}</>;
-  return <Image source={src} style={style} resizeMode="contain" accessible={false} onError={() => setFailedKey(key)} />;
+  const loaded = useAuthedSource(src);
+  // what the <Image> is actually given (a fetched picture gets a new object URL every time it is fetched):
+  // a failure belongs to that, so a later fetch of the same picture that works is shown
+  const shown = loaded.state !== "ready" ? "" : typeof loaded.src === "object" && loaded.src && "uri" in loaded.src ? String(loaded.src.uri) : String(art);
+  const [failed, setFailed] = useState<string | null>(null);
+  if (!src || loaded.state !== "ready" || failed === shown) return <>{fallback}</>;
+  return <Image source={loaded.src} style={style} resizeMode="contain" accessible={false} onError={() => setFailed(shown)} />;
 }
 
 /** A 40 × 40 rounded thumbnail; with no picture (an added kind that was never drawn) it shows the first character of the name */

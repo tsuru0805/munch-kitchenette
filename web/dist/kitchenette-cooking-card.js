@@ -11,19 +11,33 @@ function parseSettlement(v) {
   return {
     outcome: typeof s.outcome === "string" ? s.outcome : "",
     link: typeof s.link === "string" ? s.link : "free",
-    proficiency: pr && typeof pr.tier === "string" ? { tier: pr.tier, n: typeof pr.n === "number" ? pr.n : 0, toNext: typeof pr.to_next === "number" ? pr.to_next : null } : null,
+    proficiency: pr && typeof pr.tier === "string" ? {
+      tier: pr.tier,
+      n: typeof pr.n === "number" ? pr.n : 0,
+      toNext: typeof pr.to_next === "number" ? pr.to_next : null,
+      nextTier: typeof pr.next_tier === "string" && pr.next_tier ? pr.next_tier : null,
+      tierFrom: typeof pr.tier_from === "number" ? pr.tier_from : null
+    } : null,
     mishap: state ? { state, text: typeof mi.text === "string" ? mi.text : null } : null,
     icon: typeof s.icon === "string" ? s.icon : "",
     stamps: Array.isArray(s.stamps) ? s.stamps.map((x) => x && typeof x === "object" ? String(x.text ?? "") : "").filter(Boolean) : []
   };
 }
+function parseSettleMissing(v) {
+  if (!v || typeof v !== "object") return null;
+  const s = v;
+  if (s.has !== false) return null;
+  const oc = typeof s.legacy_outcome === "string" && SETTLE_OUTCOMES.has(s.legacy_outcome) ? s.legacy_outcome : null;
+  return { why: typeof s.why === "string" ? s.why : "", legacyOutcome: oc };
+}
+var SETTLE_OUTCOMES = /* @__PURE__ */ new Set(["great", "ok", "burnt", "spoiled", "ruined"]);
 var OUTCOMES = /* @__PURE__ */ new Set(["great", "ok", "burnt", "spoiled"]);
 function parseOutcome(v) {
   return typeof v === "string" && OUTCOMES.has(v) ? v : null;
 }
 function probeFromSession(s) {
   if (!s) return { status: null, outcome: null, session: null };
-  const status = s.status === "served" || s.status === "cancelled" || s.status === "cooking" ? s.status : null;
+  const status = s.status === "served" || s.status === "cancelled" || s.status === "cooking" || s.status === "ruined" ? s.status : null;
   return { status, outcome: parseOutcome(s.outcome), session: s };
 }
 var KitchenFetchError = class extends Error {
@@ -51,10 +65,18 @@ function asKitchenError(e) {
 function parseAnswer(body) {
   const b = body && typeof body === "object" ? body : {};
   const session = b.session && typeof b.session === "object" ? b.session : null;
-  return { session, timezone: typeof b.timezone === "string" ? b.timezone : "", settlement: parseSettlement(b.settlement) };
+  return {
+    session,
+    timezone: typeof b.timezone === "string" ? b.timezone : "",
+    settlement: parseSettlement(b.settlement),
+    settleMissing: parseSettleMissing(b.settlement)
+  };
 }
 async function fetchKitchen(base, sessionId, token) {
   const url = `${base.replace(/\/+$/, "")}/api/kitchen?session_id=${encodeURIComponent(sessionId)}`;
+  return parseAnswer(await getJson(url, token));
+}
+async function getJson(url, token) {
   let r;
   try {
     r = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
@@ -72,7 +94,7 @@ async function fetchKitchen(base, sessionId, token) {
   if (r.status === 404) throw fail("not_found", r.status);
   if (!r.ok) throw fail("server", r.status);
   try {
-    return parseAnswer(await r.json());
+    return await r.json();
   } catch {
     throw fail("bad_response", r.status);
   }
@@ -101,7 +123,12 @@ ${sessionId}`;
       });
     }
     const answer = await hit.p;
-    return { ...probeFromSession(answer.session), timezone: answer.timezone, settlement: answer.settlement };
+    return {
+      ...probeFromSession(answer.session),
+      timezone: answer.timezone,
+      settlement: answer.settlement,
+      settleMissing: answer.settleMissing
+    };
   };
 }
 
@@ -129,21 +156,21 @@ function outcomeWord(o) {
   return null;
 }
 function revealAtMs(f) {
-  const dueMs = (f.startedAt + Math.max(0, f.durationSec)) * 1e3;
-  if (f.outcomeAtMs === void 0) return dueMs + OUTCOME_WAIT_MS;
-  return Math.min(Math.max(dueMs, f.outcomeAtMs), dueMs + OUTCOME_WAIT_MS);
+  const dueMs2 = (f.startedAt + Math.max(0, f.durationSec)) * 1e3;
+  if (f.outcomeAtMs === void 0) return dueMs2 + OUTCOME_WAIT_MS;
+  return Math.min(Math.max(dueMs2, f.outcomeAtMs), dueMs2 + OUTCOME_WAIT_MS);
 }
 function kitchenPhase(f, nowMs) {
   const startMs = f.startedAt * 1e3;
-  const dueMs = startMs + Math.max(0, f.durationSec) * 1e3;
-  if (!Number.isFinite(startMs) || !Number.isFinite(dueMs)) return "done";
+  const dueMs2 = startMs + Math.max(0, f.durationSec) * 1e3;
+  if (!Number.isFinite(startMs) || !Number.isFinite(dueMs2)) return "done";
   if (f.cancelledSeenAtMs !== void 0) {
     const seenLive = f.cancelledSeenAtMs > f.mountedAtMs + 50;
     if (seenLive && nowMs < f.cancelledSeenAtMs + EXIT_MS) return "exit";
     return "cancelled";
   }
-  if (f.mountedAtMs >= dueMs) return "done";
-  if (nowMs < dueMs) {
+  if (f.mountedAtMs >= dueMs2) return "done";
+  if (nowMs < dueMs2) {
     const fresh = f.firstSeen && f.mountedAtMs - startMs <= FRESH_S * 1e3;
     if (fresh && nowMs < f.mountedAtMs + ENTER_MS) return "enter";
     return "stir";
@@ -287,11 +314,38 @@ function requiredSegments() {
   return segs;
 }
 var CHORE_SEGMENTS = [
+  "vendor_arrive",
   "vendor_call",
+  "vendor_wait",
+  "vendor_leave",
+  "vendor_leave_last",
+  "vendor_walkin",
+  "vendor_walkin_last",
   "vendor_pay",
-  "vendor_take",
-  "vendor_take_last",
-  "vendor_carry",
+  "vendor_give",
+  "vendor_give_last",
+  "vendor_eat",
+  "vendor_eat_last",
+  "vendor_walkout",
+  "vendor_walkout_hold",
+  "vendor_walkout_empty",
+  "vendor_still",
+  "vendor_th_arrive",
+  "vendor_th_call",
+  "vendor_th_wait",
+  "vendor_th_leave",
+  "vendor_th_leave_last",
+  "vendor_th_walkin",
+  "vendor_th_walkin_last",
+  "vendor_th_pay",
+  "vendor_th_give",
+  "vendor_th_give_last",
+  "vendor_th_eat",
+  "vendor_th_eat_last",
+  "vendor_th_walkout",
+  "vendor_th_walkout_hold",
+  "vendor_th_walkout_empty",
+  "vendor_th_still",
   "dish_sleeve",
   "dish_soap",
   "dish_scrub",
@@ -330,14 +384,14 @@ var PLATES = {
   toque: {
     great: { bottomCenter: [306, 270] },
     ok: { bottomCenter: [466, 510] },
-    burnt: { bottomCenter: [146, 510] },
-    spoiled: { bottomCenter: [136, 520], tiltEvery: 3 }
+    burnt: { bottomCenter: [156, 510] },
+    spoiled: { bottomCenter: [156, 520], tiltEvery: 3 }
   },
   scarf: {
     great: { bottomCenter: [306, 330] },
     ok: { bottomCenter: [466, 510] },
-    burnt: { bottomCenter: [146, 510] },
-    spoiled: { bottomCenter: [136, 520], tiltEvery: 3 }
+    burnt: { bottomCenter: [156, 510] },
+    spoiled: { bottomCenter: [156, 520], tiltEvery: 3 }
   }
 };
 var ICONS = /* @__PURE__ */ new Set([
@@ -392,6 +446,127 @@ function drawSettle(canvas, pose, outfit, imgs) {
   }
   if (imgs.front) ctx.drawImage(imgs.front, 0, 0);
   return true;
+}
+var PIC_FRAME = { x: 96, y: 150, w: 480, h: 410 };
+var PIC_SCALE = 0.4;
+var PIC_SCALE_NARROW = 0.3;
+var PIC_NARROW_BELOW_PX = 360;
+var PIC_PAD_Y = 8;
+function picBox(scale) {
+  const w = PIC_FRAME.w * scale;
+  const h2 = PIC_FRAME.h * scale;
+  return { w, h: h2, col: Math.ceil(w), minH: Math.ceil(h2) + 2 * PIC_PAD_Y };
+}
+function frameStill(src) {
+  const out = document.createElement("canvas");
+  out.width = PIC_FRAME.w;
+  out.height = PIC_FRAME.h;
+  const o = out.getContext("2d");
+  if (!o) return null;
+  o.imageSmoothingEnabled = false;
+  o.drawImage(src, PIC_FRAME.x, PIC_FRAME.y, PIC_FRAME.w, PIC_FRAME.h, 0, 0, PIC_FRAME.w, PIC_FRAME.h);
+  return out;
+}
+var StillCache = class {
+  #m = /* @__PURE__ */ new Map();
+  /**
+   * The still when it is ready, else null; starts loading it when nobody is, and either nobody tried yet or it
+   * failed and this card has not tried in this appearance. While it is loading (started by this card or by
+   * another one), `done` is kept and called once when the load settles, so every card waiting for the same
+   * pictures draws itself again.
+   */
+  get(key, tried, load, done) {
+    const e = this.#m.get(key);
+    if (e?.state === "ready") return e.value;
+    if (e?.state === "loading") {
+      e.waiting.add(done);
+      return null;
+    }
+    if (e?.state === "failed" && tried.has(key)) return null;
+    tried.add(key);
+    const entry = { state: "loading", waiting: /* @__PURE__ */ new Set([done]) };
+    this.#m.set(key, entry);
+    load().then((v) => this.#m.set(key, v === null ? { state: "failed" } : { state: "ready", value: v })).catch(() => this.#m.set(key, { state: "failed" })).finally(() => {
+      for (const fn of entry.waiting) {
+        try {
+          fn();
+        } catch {
+        }
+      }
+    });
+    return null;
+  }
+  /** For tests */
+  state(key) {
+    return this.#m.get(key)?.state;
+  }
+};
+
+// src/settleCard.ts
+var TIER_LADDER = ["\u751F\u758F", "\u62FF\u624B", "\u62DB\u724C"];
+var OUTCOMES2 = /* @__PURE__ */ new Set(["great", "ok", "burnt", "spoiled", "ruined"]);
+var NOT_YET = /* @__PURE__ */ new Set(["not_settled", "error"]);
+function settleView(i) {
+  if (!i.done) return { kind: "plain" };
+  const s = i.settlement;
+  if (s) {
+    return {
+      kind: "settled",
+      facts: {
+        outcome: OUTCOMES2.has(s.outcome) ? s.outcome : i.ruined ? "ruined" : null,
+        proficiency: s.proficiency,
+        mishap: s.mishap,
+        stamps: s.stamps,
+        icon: s.icon
+      }
+    };
+  }
+  const m = i.missing;
+  if (m?.why === "legacy") {
+    const outcome = i.ruined ? "ruined" : m.legacyOutcome;
+    return { kind: "settled", facts: { outcome, proficiency: null, mishap: null, stamps: [], icon: "" } };
+  }
+  if (m && !NOT_YET.has(m.why)) return { kind: "plain" };
+  if (m || !i.answered && i.canRead) return { kind: "pending" };
+  return { kind: "plain" };
+}
+function settleLines(f, t) {
+  const lines = [];
+  if (f.outcome) lines.push({ key: "outcome", label: t.settleLabelOutcome, text: t.settleOutcome(f.outcome) });
+  if (f.outcome === "ruined") return { lines, stamps: [] };
+  const p = f.proficiency;
+  if (p) {
+    const next = p.toNext ? p.nextTier ?? TIER_LADDER[TIER_LADDER.indexOf(p.tier) + 1] ?? null : null;
+    const legacy = t.settleTier;
+    lines.push({
+      key: "tier",
+      label: t.settleLabelTier,
+      text: legacy ? legacy(p.tier, p.toNext) : t.settleTierName(p.tier),
+      bar: tierBar(p),
+      sub: !legacy && p.toNext && next ? t.settleToNext(p.toNext, t.settleTierName(next)) : null
+    });
+  }
+  const m = f.mishap;
+  if (m?.state === "had" && m.text) lines.push({ key: "mishap", label: t.settleLabelMishap, text: m.text });
+  else if (m?.state === "none" && f.outcome !== "burnt" && f.outcome !== "spoiled" && f.outcome !== null) {
+    lines.push({ key: "mishap", label: t.settleLabelMishap, text: t.settleSmooth });
+  }
+  return { lines, stamps: f.stamps };
+}
+function fullestLines(t) {
+  const lines = [
+    { key: "outcome", label: t.settleLabelOutcome, text: t.settleOutcome("great") },
+    { key: "tier", label: t.settleLabelTier, text: t.settleTierName(TIER_LADDER[1]), bar: 0.5, sub: t.settleToNext(9, t.settleTierName(TIER_LADDER[2])) },
+    { key: "mishap", label: t.settleLabelMishap, text: "\u3000\n\u3000" }
+  ];
+  return { lines, stamps: ["\u3000\u3000\u3000\u3000", "\u3000\u3000\u3000\u3000"] };
+}
+function tierBar(p) {
+  if (!p.toNext) return 1;
+  const from = p.tierFrom ?? (TIER_LADDER.indexOf(p.tier) === 0 ? 0 : null);
+  if (from === null) return null;
+  const span = p.n + p.toNext - from;
+  return span > 0 ? Math.min(1, Math.max(0, (p.n - from) / span)) : null;
 }
 
 // src/manifest.generated.ts
@@ -491,11 +666,38 @@ var CLAWD_MANIFEST = {
     "toque/stirfry_serve_last": "toque/stirfry_serve_last.png",
     "toque/stirfry_taste": "toque/stirfry_taste.webp",
     "toque/stirfry_wipe": "toque/stirfry_wipe.webp",
+    "toque/vendor_arrive": "toque/vendor_arrive.webp",
     "toque/vendor_call": "toque/vendor_call.webp",
-    "toque/vendor_carry": "toque/vendor_carry.webp",
+    "toque/vendor_eat": "toque/vendor_eat.webp",
+    "toque/vendor_eat_last": "toque/vendor_eat_last.png",
+    "toque/vendor_give": "toque/vendor_give.webp",
+    "toque/vendor_give_last": "toque/vendor_give_last.png",
+    "toque/vendor_leave": "toque/vendor_leave.webp",
+    "toque/vendor_leave_last": "toque/vendor_leave_last.png",
     "toque/vendor_pay": "toque/vendor_pay.webp",
-    "toque/vendor_take": "toque/vendor_take.webp",
-    "toque/vendor_take_last": "toque/vendor_take_last.png",
+    "toque/vendor_still": "toque/vendor_still.png",
+    "toque/vendor_th_arrive": "toque/vendor_th_arrive.webp",
+    "toque/vendor_th_call": "toque/vendor_th_call.webp",
+    "toque/vendor_th_eat": "toque/vendor_th_eat.webp",
+    "toque/vendor_th_eat_last": "toque/vendor_th_eat_last.png",
+    "toque/vendor_th_give": "toque/vendor_th_give.webp",
+    "toque/vendor_th_give_last": "toque/vendor_th_give_last.png",
+    "toque/vendor_th_leave": "toque/vendor_th_leave.webp",
+    "toque/vendor_th_leave_last": "toque/vendor_th_leave_last.png",
+    "toque/vendor_th_pay": "toque/vendor_th_pay.webp",
+    "toque/vendor_th_still": "toque/vendor_th_still.png",
+    "toque/vendor_th_wait": "toque/vendor_th_wait.webp",
+    "toque/vendor_th_walkin": "toque/vendor_th_walkin.webp",
+    "toque/vendor_th_walkin_last": "toque/vendor_th_walkin_last.png",
+    "toque/vendor_th_walkout": "toque/vendor_th_walkout.webp",
+    "toque/vendor_th_walkout_empty": "toque/vendor_th_walkout_empty.webp",
+    "toque/vendor_th_walkout_hold": "toque/vendor_th_walkout_hold.webp",
+    "toque/vendor_wait": "toque/vendor_wait.webp",
+    "toque/vendor_walkin": "toque/vendor_walkin.webp",
+    "toque/vendor_walkin_last": "toque/vendor_walkin_last.png",
+    "toque/vendor_walkout": "toque/vendor_walkout.webp",
+    "toque/vendor_walkout_empty": "toque/vendor_walkout_empty.webp",
+    "toque/vendor_walkout_hold": "toque/vendor_walkout_hold.webp",
     "toque/wash": "toque/wash.webp",
     "scarf/bake_fail": "scarf/bake_fail.webp",
     "scarf/bake_fail_last": "scarf/bake_fail_last.png",
@@ -586,11 +788,38 @@ var CLAWD_MANIFEST = {
     "scarf/stirfry_serve_last": "scarf/stirfry_serve_last.png",
     "scarf/stirfry_taste": "scarf/stirfry_taste.webp",
     "scarf/stirfry_wipe": "scarf/stirfry_wipe.webp",
+    "scarf/vendor_arrive": "scarf/vendor_arrive.webp",
     "scarf/vendor_call": "scarf/vendor_call.webp",
-    "scarf/vendor_carry": "scarf/vendor_carry.webp",
+    "scarf/vendor_eat": "scarf/vendor_eat.webp",
+    "scarf/vendor_eat_last": "scarf/vendor_eat_last.png",
+    "scarf/vendor_give": "scarf/vendor_give.webp",
+    "scarf/vendor_give_last": "scarf/vendor_give_last.png",
+    "scarf/vendor_leave": "scarf/vendor_leave.webp",
+    "scarf/vendor_leave_last": "scarf/vendor_leave_last.png",
     "scarf/vendor_pay": "scarf/vendor_pay.webp",
-    "scarf/vendor_take": "scarf/vendor_take.webp",
-    "scarf/vendor_take_last": "scarf/vendor_take_last.png",
+    "scarf/vendor_still": "scarf/vendor_still.png",
+    "scarf/vendor_th_arrive": "scarf/vendor_th_arrive.webp",
+    "scarf/vendor_th_call": "scarf/vendor_th_call.webp",
+    "scarf/vendor_th_eat": "scarf/vendor_th_eat.webp",
+    "scarf/vendor_th_eat_last": "scarf/vendor_th_eat_last.png",
+    "scarf/vendor_th_give": "scarf/vendor_th_give.webp",
+    "scarf/vendor_th_give_last": "scarf/vendor_th_give_last.png",
+    "scarf/vendor_th_leave": "scarf/vendor_th_leave.webp",
+    "scarf/vendor_th_leave_last": "scarf/vendor_th_leave_last.png",
+    "scarf/vendor_th_pay": "scarf/vendor_th_pay.webp",
+    "scarf/vendor_th_still": "scarf/vendor_th_still.png",
+    "scarf/vendor_th_wait": "scarf/vendor_th_wait.webp",
+    "scarf/vendor_th_walkin": "scarf/vendor_th_walkin.webp",
+    "scarf/vendor_th_walkin_last": "scarf/vendor_th_walkin_last.png",
+    "scarf/vendor_th_walkout": "scarf/vendor_th_walkout.webp",
+    "scarf/vendor_th_walkout_empty": "scarf/vendor_th_walkout_empty.webp",
+    "scarf/vendor_th_walkout_hold": "scarf/vendor_th_walkout_hold.webp",
+    "scarf/vendor_wait": "scarf/vendor_wait.webp",
+    "scarf/vendor_walkin": "scarf/vendor_walkin.webp",
+    "scarf/vendor_walkin_last": "scarf/vendor_walkin_last.png",
+    "scarf/vendor_walkout": "scarf/vendor_walkout.webp",
+    "scarf/vendor_walkout_empty": "scarf/vendor_walkout_empty.webp",
+    "scarf/vendor_walkout_hold": "scarf/vendor_walkout_hold.webp",
     "scarf/wash": "scarf/wash.webp",
     "dishes/bake_burnt_cells": "dishes/bake_burnt_cells.png",
     "dishes/bake_cells": "dishes/bake_cells.png",
@@ -651,197 +880,47 @@ function onSeatFree(fn) {
     waiters.delete(fn);
   };
 }
-
-// src/seen.ts
-var seen = /* @__PURE__ */ new Set();
-function isFirstSeen(sessionId) {
-  return !seen.has(sessionId);
-}
-function markSeen(sessionId) {
-  seen.add(sessionId);
-}
+var SeatClaim = class {
+  #seat = null;
+  #wanted = false;
+  #offSeatFree = null;
+  #onChange;
+  constructor(onChange) {
+    this.#onChange = onChange;
+  }
+  /** Holds a seat right now (= may animate) */
+  get held() {
+    return this.#seat !== null;
+  }
+  want(wanted) {
+    if (wanted === this.#wanted) return;
+    this.#wanted = wanted;
+    if (wanted) {
+      const revoke = () => {
+        this.#seat = null;
+        this.#onChange();
+      };
+      this.#seat = acquireSeat(revoke);
+      this.#offSeatFree = onSeatFree(() => {
+        if (this.#seat || !seatFree()) return;
+        this.#seat = acquireSeat(revoke);
+        this.#onChange();
+      });
+    } else {
+      this.#offSeatFree?.();
+      this.#offSeatFree = null;
+      if (this.#seat) {
+        releaseSeat(this.#seat);
+        this.#seat = null;
+      }
+    }
+  }
+};
 
 // src/serifRange.generated.ts
 var SERIF_RARE_RANGE = "U+3400,U+4E0C,U+4E10,U+4E15,U+4E1E,U+4E28,U+4E2C,U+4E36,U+4E3F,U+4E47,U+4E5C,U+4E69,U+4E8D,U+4E93,U+4E98,U+4E9F-4EA0,U+4EB3,U+4EB5,U+4EBB,U+4EC2-4EC4,U+4EC9,U+4EDD-4EDE,U+4EE1,U+4EE8,U+4EEB,U+4EF3,U+4EF5,U+4F09,U+4F1B,U+4F22,U+4F25,U+4F27,U+4F2B,U+4F32,U+4F3D,U+4F57-4F58,U+4F5A,U+4F5D-4F5F,U+4F64-4F65,U+4F67,U+4F74,U+4F76,U+4F7B-4F7C,U+4F7E,U+4F83,U+4F89,U+4F8F,U+4F91,U+4F94,U+4FAA,U+4FAC,U+4FC5,U+4FCE,U+4FD1,U+4FDA,U+4FDC,U+4FDF,U+4FE3,U+4FE6,U+4FE8,U+4FEA,U+4FF3,U+4FF8,U+4FFE,U+500C,U+500F,U+501C,U+5025,U+5028-5029,U+502C-502E,U+5043,U+5048,U+504C,U+504E,U+5055,U+506C,U+507B,U+507E,U+50A5,U+50A7,U+50A9,U+50BA,U+50D6,U+50E6,U+50EC-50EE,U+5106-5107,U+510B,U+5140,U+5155-5156,U+516E,U+5181-5182,U+5196,U+51A2,U+51A5,U+51AB,U+51B1,U+51BC-51BD,U+51C7,U+51CD,U+51E6,U+51EA-51EB,U+51F5,U+51FC,U+5202,U+5208,U+520D-520E,U+5216,U+522D,U+5233,U+523F-5240,U+524C,U+525C,U+525E,U+5261,U+527D,U+5281-5282,U+5290,U+5293,U+52A2,U+52AC-52AD,U+52BE,U+52D0,U+52D5-52D6,U+52F0,U+52F9,U+530D,U+530F-5310,U+5315,U+531A,U+5326,U+532E,U+533E,U+5345,U+5358,U+535F,U+5363,U+5366,U+5369,U+536E,U+537A,U+538D,U+539D,U+53A3,U+53A5,U+53AE,U+53B6,U+53CE,U+53DF,U+53E8-53E9,U+53F1,U+53F5,U+53FB,U+53FD,U+5406,U+5412,U+5416,U+5421,U+5423,U+5432,U+5443,U+544B,U+5452-5454,U+5456-5457,U+5459,U+5464,U+5466,U+5471-5472,U+5476-5477,U+5482,U+5484,U+5494,U+549A-549B,U+549D,U+54A3-54A4,U+54A6-54A7,U+54A9-54AB,U+54AD,U+54B4,U+54BB,U+54BF,U+54C2,U+54CC,U+54CF-54D0,U+54D2-54D5,U+54D9-54DA,U+54DC-54DE,U+54E7,U+54F3,U+54FD,U+54FF,U+550F,U+5511,U+5514,U+551B,U+5520,U+5522-5523,U+5527,U+552A,U+5530,U+5533,U+5537,U+553C,U+553F,U+5541,U+5549,U+5550,U+5553,U+5555-5556,U+555C,U+5567,U+556C-556D,U+5575-5577,U+557B,U+557E,U+5581,U+5583,U+5588,U+558B,U+558F,U+5591,U+5594,U+5599,U+559F,U+55B1,U+55B5,U+55B9,U+55BD-55BE,U+55C4,U+55C9,U+55CC-55CD,U+55D1-55D2,U+55D4,U+55D6,U+55DD,U+55DF,U+55E4-55E6,U+55E8,U+55EA-55EC,U+55EF,U+55F2-55F3,U+55F5,U+55F7,U+55FE,U+5600-5601,U+5608,U+560C,U+560F,U+561E-561F,U+5623-5624,U+5627,U+562C-562D,U+5639,U+564C-564D,U+5654,U+5657-5659,U+565C,U+5662,U+5664,U+5669,U+566B,U+5671,U+567B-567C,U+5685-5686,U+5693,U+56AF,U+56D4,U+56D7,U+56DD,U+56DF,U+56E1,U+56EB,U+56F3,U+56F5,U+56F9,U+56FF,U+5704,U+5709-570A,U+571C,U+5729-572A,U+572C,U+572E-572F,U+5733,U+5739,U+573B,U+5742,U+574C,U+575C,U+5768-5769,U+576B,U+576D,U+5773,U+5776,U+577B-577C,U+5785-5786,U+578C,U+5793,U+57A0-57A1,U+57A4,U+57A7,U+57A9,U+57AD,U+57B2,U+57B4,U+57B8,U+57CF,U+57D2,U+57D5,U+57D8-57DA,U+57DD,U+57E4,U+57ED,U+57EF,U+57F4,U+57F8,U+57FD,U+5800,U+5805,U+5807,U+580B,U+580D,U+5819,U+581E,U+5820,U+5844,U+584D,U+5865,U+586C,U+587E,U+5880-5881,U+5889,U+589A,U+58BC,U+58C5,U+58D1,U+5902,U+5914,U+5919,U+5924-5925,U+592D,U+593C,U+5941-5942,U+5955,U+5958,U+595A,U+5981,U+5983,U+598D,U+5997,U+599E,U+59A3-59A4,U+59A9-59AB,U+59AF,U+59B2,U+59BE,U+59CA,U+59D2,U+59D7-59D8,U+59DD,U+59E3,U+59F9,U+5A05-5A06,U+5A08-5A09,U+5A0C,U+5A11,U+5A13,U+5A23,U+5A32,U+5A34,U+5A3C,U+5A40,U+5A4A,U+5A55,U+5A62,U+5A67,U+5A75,U+5A77,U+5A7A,U+5A9B,U+5AAA,U+5AB2,U+5AB5,U+5AB8,U+5ABE,U+5AD2,U+5AD4,U+5AD6,U+5AD8,U+5ADC,U+5AE0,U+5AE3,U+5AE6,U+5AEB,U+5AF1,U+5B09,U+5B16-5B17,U+5B32,U+5B34,U+5B37,U+5B40,U+5B51,U+5B53,U+5B5A-5B5B,U+5B62,U+5B65,U+5B6C,U+5B71,U+5B73,U+5B80,U+5B84,U+5B93,U+5B95,U+5B9F,U+5BA5,U+5BB8,U+5BE4,U+5BEE,U+5BF0,U+5C15,U+5C1C,U+5C22,U+5C25,U+5C2C,U+5C34,U+5C3B,U+5C50,U+5C59,U+5C63,U+5C66,U+5C6E,U+5C7A,U+5C88,U+5C8C-5C8D,U+5C90-5C91,U+5C96,U+5C98-5C9A,U+5C9C,U+5CA2-5CA3,U+5CAB-5CAC,U+5CB1,U+5CB5,U+5CB7,U+5CBD,U+5CC1,U+5CC4,U+5CCB,U+5CD2,U+5CE4-5CE5,U+5D02-5D03,U+5D06,U+5D1B,U+5D1E,U+5D24,U+5D26-5D27,U+5D2E,U+5D34,U+5D3D-5D3E,U+5D47,U+5D4A-5D4B,U+5D58,U+5D5B,U+5D5D,U+5D69,U+5D6B-5D6C,U+5D6F,U+5D74,U+5D82,U+5D99,U+5D9D,U+5DB7,U+5DC5,U+5DDB,U+5DE3,U+5DEF,U+5DFD,U+5E0F,U+5E11,U+5E14,U+5E19,U+5E31,U+5E37,U+5E3B-5E3C,U+5E44,U+5E54,U+5E5B,U+5E5E,U+5E61,U+5E7A,U+5E80,U+5E8B,U+5E91,U+5E96,U+5EA0,U+5EA5,U+5EB3,U+5EB5,U+5EB9,U+5EBE,U+5ED1-5ED2,U+5EDB,U+5EE8,U+5EEA,U+5EF4,U+5EFE-5EFF,U+5F01,U+5F08,U+5F0B,U+5F11,U+5F29-5F2A,U+5F2D,U+5F3C,U+5F40,U+5F50,U+5F56-5F58,U+5F61,U+5F73,U+5F77,U+5F82,U+5F87,U+5F89,U+5F8C,U+5F95,U+5F99,U+5F9C,U+5FA8,U+5FAD,U+5FB5,U+5FBC,U+5FC4,U+5FC9,U+5FCF-5FD2,U+5FD6,U+5FDD,U+5FE1,U+5FE4,U+5FEA,U+5FED-5FEE,U+5FF8,U+5FFE,U+6003-6006,U+600A,U+600D,U+600F,U+6019,U+601B,U+6021,U+6026,U+6029,U+602B,U+6035,U+603C,U+603F,U+6041-6042,U+6059-605A,U+605D,U+6063,U+6067,U+606A,U+6078-607B,U+607D,U+6083,U+608C,U+6092,U+6096,U+609A-609B,U+609D,U+60AB,U+60AD,U+60B1,U+60B4,U+60BB,U+60C6,U+60D8,U+60DA,U+60DD,U+60EC,U+60F4,U+6100,U+6106,U+610D-610E,U+6115,U+6120,U+6123,U+6126,U+612B,U+614A,U+615D,U+6175,U+6194,U+619D,U+61A7,U+61A9,U+61AC,U+61B7,U+61CB,U+61D1,U+61D4,U+61F5,U+61FF,U+6206,U+620B,U+6215,U+6217,U+621B,U+621F,U+6221-6222,U+6224-6225,U+622C,U+6238,U+623D-623E,U+6243,U+6248-6249,U+624C,U+6255,U+626A,U+629F,U+62BB,U+62CA,U+62D7,U+62DA,U+62EE,U+62F6,U+6308,U+6322,U+6332,U+6339,U+6343,U+634B,U+6369,U+636D,U+6371,U+637A,U+638A,U+638E,U+63AC-63AE,U+63B0,U+63B4,U+63BC,U+63BE,U+63C4,U+63C6,U+63CE,U+63DE,U+63E0,U+63F2,U+63F6,U+63F8,U+63FF,U+640B-640C,U+641B,U+6420-6421,U+6426,U+6434,U+643F,U+6441,U+6445,U+6452,U+645E,U+646D,U+647A,U+6484,U+6496,U+6499,U+64B7-64B8,U+64BA,U+64C0,U+64D0,U+64D7-64D8,U+64E2,U+64E4,U+6509,U+6525,U+652E,U+6534-6535,U+6538,U+6549,U+6555,U+656B,U+6590,U+6593,U+659B,U+65AB,U+65BC,U+65C3-65C4,U+65C6,U+65CC,U+65CE,U+65D2,U+65D6,U+65EE-65F0,U+6600,U+6603,U+660A,U+6615,U+6619,U+661D,U+6631,U+6634-6636,U+6641-6642,U+664F,U+6654,U+6656-6657,U+665F,U+6661,U+6677,U+6684,U+668C,U+669D,U+66A7-66A8,U+66B9,U+66BE,U+66DB-66DC,U+66E6,U+66E9,U+66F7,U+670A,U+6710,U+6715,U+6726,U+6748,U+674C,U+6753,U+675E,U+6769-676A,U+6771-6773,U+6775,U+6777,U+677C,U+6787,U+678B,U+6798,U+679E,U+67A5,U+67A7-67A8,U+67AD,U+67B0,U+67B3,U+67B5,U+67B8,U+67C1,U+67C3,U+67CE,U+67D8-67DA,U+67DD,U+67E2,U+67E9,U+67F0,U+67FD,U+6800,U+6804,U+6809-680A,U+680C,U+680E,U+681D-681E,U+6829,U+6832-6833,U+683E,U+6840-6841,U+6844,U+6849-684A,U+684E,U+6855,U+6860-6862,U+6864,U+6866-6867,U+686B,U+6874,U+6877,U+6883,U+688F,U+6893,U+68B5,U+68C2,U+68E3,U+68F0,U+68F9,U+68FC,U+6901,U+690B,U+6910,U+691F-6920,U+6924,U+6934,U+6939,U+6942,U+6953,U+6957,U+695D,U+6960,U+6963,U+6966,U+696B,U+696E,U+6971,U+6978-6979,U+6980,U+6984,U+6987-6989,U+698D,U+6995,U+6998,U+699B,U+69A7,U+69AB,U+69AD,U+69B1,U+69BB,U+69C1,U+69CA,U+69CC,U+69CE,U+69D4,U+69DF-69E0,U+69ED,U+69F2,U+69FF,U+6A17-6A18,U+6A28,U+6A2F,U+6A35,U+6A3D-6A3E,U+6A44,U+6A50,U+6A58,U+6A5B,U+6A65,U+6A79,U+6A7C,U+6A8E,U+6A90-6A91,U+6A97,U+6AA0,U+6AA9,U+6AAB,U+6AFB,U+6B24,U+6B37,U+6B39,U+6B43,U+6B46,U+6B59,U+6B81-6B82,U+6B84,U+6B87,U+6B8D,U+6B92-6B93,U+6B9A-6B9B,U+6BA1,U+6BAA,U+6BB3,U+6BC2,U+6BD3,U+6BEA,U+6BF3,U+6BF5,U+6BF9,U+6BFD,U+6C05-6C07,U+6C0D,U+6C10,U+6C15,U+6C17-6C1A,U+6C21,U+6C24,U+6C29-6C2A,U+6C32,U+6C35,U+6C37,U+6C3D,U+6C46,U+6C4A,U+6C54,U+6C5C,U+6C68-6C69,U+6C74,U+6C76,U+6C85-6C86,U+6C8C,U+6C90,U+6C93-6C94,U+6CA2-6CA3,U+6CA9,U+6CAD,U+6CB1-6CB2,U+6CD0,U+6CD3-6CD4,U+6CD6-6CD7,U+6CE0,U+6CEB,U+6CEE-6CEF,U+6CF1,U+6CF6-6CF8,U+6CFA,U+6CFE,U+6D04,U+6D07,U+6D0C,U+6D0E,U+6D19-6D1A,U+6D27,U+6D2B,U+6D2E,U+6D33,U+6D35,U+6D39,U+6D43,U+6D48,U+6D4D,U+6D4F,U+6D52,U+6D54,U+6D5C,U+6D5E,U+6D60,U+6D63,U+6D6F,U+6D7C,U+6D91,U+6D93-6D94,U+6D9E,U+6DA0,U+6DAB,U+6DAE,U+6DBC,U+6DBF,U+6DC5,U+6DC7,U+6DD9,U+6DDD-6DDE,U+6DE0,U+6DE6,U+6DFC,U+6E0C,U+6E0E,U+6E11,U+6E16,U+6E1A,U+6E25,U+6E2B,U+6E32,U+6E44,U+6E4E,U+6E53-6E54,U+6E5F,U+6E6B,U+6E6E,U+6E80,U+6E86,U+6E8F,U+6E98,U+6E9F,U+6EA5,U+6EA7,U+6EB1-6EB2,U+6EB4,U+6EB7,U+6EBB,U+6EBD,U+6EC2,U+6ECF,U+6ED5,U+6ED7,U+6EDF-6EE0,U+6EE2,U+6EF9,U+6F09,U+6F15,U+6F24,U+6F29-6F2A,U+6F2D,U+6F2F,U+6F36,U+6F46-6F47,U+6F4B,U+6F51,U+6F62,U+6F64,U+6F72,U+6F74,U+6F78,U+6F7A,U+6F7C,U+6F89,U+6F8C-6F8D,U+6FA7,U+6FB6,U+6FB9,U+6FC2,U+6FC9,U+6FD1,U+6FDE,U+6FE0-6FE1,U+6FEE-6FEF,U+701A-701B,U+701E,U+7023,U+7035,U+7039,U+704F,U+705E,U+706C,U+7080,U+7085,U+7096,U+709C-709D,U+70AB,U+70B1,U+70B7,U+70BA-70BB,U+70C0,U+70CA,U+70E8,U+7110,U+7113,U+7116,U+7118,U+712F,U+7131,U+7145,U+714A,U+715C,U+7166,U+7168,U+7172-7173,U+7178,U+717A,U+7198,U+71A0,U+71A8,U+71B3,U+71B5,U+71B9,U+71D4,U+71E0,U+71E7,U+71EE,U+71F9,U+721D,U+7228,U+7230,U+723B,U+723F,U+724D,U+7252,U+7256,U+725D,U+7266,U+726E-726F,U+727E-727F,U+7284,U+728B,U+728D,U+728F,U+7292,U+729F,U+72AD,U+72B0,U+72B4,U+72B7-72B8,U+72C1,U+72C3,U+72CD-72CE,U+72D2,U+72E8-72E9,U+72EF,U+72F2-72F4,U+72F7,U+72FA-72FB,U+7301,U+7303,U+730A,U+7313,U+7315,U+7317,U+731D-731E,U+7321-7322,U+7325,U+732C,U+7331,U+7337-7339,U+734D,U+7350,U+7352,U+7357,U+7360,U+736C,U+736F,U+737E,U+738E,U+7391,U+739F,U+73A2,U+73AE,U+73B3,U+73B7,U+73BA,U+73C0,U+73C2,U+73C8-73C9,U+73CF,U+73D1,U+73D9,U+73DE,U+73E5,U+73E7,U+73E9,U+73F2,U+740A,U+740F,U+741A-741B,U+7425-7426,U+7428,U+742A,U+742C,U+742E,U+7430,U+7441,U+7455,U+7457,U+7459,U+745B-745C,U+746D,U+7477,U+747E,U+7480-7481,U+7487,U+748B,U+748E,U+7490,U+749C,U+749E,U+74A7-74A9,U+74BA,U+74D2,U+74DE,U+74E0,U+74EF,U+74F4,U+74FF,U+750D,U+750F,U+7511,U+7513,U+7519,U+752C,U+752F,U+753A,U+753E,U+7540,U+7548,U+754B,U+754E,U+755A-755B,U+7572,U+7579,U+757F,U+7583,U+758B,U+7592,U+7594,U+7596,U+759D,U+75A0,U+75A3,U+75AC,U+75B0-75B1,U+75B3-75B4,U+75B8,U+75C2-75C4,U+75CD,U+75D6,U+75E3-75E4,U+75E6-75E8,U+75EB,U+75F1,U+75FC,U+75FF-7600,U+7603,U+7605,U+760A,U+760C,U+7610,U+7615,U+7617-7619,U+761B,U+7620,U+7622,U+7625,U+762D,U+7630,U+7633,U+7635,U+763C,U+763E-7640,U+7643,U+764D,U+7654,U+7656,U+765C,U+765E,U+766B,U+766F,U+767A,U+7688,U+768E,U+7693,U+7699,U+76A4,U+76B2,U+76B4,U+76CD,U+76DE,U+76E5,U+76F1,U+76F9,U+7704,U+7707-7708,U+770D,U+7719-771A,U+7722,U+7726,U+772D,U+7735,U+7738,U+7743,U+7746-7747,U+774D,U+7750-7751,U+775A,U+7762,U+7765,U+7768,U+777D-7780,U+778C-778D,U+7791,U+779F-77A0,U+77A2,U+77B0,U+77B5,U+77BD,U+77BF,U+77CD,U+77DC,U+77E7,U+77EC,U+77F6,U+77F8,U+7800,U+7809,U+7811,U+7817-7818,U+781C-781D,U+781F,U+7823,U+7825-7826,U+7829,U+782C-782D,U+7839-783C,U+7847,U+784C,U+784E,U+7850,U+7856-7857,U+786A,U+786D,U+7887,U+7893,U+789A-789C,U+78A1,U+78A3,U+78A5,U+78B2,U+78B9,U+78C9,U+78D4,U+78D9,U+78EC,U+78F2,U+78F4,U+7905,U+7913,U+791E,U+7924,U+7934,U+793B,U+7940,U+7946,U+7949,U+7953,U+7957,U+795A-795C,U+7960,U+7962,U+7967,U+796F,U+797A,U+7980,U+7985,U+798A,U+799A,U+79A7,U+79B3,U+79BA,U+79D5,U+79E3,U+79EB,U+79ED,U+7A02-7A03,U+7A06,U+7A14,U+7A1E,U+7A23,U+7A2E,U+7A37,U+7A39,U+7A40,U+7A51,U+7A70,U+7A78-7A79,U+7A80,U+7A86,U+7A88,U+7A95,U+7AA0,U+7AA6,U+7AA8,U+7AAC-7AAD,U+7AB3,U+7AE6,U+7AFA,U+7AFD,U+7B03-7B04,U+7B08,U+7B0A,U+7B0F,U+7B15,U+7B19,U+7B1E,U+7B20,U+7B24-7B25,U+7B2A-7B2B,U+7B2E,U+7B31,U+7B33,U+7B38,U+7B3E,U+7B45,U+7B47,U+7B4C,U+7B58,U+7B5A,U+7B5D,U+7B60,U+7B62,U+7B6E,U+7B71-7B72,U+7B75,U+7B7B,U+7B85,U+7B90,U+7B9C-7B9D,U+7BA2,U+7BA6-7BA8,U+7BAA-7BAC,U+7BB4,U+7BB8,U+7BC1,U+7BCC,U+7BD1,U+7BDA,U+7BDD,U+7BE5-7BE6,U+7BEA,U+7BFC,U+7BFE,U+7C0B-7C0C,U+7C0F,U+7C16,U+7C1F,U+7C26,U+7C2A,U+7C38,U+7C40-7C41,U+7C74,U+7C7C,U+7C91,U+7C9B-7C9E,U+7CA2,U+7CB2,U+7CBC-7CBD,U+7CC1,U+7CC5,U+7CC7-7CC8,U+7CCC-7CCD,U+7CD7,U+7CE8,U+7CF8,U+7D05,U+7D50,U+7D77,U+7DA6,U+7DAE,U+7DBF,U+7E3B,U+7E47,U+7E9B,U+7E9F,U+7EA1,U+7EA3,U+7EA5,U+7EA8-7EA9,U+7EAD,U+7EB0,U+7EBE,U+7EC0-7EC2,U+7EC9,U+7ECB-7ECC,U+7ED0,U+7ED4,U+7ED7,U+7EDB,U+7EE0-7EE1,U+7EE8,U+7EEB,U+7EEE-7EEF,U+7EF1-7EF2,U+7EF6,U+7EFA-7EFB,U+7EFE,U+7F01-7F03,U+7F07-7F08,U+7F0B-7F0D,U+7F0F,U+7F11-7F12,U+7F17,U+7F19,U+7F1B-7F1C,U+7F1F,U+7F21-7F27,U+7F2A-7F2D,U+7F2F-7F33,U+7F35-7F36,U+7F42,U+7F44-7F45,U+7F54,U+7F58,U+7F5F,U+7F61,U+7F68,U+7F71,U+7F74,U+7F79,U+7F7E,U+7F81,U+7F9D,U+7F9F,U+7FA7,U+7FAF-7FB0,U+7FB2,U+7FB8,U+7FBC,U+7FBF,U+7FCA,U+7FCE,U+7FD2,U+7FD5,U+7FE1,U+7FE5-7FE6,U+7FE9,U+7FEE,U+7FF3,U+8004,U+8006,U+800B,U+8012,U+8014,U+8016,U+801C,U+8020,U+8022,U+8025-8029,U+8031,U+8035,U+8037,U+8043,U+8046,U+804D,U+8052,U+8069,U+8071,U+807F-8080,U+8093,U+809C,U+809F,U+80AB,U+80AD,U+80B1,U+80B4,U+80B7,U+80BC-80BD,U+80C2,U+80C4,U+80CD,U+80D7,U+80D9,U+80DB,U+80DD,U+80E4-80E5,U+80E7-80ED,U+80F1-80F2,U+80F4,U+80FC,U+810D-810E,U+8112,U+8114,U+8118,U+811E,U+812C,U+8132,U+8136,U+8148,U+814C,U+8153,U+8159-815A,U+8160,U+8167,U+8169,U+816D,U+8171,U+8174,U+817C-817D,U+8182,U+8188,U+8191,U+81A3,U+81A6,U+81AA,U+81BA-81BB,U+81C1,U+81CA,U+81CC,U+81E7,U+81EC,U+81FE,U+8201-8202,U+8204,U+8210,U+821B,U+8221-8223,U+8228,U+822B,U+822D,U+822F,U+8233-8234,U+8238,U+823B,U+823E,U+8244,U+8249,U+824B,U+824F,U+825A,U+825F,U+8268,U+826E,U+8274,U+8279,U+827D,U+827F,U+8284,U+8288,U+828A,U+828E-828F,U+8291,U+8297-8299,U+829F,U+82A1,U+82A4,U+82A8-82AB,U+82AE,U+82B0,U+82B4,U+82B7-82B8,U+82BE,U+82C1,U+82C4,U+82C8,U+82CA-82CC,U+82CE,U+82D2-82D3,U+82D5,U+82D8,U+82DC,U+82E0-82E1,U+82E3-82E4,U+82F4,U+82F7,U+82FB,U+8306-8309,U+830C,U+830F,U+8311,U+8314-8315,U+8317,U+831A-831C,U+832D,U+832F,U+8331,U+8333-8334,U+833A,U+833C,U+8340,U+8343,U+8347,U+834F,U+8351,U+835B-835C,U+835E-8360,U+8365-8366,U+8368-836A,U+836C-836E,U+8378,U+837B-837D,U+8385,U+8392-8393,U+8398,U+839B-839C,U+839E,U+83A0,U+83A8-83AA,U+83B0,U+83B3-83B4,U+83B6,U+83B8,U+83BA,U+83BC,U+83C0-83C1,U+83C5,U+83D4,U+83D6,U+83D8,U+83DD,U+83DF,U+83E1,U+83E5,U+83EA,U+83EF-83F0,U+83F8-83F9,U+83FD,U+8401,U+8403,U+8406,U+840B,U+840F,U+8411,U+8418,U+841C,U+8426,U+8431,U+8438,U+843C,U+8446,U+8449,U+8451,U+8459-845A,U+845C,U+8469,U+846D,U+8473,U+8476,U+8478,U+847A,U+8487-8489,U+848C,U+848E,U+8497,U+84A1,U+84AF,U+84B4,U+84B9-84BA,U+84BD,U+84BF,U+84C1,U+84CA,U+84CD,U+84D0,U+84D3,U+84E0,U+84E3,U+84E5-84E6,U+84EE,U+84F0,U+84FC,U+84FF,U+850C,U+851F,U+8526,U+8535,U+8538-853B,U+8543,U+8548,U+8556,U+8559,U+855E,U+8564,U+8568,U+8572,U+8579-857B,U+8585,U+8587,U+858F,U+859C,U+85A4,U+85A8,U+85AE,U+85B0,U+85B7,U+85B9,U+85C1,U+85D3,U+85DC,U+85FF,U+8605,U+8616,U+8627,U+8629,U+863C,U+864D,U+8654,U+8662,U+866C,U+866E,U+867A-867C,U+867F,U+868B,U+868D,U+8693,U+869D,U+86A3,U+86A7-86AA,U+86AC,U+86AF-86B1,U+86B4-86B6,U+86BA,U+86C4,U+86C9,U+86CE-86D1,U+86D8,U+86DE-86DF,U+86E9,U+86ED,U+86F1-86F4,U+86F8,U+8703,U+8707-870A,U+870D,U+8713,U+871A,U+871E,U+8722-8723,U+8725,U+8729,U+872E,U+8731,U+8734,U+8737,U+873B,U+873E-873F,U+8748,U+874C,U+8753,U+8759,U+8760,U+8763-8765,U+876E,U+8770,U+877B-877E,U+8782-8783,U+8785,U+8788,U+878B,U+8793,U+8797,U+87A2,U+87A8,U+87AB-87AD,U+87AF,U+87B3,U+87B5,U+87BD,U+87C0,U+87C4,U+87C6,U+87CA-87CB,U+87D1-87D3,U+87DB,U+87E0,U+87E5,U+87EA,U+87EE,U+87F7,U+87FE,U+8803,U+880A,U+8813,U+8816,U+881B,U+8821,U+8832,U+8839,U+883C,U+8844,U+8862,U+8864,U+8869,U+886E,U+8872,U+887D-887F,U+8882,U+8885,U+8888,U+88A2,U+88A4,U+88B7,U+88BC,U+88C6,U+88C9,U+88CE,U+88D2,U+88D8,U+88DF,U+88E2-88E3,U+88E5,U+88E8,U+88F0-88F1,U+88FC,U+88FE,U+890A,U+8913,U+8919-891B,U+8921,U+892B,U+8930,U+8934,U+8936,U+8941,U+895E,U+8966,U+897B,U+8983,U+898B,U+899A,U+89C7,U+89CA-89CC,U+89CE-89D1,U+89D6,U+89DA,U+89DC,U+89DE,U+89E5,U+89EB,U+89EF,U+89F3,U+8A07,U+8A3E,U+8A48,U+8AAD,U+8B07,U+8B19,U+8B26,U+8BA0,U+8BA6-8BA7,U+8BAA,U+8BB4-8BB5,U+8BB7,U+8BC2-8BC3,U+8BCB,U+8BCE-8BCF,U+8BD2-8BD4,U+8BD6,U+8BD8-8BD9,U+8BDC,U+8BDF-8BE0,U+8BE4,U+8BE8-8BE9,U+8BEE,U+8BF0,U+8BF3,U+8BF6,U+8BF9,U+8BFC,U+8BFF-8C00,U+8C02,U+8C04,U+8C07,U+8C0C,U+8C0F,U+8C11-8C12,U+8C14-8C16,U+8C18-8C19,U+8C1B,U+8C1D,U+8C1F-8C21,U+8C25,U+8C27,U+8C2A-8C2B,U+8C2E-8C2F,U+8C32-8C33,U+8C35-8C36,U+8C47,U+8C49,U+8C55,U+8C5A,U+8C73,U+8C78,U+8C82,U+8C85,U+8C8A,U+8C94,U+8C98,U+8D32-8D33,U+8D36,U+8D3B,U+8D3D,U+8D40,U+8D45-8D49,U+8D4D,U+8D53,U+8D55,U+8D59,U+8D5C-8D5D,U+8D67,U+8D6D,U+8D73,U+8D84,U+8D91,U+8D94,U+8DB1,U+8DB5,U+8DB8,U+8DBA,U+8DBC,U+8DBF,U+8DC4,U+8DC6,U+8DCE-8DCF,U+8DD6-8DD7,U+8DDA-8DDB,U+8DDE,U+8DE3-8DE4,U+8DEB-8DEC,U+8DF7-8DF9,U+8DFB,U+8DFD,U+8E05,U+8E09,U+8E14,U+8E1D,U+8E1F,U+8E23,U+8E2C,U+8E2E-8E2F,U+8E31,U+8E35,U+8E39-8E3A,U+8E3D,U+8E40-8E42,U+8E47,U+8E49-8E4A,U+8E51-8E52,U+8E59,U+8E69,U+8E6F-8E70,U+8E74,U+8E76,U+8E7C,U+8E85,U+8E8F-8E90,U+8E94,U+8E9C,U+8E9E,U+8ECE,U+8F6B,U+8F6D,U+8F71-8F73,U+8F75-8F7A,U+8F7C,U+8F7E,U+8F81-8F82,U+8F84,U+8F87,U+8F8B,U+8F8D-8F8F,U+8F94,U+8F98,U+8F9A,U+8FB6,U+8FD3,U+8FD5,U+8FE4-8FE6,U+8FE8-8FE9,U+8FEE,U+8FF3,U+9004-9005,U+900B,U+900D,U+9011,U+9016,U+9021,U+9026,U+902D,U+902F,U+9035-9036,U+9044,U+9050-9052,U+9058,U+905B,U+9062,U+9068,U+9074,U+907D,U+9082-9083,U+9088,U+908B,U+9095,U+9097,U+9099,U+909B,U+909D,U+90A1,U+90AC,U+90B0,U+90B3-90B4,U+90B6,U+90B8,U+90BA,U+90BE,U+90C4-90C5,U+90C7,U+90CF-90D0,U+90D3,U+90D7,U+90DB-90DC,U+90E2,U+90E6,U+90EB,U+90EF,U+90FE,U+9104,U+911E,U+9122-9123,U+912F,U+9131,U+9139,U+9143,U+9146,U+914A,U+914E-9150,U+9154,U+9161-9162,U+9164,U+9169,U+916F-9170,U+9172,U+9174,U+9179,U+917D-917E,U+9185,U+918C-918D,U+9190-9191,U+91A2-91A3,U+91AA,U+91AD-91AF,U+91B4-91B5,U+91BA,U+928E,U+92AE,U+92C8,U+933E,U+936A,U+938F,U+93CA,U+93D6,U+943E,U+9451,U+946B,U+9485-9487,U+948A-948D,U+948F-9490,U+9494-9495,U+9497,U+949A-949C,U+94A3-94A4,U+94AA-94AD,U+94AF-94B0,U+94B2,U+94B4,U+94B6-94BA,U+94BC-94BD,U+94BF,U+94C4,U+94C8-94CE,U+94D0-94D2,U+94D5-94D9,U+94DB,U+94DE-94E0,U+94E2,U+94E4-94E5,U+94E7-94EB,U+94EE-94EF,U+94F3-94F5,U+94F7,U+94F9,U+94FC-94FD,U+94FF,U+9502-9503,U+9506-9507,U+9509-950A,U+950D-950F,U+9512-9516,U+9518,U+951B,U+951D-951F,U+9522,U+9529-952C,U+9531-9532,U+9534-9538,U+953A,U+953C,U+953E-953F,U+9542,U+9544-9546,U+9549,U+954C,U+954E-954F,U+9552-9554,U+9556-9559,U+955B,U+955D-955F,U+9561-9562,U+9564-956C,U+956F,U+9571-9573,U+9589,U+958B,U+9598,U+95E9,U+95EB,U+95F1,U+95F3,U+95F5-95F6,U+95FC,U+95FE,U+9603-9604,U+9606,U+9608,U+960A-960D,U+960F,U+9612,U+9615-9617,U+9619-961A,U+961D,U+9621-9622,U+962A,U+9631,U+963C-963D,U+9642,U+9649,U+9654,U+965F,U+9667,U+966C,U+9672,U+9674,U+9688,U+968D,U+9697,U+96B0,U+96B3,U+96B9,U+96BC-96BD,U+96C9-96CA,U+96CE,U+96D2,U+96E0,U+96E9,U+96EF,U+96F3,U+9701,U+9706,U+9708,U+970E-970F,U+9727,U+972A,U+972D,U+9730,U+973E,U+9746,U+9753,U+9765,U+977C,U+9785,U+9791-9792,U+9794,U+97A3,U+97AB,U+97AF,U+97B2,U+97B4,U+97EA-97EC,U+9878,U+987C,U+9880,U+9883,U+9889,U+988C-988D,U+988F,U+9894,U+989A-989B,U+989E-989F,U+98A1-98A2,U+98A5-98A6,U+98A8,U+98D1-98D3,U+98D5,U+98D9-98DA,U+98E7-98E8,U+990D,U+992E,U+9954-9955,U+9963,U+9967-996C,U+9974,U+9977,U+997D,U+9980,U+9984,U+9987,U+998A,U+998D,U+9990-9991,U+9993-9995,U+9997-9998,U+99A5,U+99A8,U+9A75,U+9A77-9A78,U+9A7A,U+9A7D,U+9A7F-9A81,U+9A85,U+9A88,U+9A8A,U+9A90,U+9A92-9A93,U+9A96,U+9A98,U+9A9B-9AA0,U+9AA2-9AA3,U+9AA5,U+9AA7,U+9AB0-9AB1,U+9AB6-9AB7,U+9ABA,U+9ABC,U+9AC0-9AC2,U+9AC5,U+9ACB-9ACC,U+9AD1,U+9ADF,U+9AE1,U+9AE6,U+9AEB,U+9AED,U+9AEF,U+9AF9,U+9AFB,U+9B08,U+9B0F,U+9B13,U+9B1F,U+9B23,U+9B2F,U+9B32,U+9B3B,U+9B43,U+9B45,U+9B47-9B49,U+9B4D,U+9B51,U+9B5A,U+9B9F,U+9C47,U+9C56,U+9C7F,U+9C82,U+9C85-9C88,U+9C8B,U+9C8E,U+9C90-9C92,U+9C94-9C95,U+9C9A-9C9B,U+9C9E-9CA3,U+9CA5-9CA9,U+9CAB,U+9CAD-9CAE,U+9CB0-9CB7,U+9CBA-9CBD,U+9CC4-9CC7,U+9CCA-9CD0,U+9CD3-9CD5,U+9CD7-9CD9,U+9CDC-9CDD,U+9CDF,U+9CE2,U+9CE5,U+9CF4,U+9D12,U+9D3B,U+9D8F,U+9DAF,U+9DBA,U+9DF9,U+9E20,U+9E22,U+9E28-9E2C,U+9E31-9E32,U+9E36-9E3A,U+9E3E,U+9E41-9E42,U+9E44,U+9E46-9E49,U+9E4B-9E4C,U+9E4E,U+9E51,U+9E55,U+9E57-9E58,U+9E5A-9E5C,U+9E5E,U+9E63,U+9E66-9E6D,U+9E71,U+9E73,U+9E7E,U+9E82,U+9E87-9E88,U+9E8B,U+9E92,U+9E9D,U+9E9F,U+9EB4,U+9EB8,U+9EBD-9EBE,U+9EC9,U+9ECF,U+9ED2,U+9EDB-9EDD,U+9EDF-9EE0,U+9EE2,U+9EE5,U+9EE7,U+9EE9-9EEA,U+9EEF,U+9EF9,U+9EFB-9EFC,U+9EFE,U+9F0B,U+9F0D,U+9F10,U+9F17,U+9F19,U+9F22,U+9F2C,U+9F2F,U+9F37,U+9F39,U+9F3D-9F3E,U+9F44,U+9F51,U+9F80,U+9F83,U+9F85-9F8A,U+9F8C,U+9F9B,U+9FA0,U+9FFF";
 
-// src/spring.ts
-var STIFFNESS = 338.8;
-var DAMPING = 19;
-var MASS = 1;
-var FRAME_MS = 1e3 / 60;
-var MAX_MS = 1500;
-var REST_PX = 0.5;
-function springFrames(from, to) {
-  const omega0 = Math.sqrt(STIFFNESS / MASS);
-  const zeta = DAMPING / (2 * Math.sqrt(STIFFNESS * MASS));
-  const omega1 = omega0 * Math.sqrt(1 - zeta * zeta);
-  const x0 = to - from;
-  const values = [];
-  let t = 0;
-  for (; t <= MAX_MS; t += FRAME_MS) {
-    const s = t / 1e3;
-    const envelope = Math.exp(-zeta * omega0 * s);
-    values.push(to - envelope * (zeta * omega0 * x0 / omega1 * Math.sin(omega1 * s) + x0 * Math.cos(omega1 * s)));
-    if (Math.abs(x0) * envelope < REST_PX) break;
-  }
-  values.push(to);
-  return { values, durationMs: Math.min(t, MAX_MS) + FRAME_MS };
-}
-
-// src/strings.ts
-var zh = {
-  symbol: "\u706B",
-  symbolLabel: "KITCHEN",
-  eyebrow: "\u5C0F\u53A8\u623F",
-  cancelled: "\u5173\u706B\u4E86",
-  served: (o) => {
-    const w = outcomeWord(o);
-    return w ? `\u51FA\u9505\u4E86 \xB7 ${w}` : "\u51FA\u9505\u4E86";
-  },
-  minutes: fmtMinutes,
-  footCooking: (start, duration, due) => `${start} \u4E0B\u9505 \xB7 \u505A ${duration} \xB7 ${due} \u51FA\u9505`,
-  footServed: (start, duration, due) => `${start} \u4E0B\u9505 \xB7 \u505A\u4E86 ${duration} \xB7 ${due} \u51FA\u9505`,
-  footCancelled: (start) => `${start} \u4E0B\u9505 \xB7 \u6CA1\u505A\u5B8C`,
-  ariaCooking: (dish, remaining) => `${dish},\u5728\u706B\u4E0A,\u8FD8\u5269 ${remaining}`,
-  ariaServed: (dish, served) => `${dish},${served}`,
-  ariaCancelled: (dish) => `${dish},\u5173\u706B\u4E86`,
-  settleTier: (tier, toNext) => toNext ? `${tier} \xB7 \u518D\u505A ${toNext} \u6B21\u5347\u6863` : tier,
-  settleSmooth: "\u4E00\u8DEF\u987A\u5229",
-  loadFailed: (kind, status) => `\u53D6\u4E0D\u5230\u8FD9\u4E00\u9505\uFF1A${{
-    unreachable: "\u8FDE\u4E0D\u4E0A\u53A8\u623F\u670D\u52A1\u3002",
-    blocked: "\u6D4F\u89C8\u5668\u62E6\u4E0B\u4E86\u8FD9\u6B21\u8BFB\u53D6\uFF0C\u53A8\u623F\u670D\u52A1\u7684\u8DE8\u7AD9\u540D\u5355\u91CC\u6CA1\u6709\u8FD9\u4E2A\u9875\u9762\u3002",
-    unauthorized: "\u53A8\u623F\u670D\u52A1\u62D2\u7EDD\u4E86\uFF0C\u53E3\u4EE4\u6CA1\u5E26\u6216\u4E0D\u5BF9\u3002",
-    not_found: "\u53A8\u623F\u670D\u52A1\u91CC\u6CA1\u6709\u8FD9\u4E00\u9505\u3002",
-    server: `\u53A8\u623F\u670D\u52A1\u51FA\u9519\u4E86${status ? `\uFF08\u72B6\u6001\u7801 ${status}\uFF09` : ""}\u3002`,
-    bad_response: "\u53A8\u623F\u670D\u52A1\u7684\u56DE\u7B54\u770B\u4E0D\u61C2\u3002"
-  }[kind]}`
-};
-var EN_OUTCOME = { great: "great", ok: null, burnt: "burnt", spoiled: "spoiled" };
-var en = {
-  symbol: "\u706B",
-  symbolLabel: "KITCHEN",
-  eyebrow: "KITCHENETTE",
-  cancelled: "Heat off",
-  served: (o) => {
-    const w = o ? EN_OUTCOME[o] : null;
-    return w ? `Served \xB7 ${w}` : "Served";
-  },
-  minutes: (sec) => {
-    const m = Math.round(sec / 60);
-    if (m < 60) return `${m} min`;
-    const h2 = Math.floor(m / 60);
-    const r = m % 60;
-    return r === 0 ? `${h2} h` : `${h2} h ${r} min`;
-  },
-  footCooking: (start, duration, due) => `On at ${start} \xB7 ${duration} \xB7 ready ${due}`,
-  footServed: (start, duration, due) => `On at ${start} \xB7 cooked ${duration} \xB7 served ${due}`,
-  footCancelled: (start) => `On at ${start} \xB7 not finished`,
-  ariaCooking: (dish, remaining) => `${dish}, on the stove, ${remaining} left`,
-  ariaServed: (dish, served) => `${dish}, ${served}`,
-  ariaCancelled: (dish) => `${dish}, heat off`,
-  settleTier: (tier, toNext) => toNext ? `${tier} \xB7 ${toNext} more to the next` : tier,
-  settleSmooth: "no mishaps",
-  loadFailed: (kind, status) => `Can't load this pot: ${{
-    unreachable: "the kitchen server can't be reached.",
-    blocked: "the browser blocked the request. This page is not on the kitchen server's list of allowed sites.",
-    unauthorized: "the kitchen server refused it. The token is missing or wrong.",
-    not_found: "the kitchen server has no pot with this id.",
-    server: `the kitchen server answered with an error${status ? ` (status ${status})` : ""}.`,
-    bad_response: "the kitchen server's answer was not understood."
-  }[kind]}`
-};
-var STRINGS = { zh, en };
-function stringsFor(lang) {
-  return (lang ?? "").toLowerCase().startsWith("en") ? en : zh;
-}
-
-// src/styles.ts
-var CARD_CSS = `
-:host {
-  display: block;
-  margin: 8px 0;
-  /* Text settings a host page may have set on an ancestor do not leak into the card */
-  font-size: 14px; line-height: normal; font-weight: 400; font-style: normal; letter-spacing: normal;
-  text-align: left; text-transform: none; text-indent: 0; word-spacing: normal;
-  --_paper: var(--kitchenette-paper, #FEFEFD);
-  --_ink: var(--kitchenette-ink, #2A3550);
-  --_accent: var(--kitchenette-accent, #4159E8);
-  --_mute: var(--kitchenette-mute, #5A6377);
-  --_hair: var(--kitchenette-hair, rgba(42, 53, 80, 0.22));
-  --_shadow: var(--kitchenette-shadow, #394CB3);
-  --_offset: var(--kitchenette-shadow-offset, 4px);
-  --_serif: var(--kitchenette-font-serif, "Kitchenette Serif", "Songti SC", "Noto Serif SC", serif);
-  --_display: var(--kitchenette-font-display, "Kitchenette Bodoni 28", "Bodoni Moda", "Bodoni 72", Didot, serif);
-  --_display-small: var(--kitchenette-font-display-small, "Kitchenette Bodoni 11", "Bodoni Moda", "Bodoni 72", Didot, serif);
-}
-:host([theme="dark"]) {
-  --_paper: var(--kitchenette-paper, #111524);
-  --_ink: var(--kitchenette-ink, #EDE7D6);
-  --_accent: var(--kitchenette-accent, #4159E8);
-  --_mute: var(--kitchenette-mute, #A8A795);
-  --_hair: var(--kitchenette-hair, rgba(237, 231, 214, 0.2));
-  --_shadow: var(--kitchenette-shadow, #7D8BE2);
-}
-:host([hidden]) { display: none; }
-* { box-sizing: border-box; }
-.stage {
-  height: ${STAGE_PX}px;
-  width: ${CANVAS_PX}px;
-  overflow: hidden;
-  margin-left: auto;
-  margin-right: 12px;
-  pointer-events: none;
-}
-.canvas { position: relative; width: ${CANVAS_PX}px; height: ${CANVAS_PX}px; }
-.canvas img {
-  position: absolute; left: 0; top: 0;
-  width: ${CANVAS_PX}px; height: ${CANVAS_PX}px;
-  object-fit: contain;
-  user-select: none; -webkit-user-drag: none;
-}
-.frame { position: relative; padding-right: var(--_offset); padding-bottom: var(--_offset); }
-.frame.dim { opacity: 0.55; }
-.shadow { position: absolute; left: var(--_offset); top: var(--_offset); right: 0; bottom: 0; background: var(--_shadow); }
-.card {
-  position: relative;
-  display: flex; flex-direction: row;
-  background: var(--_paper);
-  border: 1px solid var(--_ink);
-}
-.sym {
-  flex: none; width: 44px;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
-  background: var(--_accent);
-  border-right: 1px dashed var(--_paper);
-}
-.sym-text { color: var(--_paper); font-family: var(--_serif); font-size: 15px; line-height: 18px; }
-.sym-en { color: var(--_paper); font-family: var(--_display-small); font-size: 7px; letter-spacing: 1.1px; }
-.body { flex: 1; min-width: 0; padding: 8px 11px; }
-.top { display: flex; flex-direction: row; align-items: center; gap: 10px; }
-.left { flex: 1; min-width: 0; }
-.eyebrow { font-family: var(--_serif); font-size: 9.5px; letter-spacing: 1.2px; color: var(--_accent); }
-.dish, .note { white-space: pre-wrap; overflow-wrap: anywhere; }
-.dish { font-family: var(--_serif); font-size: 14px; line-height: 21px; font-weight: 600; color: var(--_ink); margin-top: 1px; }
-.note { font-family: var(--_serif); font-size: 11.5px; line-height: 18px; color: var(--_mute); margin-top: 1px; }
-.track { height: 2px; background: var(--_hair); margin-top: 8px; overflow: hidden; }
-.fill { height: 2px; background: var(--_accent); }
-.foot { font-family: var(--_serif); font-size: 10.5px; line-height: 16px; color: var(--_mute); margin-top: 6px; font-variant-numeric: tabular-nums; }
-.settle { font-family: var(--_serif); font-size: 10.5px; line-height: 16px; color: var(--_mute); margin-top: 4px; padding-top: 4px; border-top: 1px dashed currentColor; white-space: pre-line; }
-.settle[hidden] { display: none; }
-.right { flex: none; display: flex; flex-direction: column; align-items: flex-end; justify-content: center; }
-.clock { font-family: var(--_display); font-size: 26px; color: var(--_ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.state-word { font-family: var(--_serif); font-size: 12.5px; line-height: 19px; color: var(--_accent); text-align: right; }
-/* The pot could not be fetched: the same card, with one line saying so */
-.card.failed .dish, .card.failed .right, .card.failed .track, .card.failed .foot { display: none; }
-[hidden] { display: none !important; }
-`;
-
-// src/element.ts
-var TICK_MS = 250;
-var CANCEL_POLL_MS = 15e3;
-var OUTCOME_POLL_MS = 1500;
-var CROSSFADE_MS = 120;
-var HIDDEN_Y = STAGE_PX + 8;
+// src/cardKit.ts
 var SCRIPT_URL = import.meta.url;
 var DEFAULT_ASSETS = new URL("../../assets/clawd/", SCRIPT_URL).href;
 var DEFAULT_FONTS = new URL("../fonts/", SCRIPT_URL).href;
@@ -922,15 +1001,276 @@ function checkPack(folder, probeUrl) {
   }
   return pack;
 }
-var settleCache = /* @__PURE__ */ new Map();
 var h = (tag, cls, parent) => {
   const el = document.createElement(tag);
   el.className = cls;
   parent?.appendChild(el);
   return el;
 };
+function dropLayer(l) {
+  l.img.remove();
+  if (l.objectUrl) URL.revokeObjectURL(l.objectUrl);
+}
+function setText(el, text) {
+  if (el.textContent !== text) el.textContent = text;
+}
+function withSlash(url) {
+  return url.endsWith("/") ? url : `${url}/`;
+}
 var Base = typeof HTMLElement === "undefined" ? class {
 } : HTMLElement;
+
+// src/seen.ts
+var seen = /* @__PURE__ */ new Set();
+function isFirstSeen(sessionId) {
+  return !seen.has(sessionId);
+}
+function markSeen(sessionId) {
+  seen.add(sessionId);
+}
+
+// src/spring.ts
+var STIFFNESS = 338.8;
+var DAMPING = 19;
+var MASS = 1;
+var FRAME_MS = 1e3 / 60;
+var MAX_MS = 1500;
+var REST_PX = 0.5;
+function springFrames(from, to) {
+  const omega0 = Math.sqrt(STIFFNESS / MASS);
+  const zeta = DAMPING / (2 * Math.sqrt(STIFFNESS * MASS));
+  const omega1 = omega0 * Math.sqrt(1 - zeta * zeta);
+  const x0 = to - from;
+  const values = [];
+  let t = 0;
+  for (; t <= MAX_MS; t += FRAME_MS) {
+    const s = t / 1e3;
+    const envelope = Math.exp(-zeta * omega0 * s);
+    values.push(to - envelope * (zeta * omega0 * x0 / omega1 * Math.sin(omega1 * s) + x0 * Math.cos(omega1 * s)));
+    if (Math.abs(x0) * envelope < REST_PX) break;
+  }
+  values.push(to);
+  return { values, durationMs: Math.min(t, MAX_MS) + FRAME_MS };
+}
+
+// src/strings.ts
+var zh = {
+  symbol: "\u706B",
+  symbolLabel: "KITCHEN",
+  eyebrow: "\u5C0F\u53A8\u623F",
+  cancelled: "\u5173\u706B\u4E86",
+  served: (o) => {
+    const w = outcomeWord(o);
+    return w ? `\u51FA\u9505\u4E86 \xB7 ${w}` : "\u51FA\u9505\u4E86";
+  },
+  minutes: fmtMinutes,
+  footCooking: (start, duration, due) => `${start} \u4E0B\u9505 \xB7 \u505A ${duration} \xB7 ${due} \u51FA\u9505`,
+  footServed: (start, duration, due) => `${start} \u4E0B\u9505 \xB7 \u505A\u4E86 ${duration} \xB7 ${due} \u51FA\u9505`,
+  footCancelled: (start) => `${start} \u4E0B\u9505 \xB7 \u6CA1\u505A\u5B8C`,
+  ariaCooking: (dish, remaining) => `${dish},\u5728\u706B\u4E0A,\u8FD8\u5269 ${remaining}`,
+  ariaServed: (dish, served) => `${dish},${served}`,
+  ariaCancelled: (dish) => `${dish},\u5173\u706B\u4E86`,
+  settleEyebrow: (eyebrow) => `${eyebrow} \xB7 \u505A\u597D\u4E86`,
+  settleLabelOutcome: "\u6210\u8272",
+  settleLabelTier: "\u719F\u7EC3",
+  settleLabelMishap: "\u610F\u5916",
+  settleOutcome: (o) => ({ great: "\u5F88\u597D", ok: "\u666E\u901A", burnt: "\u7CCA\u4E86", spoiled: "\u574F\u4E86", ruined: "\u6BC1\u4E86" })[o] ?? o,
+  settleTierName: (tier) => tier,
+  settleToNext: (n, next) => `\u518D\u505A ${n} \u6B21\u5347${next}`,
+  settleSmooth: "\u4E00\u8DEF\u987A\u5229",
+  footSettled: (start, duration) => `${start} \u4E0B\u9505 \xB7 \u505A\u4E86 ${duration}`,
+  footRuined: (start) => `${start} \u4E0B\u9505`,
+  loadFailed: (kind, status) => `\u53D6\u4E0D\u5230\u8FD9\u4E00\u9505\uFF1A${{
+    unreachable: "\u8FDE\u4E0D\u4E0A\u53A8\u623F\u670D\u52A1\u3002",
+    blocked: "\u6D4F\u89C8\u5668\u62E6\u4E0B\u4E86\u8FD9\u6B21\u8BFB\u53D6\uFF0C\u53A8\u623F\u670D\u52A1\u7684\u8DE8\u7AD9\u540D\u5355\u91CC\u6CA1\u6709\u8FD9\u4E2A\u9875\u9762\u3002",
+    unauthorized: "\u53A8\u623F\u670D\u52A1\u62D2\u7EDD\u4E86\uFF0C\u53E3\u4EE4\u6CA1\u5E26\u6216\u4E0D\u5BF9\u3002",
+    not_found: "\u53A8\u623F\u670D\u52A1\u91CC\u6CA1\u6709\u8FD9\u4E00\u9505\u3002",
+    server: `\u53A8\u623F\u670D\u52A1\u51FA\u9519\u4E86${status ? `\uFF08\u72B6\u6001\u7801 ${status}\uFF09` : ""}\u3002`,
+    bad_response: "\u53A8\u623F\u670D\u52A1\u7684\u56DE\u7B54\u770B\u4E0D\u61C2\u3002"
+  }[kind]}`
+};
+var EN_OUTCOME = { great: "great", ok: null, burnt: "burnt", spoiled: "spoiled" };
+var en = {
+  symbol: "\u706B",
+  symbolLabel: "KITCHEN",
+  eyebrow: "KITCHENETTE",
+  cancelled: "Heat off",
+  served: (o) => {
+    const w = o ? EN_OUTCOME[o] : null;
+    return w ? `Served \xB7 ${w}` : "Served";
+  },
+  minutes: (sec) => {
+    const m = Math.round(sec / 60);
+    if (m < 60) return `${m} min`;
+    const h2 = Math.floor(m / 60);
+    const r = m % 60;
+    return r === 0 ? `${h2} h` : `${h2} h ${r} min`;
+  },
+  footCooking: (start, duration, due) => `On at ${start} \xB7 ${duration} \xB7 ready ${due}`,
+  footServed: (start, duration, due) => `On at ${start} \xB7 cooked ${duration} \xB7 served ${due}`,
+  footCancelled: (start) => `On at ${start} \xB7 not finished`,
+  ariaCooking: (dish, remaining) => `${dish}, on the stove, ${remaining} left`,
+  ariaServed: (dish, served) => `${dish}, ${served}`,
+  ariaCancelled: (dish) => `${dish}, heat off`,
+  settleEyebrow: (eyebrow) => `${eyebrow} \xB7 DONE`,
+  settleLabelOutcome: "Result",
+  settleLabelTier: "Skill",
+  settleLabelMishap: "Mishap",
+  settleOutcome: (o) => ({ great: "great", ok: "ok", burnt: "burnt", spoiled: "spoiled", ruined: "ruined" })[o] ?? o,
+  settleTierName: (tier) => ({ \u751F\u758F: "learning", \u62FF\u624B: "practised", \u62DB\u724C: "signature" })[tier] ?? tier,
+  settleToNext: (n, next) => `${n} more to ${next}`,
+  settleSmooth: "no mishaps",
+  footSettled: (start, duration) => `On at ${start} \xB7 cooked ${duration}`,
+  footRuined: (start) => `On at ${start}`,
+  loadFailed: (kind, status) => `Can't load this pot: ${{
+    unreachable: "the kitchen server can't be reached.",
+    blocked: "the browser blocked the request. This page is not on the kitchen server's list of allowed sites.",
+    unauthorized: "the kitchen server refused it. The token is missing or wrong.",
+    not_found: "the kitchen server has no pot with this id.",
+    server: `the kitchen server answered with an error${status ? ` (status ${status})` : ""}.`,
+    bad_response: "the kitchen server's answer was not understood."
+  }[kind]}`
+};
+var STRINGS = { zh, en };
+function stringsFor(lang) {
+  return (lang ?? "").toLowerCase().startsWith("en") ? en : zh;
+}
+
+// src/styles.ts
+var PIC = picBox(PIC_SCALE);
+var PIC_NARROW = picBox(PIC_SCALE_NARROW);
+var CARD_CSS = `
+:host {
+  display: block;
+  container: kitchenette-card / inline-size;
+  margin: 8px 0;
+  /* Text settings a host page may have set on an ancestor do not leak into the card */
+  font-size: 14px; line-height: normal; font-weight: 400; font-style: normal; letter-spacing: normal;
+  text-align: left; text-transform: none; text-indent: 0; word-spacing: normal;
+  --_paper: var(--kitchenette-paper, #FEFEFD);
+  --_ink: var(--kitchenette-ink, #2A3550);
+  --_accent: var(--kitchenette-accent, #4159E8);
+  --_mute: var(--kitchenette-mute, #5A6377);
+  --_hair: var(--kitchenette-hair, rgba(42, 53, 80, 0.22));
+  --_shadow: var(--kitchenette-shadow, #394CB3);
+  --_offset: var(--kitchenette-shadow-offset, 4px);
+  --_serif: var(--kitchenette-font-serif, "Kitchenette Serif", "Songti SC", "Noto Serif SC", serif);
+  --_display: var(--kitchenette-font-display, "Kitchenette Bodoni 28", "Bodoni Moda", "Bodoni 72", Didot, serif);
+  --_display-small: var(--kitchenette-font-display-small, "Kitchenette Bodoni 11", "Bodoni Moda", "Bodoni 72", Didot, serif);
+}
+:host([theme="dark"]) {
+  --_paper: var(--kitchenette-paper, #111524);
+  --_ink: var(--kitchenette-ink, #EDE7D6);
+  --_accent: var(--kitchenette-accent, #4159E8);
+  --_mute: var(--kitchenette-mute, #A8A795);
+  --_hair: var(--kitchenette-hair, rgba(237, 231, 214, 0.2));
+  --_shadow: var(--kitchenette-shadow, #7D8BE2);
+}
+:host([hidden]) { display: none; }
+* { box-sizing: border-box; }
+.stage {
+  height: ${STAGE_PX}px;
+  width: ${CANVAS_PX}px;
+  overflow: hidden;
+  margin-left: auto;
+  margin-right: 12px;
+  pointer-events: none;
+}
+.canvas { position: relative; width: ${CANVAS_PX}px; height: ${CANVAS_PX}px; }
+.canvas img {
+  position: absolute; left: 0; top: 0;
+  width: ${CANVAS_PX}px; height: ${CANVAS_PX}px;
+  object-fit: contain;
+  user-select: none; -webkit-user-drag: none;
+}
+.frame { position: relative; padding-right: var(--_offset); padding-bottom: var(--_offset); }
+.frame.dim { opacity: 0.55; }
+.shadow { position: absolute; left: var(--_offset); top: var(--_offset); right: 0; bottom: 0; background: var(--_shadow); }
+.card {
+  position: relative;
+  display: flex; flex-direction: row;
+  background: var(--_paper);
+  border: 1px solid var(--_ink);
+}
+.sym {
+  flex: none; width: 44px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  background: var(--_accent);
+  border-right: 1px dashed var(--_paper);
+}
+.sym-text { color: var(--_paper); font-family: var(--_serif); font-size: 15px; line-height: 18px; }
+.sym-en { color: var(--_paper); font-family: var(--_display-small); font-size: 7px; letter-spacing: 1.1px; }
+.body { flex: 1; min-width: 0; padding: 8px 11px; }
+.top { display: flex; flex-direction: row; align-items: center; gap: 10px; }
+.left { flex: 1; min-width: 0; }
+.eyebrow { font-family: var(--_serif); font-size: 9.5px; letter-spacing: 1.2px; color: var(--_accent); }
+.dish, .note { white-space: pre-wrap; overflow-wrap: anywhere; }
+.dish { font-family: var(--_serif); font-size: 14px; line-height: 21px; font-weight: 600; color: var(--_ink); margin-top: 1px; }
+.note { font-family: var(--_serif); font-size: 11.5px; line-height: 18px; color: var(--_mute); margin-top: 1px; }
+.track { height: 2px; background: var(--_hair); margin-top: 8px; overflow: hidden; }
+.fill { height: 2px; background: var(--_accent); }
+.foot { font-family: var(--_serif); font-size: 10.5px; line-height: 16px; color: var(--_mute); margin-top: 6px; font-variant-numeric: tabular-nums; }
+/* The settled card: the picture column on the left (him with the dish, feet on one line), a dashed line,
+   then the dish and one line per fact, each with its small title on the left */
+.pic {
+  flex: none; width: ${PIC.col}px; min-height: ${PIC.minH}px; position: relative; overflow: hidden;
+  display: flex; align-items: center; justify-content: center; padding: ${PIC_PAD_Y}px 0;
+  border-right: 1px dashed var(--_ink);
+}
+/* Every pose through the same frame at the same scale, the frame in the middle of the column: the same
+   size, feet on the same line */
+.pic-img {
+  display: block; flex: none; width: ${PIC.w}px; height: ${PIC.h}px;
+  image-rendering: pixelated; user-select: none; -webkit-user-drag: none;
+}
+/* A narrow card: every still a size smaller (still all the same size) */
+@container kitchenette-card (max-width: ${PIC_NARROW_BELOW_PX - 1}px) {
+  .pic { width: ${PIC_NARROW.col}px; min-height: ${PIC_NARROW.minH}px; }
+  .pic-img { width: ${PIC_NARROW.w}px; height: ${PIC_NARROW.h}px; }
+}
+.card.settled .sym, .card.settled .right, .card.settled .track { display: none; }
+.card.settled .body { padding: 9px 11px 9px 12px; display: grid; align-content: start; }
+/* The invisible fullest card shares the content's place: the card is as tall as the taller of the two,
+   content at the top. Every settled card is then one height, before and after its lines arrive. */
+.sizer { display: none; visibility: hidden; pointer-events: none; }
+.card.settled .content, .card.settled .sizer { grid-area: 1 / 1; min-width: 0; }
+.card.settled .sizer { display: block; }
+.sizer .line-text { white-space: pre-line; }
+.card.settled .foot { font-size: 10px; line-height: 15px; margin-top: 5px; }
+.lines {
+  display: grid; grid-template-columns: max-content minmax(0, 1fr);
+  margin-top: 6px; border-top: 1px solid var(--_hair);
+  font-family: var(--_serif); font-size: 11px; line-height: 17px;
+}
+.line { display: contents; }
+.line-label, .line-value { padding: 3px 0; border-bottom: 1px solid var(--_hair); }
+.line-label { min-width: 34px; padding-right: 8px; color: var(--_mute); }
+.line-value { min-width: 0; color: var(--_ink); overflow-wrap: anywhere; }
+.line-bar { display: inline-block; position: relative; width: 46px; height: 2px; margin-left: 6px; vertical-align: middle; background: var(--_hair); }
+.line-bar-fill { position: absolute; left: 0; top: 0; height: 2px; background: var(--_accent); }
+/* A mishap is at most two lines */
+.line-mishap .line-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.line-sub { font-size: 10px; line-height: 15px; color: var(--_mute); }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.chip {
+  font-family: var(--_serif); font-size: 9.5px; line-height: 14px; letter-spacing: 0.5px; padding: 0 5px;
+  color: var(--_accent); border: 1px solid var(--_accent);
+}
+.right { flex: none; display: flex; flex-direction: column; align-items: flex-end; justify-content: center; }
+.clock { font-family: var(--_display); font-size: 26px; color: var(--_ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.state-word { font-family: var(--_serif); font-size: 12.5px; line-height: 19px; color: var(--_accent); text-align: right; }
+/* The pot could not be fetched: the same card, with one line saying so */
+.card.failed .dish, .card.failed .right, .card.failed .track, .card.failed .foot { display: none; }
+[hidden] { display: none !important; }
+`;
+
+// src/element.ts
+var TICK_MS = 250;
+var CANCEL_POLL_MS = 15e3;
+var OUTCOME_POLL_MS = 1500;
+var CROSSFADE_MS = 120;
+var HIDDEN_Y = STAGE_PX + 8;
+var settleCache = new StillCache();
 var KitchenetteCookingCard = class extends Base {
   static {
     this.observedAttributes = ["api-base", "session-id", "assets", "fonts", "lang", "timezone"];
@@ -957,12 +1297,14 @@ var KitchenetteCookingCard = class extends Base {
   #serverTz = "";
   #packWatched = false;
   #preloaded = false;
+  /** Settled stills this appearance of the card has asked for (a failed one is asked again on the next) */
+  #stillsTried = /* @__PURE__ */ new Set();
   // ── sprite ──
   #layers = [];
   #stillImg = null;
-  #seat = null;
-  #seatWanted = false;
-  #offSeatFree = null;
+  #seat = new SeatClaim(() => {
+    if (this.#pot) this.#render();
+  });
   #slide = null;
   #lastSpritePhase = null;
   #reduced = null;
@@ -982,7 +1324,11 @@ var KitchenetteCookingCard = class extends Base {
   #track;
   #fill;
   #foot;
-  #settle;
+  #pic;
+  #picImg;
+  #lines;
+  #chips;
+  #sizer;
   #wrap;
   constructor() {
     super();
@@ -1000,12 +1346,22 @@ var KitchenetteCookingCard = class extends Base {
     h("div", "shadow", this.#frame);
     this.#card = h("div", "card", this.#frame);
     this.#card.setAttribute("role", "group");
+    this.#pic = h("div", "pic", this.#card);
+    this.#pic.setAttribute("aria-hidden", "true");
+    this.#pic.hidden = true;
+    this.#picImg = h("img", "pic-img", this.#pic);
+    this.#picImg.alt = "";
+    this.#picImg.draggable = false;
+    this.#picImg.hidden = true;
     const sym = h("div", "sym", this.#card);
     sym.setAttribute("aria-hidden", "true");
     this.#symText = h("span", "sym-text", sym);
     this.#symEn = h("span", "sym-en", sym);
     const body = h("div", "body", this.#card);
-    const top = h("div", "top", body);
+    const content = h("div", "content", body);
+    this.#sizer = h("div", "sizer", body);
+    this.#sizer.setAttribute("aria-hidden", "true");
+    const top = h("div", "top", content);
     const left = h("div", "left", top);
     this.#eyebrow = h("div", "eyebrow", left);
     this.#dish = h("div", "dish", left);
@@ -1013,11 +1369,13 @@ var KitchenetteCookingCard = class extends Base {
     const right = h("div", "right", top);
     this.#clockEl = h("div", "clock", right);
     this.#stateWord = h("div", "state-word", right);
-    this.#track = h("div", "track", body);
+    this.#track = h("div", "track", content);
     this.#fill = h("div", "fill", this.#track);
-    this.#foot = h("div", "foot", body);
-    this.#settle = h("div", "settle", body);
-    this.#settle.hidden = true;
+    this.#lines = h("div", "lines", content);
+    this.#lines.hidden = true;
+    this.#chips = h("div", "chips", content);
+    this.#chips.hidden = true;
+    this.#foot = h("div", "foot", content);
   }
   // ── public API ──
   /** One pot's data. Assign it directly, or leave it unset and give `api-base` + `session-id` instead. */
@@ -1028,7 +1386,7 @@ var KitchenetteCookingCard = class extends Base {
     this.#session = s;
     if (!this.isConnected) return;
     if (s && this.#pot && this.#pot.id === s.id) {
-      this.#take(probeFromSession(s));
+      this.#take(probeFromSession(s), false);
       this.#render();
     } else this.#mount();
   }
@@ -1124,7 +1482,11 @@ var KitchenetteCookingCard = class extends Base {
     this.#serverTz = "";
     this.#packWatched = false;
     this.#preloaded = false;
-    this.#card.classList.remove("failed");
+    this.#stillsTried = /* @__PURE__ */ new Set();
+    this.#card.classList.remove("failed", "settled");
+    this.#pic.hidden = true;
+    this.#lines.hidden = true;
+    this.#chips.hidden = true;
   }
   #mount() {
     this.#unmount();
@@ -1143,8 +1505,11 @@ var KitchenetteCookingCard = class extends Base {
     probe(id, true).then((r) => {
       if (token !== this.#loadToken) return;
       if (r.timezone) this.#serverTz = r.timezone;
-      if (r.session) this.#begin(r.session);
-      else this.#fail(notFound());
+      if (r.session) {
+        this.#begin(r.session);
+        this.#take(r, true);
+        this.#render();
+      } else this.#fail(notFound());
     }).catch((e) => {
       if (token === this.#loadToken) this.#fail(asKitchenError(e), e);
     });
@@ -1188,9 +1553,11 @@ var KitchenetteCookingCard = class extends Base {
       // Read here, recorded later: a pot only counts as seen once its entrance has finished
       firstSeen: isFirstSeen(String(s.id)),
       cancelledSeenAtMs: void 0,
-      outcome: void 0
+      outcome: void 0,
+      settleAnswered: false,
+      ruined: false
     };
-    this.#take(probeFromSession(s));
+    this.#take(probeFromSession(s), false);
     this.#wrap.hidden = false;
     this.#render();
     if (this.#phase && phaseIsLive(this.#phase)) this.#tick = setInterval(() => this.#render(), TICK_MS);
@@ -1201,13 +1568,17 @@ var KitchenetteCookingCard = class extends Base {
     if (!base) return null;
     return apiProbe(new URL(base, document.baseURI).href, () => this.getAttribute("token"));
   }
-  #take(r) {
+  /** fromRead = the answer came from the backend (the data a card was given does not settle anything) */
+  #take(r, fromRead) {
     const pot = this.#pot;
     if (r.timezone) this.#serverTz = r.timezone;
     if (!pot) return;
     if (r.status === "cancelled") pot.cancelledSeenAtMs ??= this.#clock();
     else if (r.status === "served") pot.outcome ??= { v: r.outcome, atMs: this.#clock() };
+    else if (r.status === "ruined") pot.ruined = true;
     if (r.settlement) pot.settlement ??= r.settlement;
+    if (r.settleMissing) pot.settleMissing = r.settleMissing;
+    if (fromRead && (r.status === "served" || r.status === "ruined")) pot.settleAnswered = true;
   }
   #check(fresh) {
     const pot = this.#pot;
@@ -1216,7 +1587,7 @@ var KitchenetteCookingCard = class extends Base {
     const token = this.#loadToken;
     probe(pot.id, fresh).then((r) => {
       if (token !== this.#loadToken || this.#pot !== pot) return;
-      this.#take(r);
+      this.#take(r, true);
       this.#render();
     }).catch(() => {
     });
@@ -1238,13 +1609,13 @@ var KitchenetteCookingCard = class extends Base {
     if (!pot) return;
     const nowMs = this.#clock();
     const facts = this.#facts(pot);
-    const phase = kitchenPhase(facts, nowMs);
+    const phase = pot.ruined ? "done" : kitchenPhase(facts, nowMs);
     this.#phase = phase;
     if (phase !== "enter") markSeen(pot.id);
-    const dueMs = (pot.startedAt + pot.durationSec) * 1e3;
+    const dueMs2 = (pot.startedAt + pot.durationSec) * 1e3;
     const cancelled = pot.cancelledSeenAtMs !== void 0;
     const visible = document.visibilityState !== "hidden";
-    const cooking = !cancelled && nowMs < dueMs;
+    const cooking = !cancelled && !pot.ruined && nowMs < dueMs2;
     const pollKey = `${cooking}|${visible}`;
     if (pollKey !== this.#pollKey) {
       this.#pollKey = pollKey;
@@ -1253,7 +1624,7 @@ var KitchenetteCookingCard = class extends Base {
       this.#check(false);
       if (cooking && visible) this.#cancelPoll = setInterval(() => this.#check(false), CANCEL_POLL_MS);
     }
-    const awaiting = !cancelled && pot.outcome === void 0 && pot.mountedAtMs < dueMs && nowMs >= dueMs && nowMs < dueMs + OUTCOME_WAIT_MS;
+    const awaiting = !cancelled && !pot.ruined && pot.outcome === void 0 && pot.mountedAtMs < dueMs2 && nowMs >= dueMs2 && nowMs < dueMs2 + OUTCOME_WAIT_MS;
     if (awaiting !== this.#awaiting) {
       this.#awaiting = awaiting;
       clearInterval(this.#outcomePoll);
@@ -1277,25 +1648,30 @@ var KitchenetteCookingCard = class extends Base {
       method: parseMethod(pot.method),
       sessionId: pot.id
     });
-    this.#segment = segment;
-    const settled = !!pot.settlement && pot.outcome !== void 0 && !pot.cancelledSeenAtMs && (phase === "exit" || phase === "done");
-    if (settled) {
-      const last = `${parseMethod(pot.method)}_${isFailOutcome(pot.outcome?.v ?? null) ? "fail" : "serve"}_last`;
-      this.#segment = last;
-      this.#renderSprite("serve", outfit, last, visible);
-    } else this.#renderSprite(phase, outfit, segment, visible);
+    this.#segment = pot.ruined ? null : segment;
+    this.#renderSprite(phase, outfit, this.#segment, visible);
     const t = { ...stringsFor(this.getAttribute("lang")), ...this.#strings };
     const p = cookProgress(pot.startedAt, pot.durationSec, nowMs);
-    const onFire = !cancelled && p.remainingSec > 0;
+    const onFire = !cancelled && !pot.ruined && p.remainingSec > 0;
     const served = t.served(pot.outcome?.v ?? null);
     const tz = pickTimeZone(this.#serverTz, this.getAttribute("timezone"));
     const start = fmtHM(pot.startedAt, tz);
     const due = fmtHM(pot.startedAt + pot.durationSec, tz);
     const duration = t.minutes(pot.durationSec);
     const remaining = fmtRemaining(p.remainingSec);
+    const view = settleView({
+      done: !cancelled && (pot.ruined || phase === "done"),
+      ruined: pot.ruined,
+      settlement: pot.settlement,
+      missing: pot.settleMissing,
+      answered: pot.settleAnswered,
+      canRead: this.#activeProbe() !== null
+    });
+    const settledFace = view.kind !== "plain";
+    this.#card.classList.toggle("settled", settledFace);
     setText(this.#symText, t.symbol);
     setText(this.#symEn, t.symbolLabel);
-    setText(this.#eyebrow, t.eyebrow);
+    setText(this.#eyebrow, settledFace && !pot.ruined ? t.settleEyebrow(t.eyebrow) : t.eyebrow);
     setText(this.#dish, pot.dish);
     setText(this.#note, pot.note);
     this.#note.hidden = !pot.note;
@@ -1303,28 +1679,92 @@ var KitchenetteCookingCard = class extends Base {
     this.#clockEl.hidden = !onFire;
     this.#stateWord.hidden = onFire;
     if (onFire) setText(this.#clockEl, remaining);
-    else setText(this.#stateWord, cancelled ? t.cancelled : served);
+    else setText(this.#stateWord, cancelled ? t.cancelled : pot.ruined ? t.settleOutcome("ruined") : served);
     this.#track.hidden = !onFire;
     if (onFire) this.#fill.style.width = `${Math.round(p.progress * 1e3) / 10}%`;
     setText(
       this.#foot,
-      cancelled ? t.footCancelled(start) : onFire ? t.footCooking(start, duration, due) : t.footServed(start, duration, due)
+      cancelled ? t.footCancelled(start) : pot.ruined ? t.footRuined(start) : onFire ? t.footCooking(start, duration, due) : settledFace ? t.footSettled(start, duration) : t.footServed(start, duration, due)
     );
-    const st = !onFire && !cancelled && phase !== "stir" ? pot.settlement ?? null : null;
-    const settleText = st ? [
-      st.proficiency ? t.settleTier(st.proficiency.tier, st.proficiency.toNext) : "",
-      st.mishap ? st.mishap.state === "none" ? t.settleSmooth : st.mishap.text ?? "" : "",
-      st.stamps.join(" \xB7 ")
-    ].filter(Boolean).join("\n") : "";
-    this.#settle.hidden = !settleText;
-    setText(this.#settle, settleText);
-    const label = cancelled ? t.ariaCancelled(pot.dish) : onFire ? t.ariaCooking(pot.dish, remaining) : t.ariaServed(pot.dish, served);
+    const said = this.#renderSettled(view, t, outfit);
+    const label = cancelled ? t.ariaCancelled(pot.dish) : onFire ? t.ariaCooking(pot.dish, remaining) : t.ariaServed(pot.dish, settledFace ? said || t.settleEyebrow(t.eyebrow) : served);
     if (this.#card.getAttribute("aria-label") !== label) this.#card.setAttribute("aria-label", label);
     if (!phaseIsLive(phase)) {
       clearInterval(this.#tick);
       this.#tick = void 0;
     }
   }
+  // ── the settled card: the picture on the left, the lines on the right ──
+  /** Draws the settled parts of the card for this view; returns the lines read out for screen readers */
+  #renderSettled(view, t, outfit) {
+    const facts = view.kind === "settled" ? view.facts : null;
+    this.#pic.hidden = view.kind === "plain";
+    const still = facts ? this.#stillFor(outfit, facts) : null;
+    this.#picImg.hidden = !still;
+    if (still) {
+      if (this.#picImg.dataset.url !== still.url) {
+        this.#picImg.dataset.url = still.url;
+        this.#picImg.src = still.url;
+      }
+    }
+    const { lines, stamps } = facts ? settleLines(facts, t) : { lines: [], stamps: [] };
+    fillLines(this.#lines, this.#chips, lines, stamps);
+    this.#lines.hidden = lines.length === 0;
+    this.#chips.hidden = stamps.length === 0;
+    if (view.kind !== "plain") this.#renderSizer(t);
+    return [...lines.map((l) => `${l.label} ${l.text}${l.sub ? `,${l.sub}` : ""}`), ...stamps].join(",");
+  }
+  #renderSizer(t) {
+    const pot = this.#pot;
+    if (!pot) return;
+    const full = fullestLines(t);
+    const eyebrow = pot.ruined ? t.eyebrow : t.settleEyebrow(t.eyebrow);
+    const key = JSON.stringify([eyebrow, pot.dish, pot.note, this.#foot.textContent, full]);
+    if (this.#sizer.dataset.key === key) return;
+    this.#sizer.dataset.key = key;
+    this.#sizer.replaceChildren();
+    const left = h("div", "left", h("div", "top", this.#sizer));
+    h("div", "eyebrow", left).textContent = eyebrow;
+    h("div", "dish", left).textContent = pot.dish;
+    if (pot.note) h("div", "note", left).textContent = pot.note;
+    fillLines(h("div", "lines", this.#sizer), h("div", "chips", this.#sizer), full.lines, full.stamps);
+    h("div", "foot", this.#sizer).textContent = this.#foot.textContent;
+  }
+  /** The still for a settled card: him in the pose for the outcome, with the dish; the plain standing pose when the outcome is not known */
+  #stillFor(outfit, f) {
+    if (!this.#packReady(outfit, false)) return null;
+    const pose = f.outcome ? poseFor(f.outcome) : null;
+    const keys = pose ? settleKeys(outfit, pose, f.icon) : [assetKey(outfit, "base")];
+    const urls = keys.map((k) => this.#assetUrl(k));
+    if (urls.some((u) => !u)) return null;
+    const cacheKey = urls.join("|");
+    const load = (u) => new Promise((ok, no) => {
+      const im = new Image();
+      im.crossOrigin = "anonymous";
+      im.onload = () => ok(im);
+      im.onerror = no;
+      im.src = u;
+    });
+    return settleCache.get(cacheKey, this.#stillsTried, async () => {
+      const [poseImg, front, dish] = await Promise.all(urls.map((u) => load(u)));
+      const c = document.createElement("canvas");
+      if (pose) {
+        if (!drawSettle(c, pose, outfit, { pose: poseImg, front, dish })) return null;
+      } else {
+        const ctx = c.getContext("2d");
+        if (!ctx) return null;
+        c.width = poseImg.naturalWidth;
+        c.height = poseImg.naturalHeight;
+        ctx.drawImage(poseImg, 0, 0);
+      }
+      const cut = frameStill(c);
+      return cut ? { url: cut.toDataURL("image/png"), w: cut.width, h: cut.height } : null;
+    }, this.#onStill);
+  }
+  /** A still this card waits for is drawn (or failed): one function per card, so waiting is registered once */
+  #onStill = () => {
+    if (this.isConnected && this.#pot) this.#render();
+  };
   // ── sprite: slide in / out, the cut line, cross-fading between clips ──
   #assetsFolder() {
     const base = this.getAttribute("assets");
@@ -1341,7 +1781,7 @@ var KitchenetteCookingCard = class extends Base {
    * Is the sprite pack there? The first card to ask sends one request for one file; until the answer is
    * in, and for good when the answer is no, nothing else is requested and the stage stays empty.
    */
-  #packReady(outfit) {
+  #packReady(outfit, preloadClips = true) {
     const folder = this.#assetsFolder();
     const file = this.#manifest.files[assetKey(outfit, "base")] ?? Object.values(this.#manifest.files)[0];
     if (file === void 0) return false;
@@ -1353,7 +1793,7 @@ var KitchenetteCookingCard = class extends Base {
         if (token === this.#loadToken && this.#pot) this.#render();
       });
     }
-    if (pack.state === "ok" && !this.#preloaded) {
+    if (pack.state === "ok" && preloadClips && !this.#preloaded) {
       this.#preloaded = true;
       this.#preloadPot();
     }
@@ -1372,27 +1812,7 @@ var KitchenetteCookingCard = class extends Base {
     }
   }
   #wantSeat(wanted) {
-    if (wanted === this.#seatWanted) return;
-    this.#seatWanted = wanted;
-    if (wanted) {
-      const revoke = () => {
-        this.#seat = null;
-        if (this.#pot) this.#render();
-      };
-      this.#seat = acquireSeat(revoke);
-      this.#offSeatFree = onSeatFree(() => {
-        if (this.#seat || !seatFree()) return;
-        this.#seat = acquireSeat(revoke);
-        if (this.#pot) this.#render();
-      });
-    } else {
-      this.#offSeatFree?.();
-      this.#offSeatFree = null;
-      if (this.#seat) {
-        releaseSeat(this.#seat);
-        this.#seat = null;
-      }
-    }
+    this.#seat.want(wanted);
   }
   #clearSprite() {
     this.#slide?.cancel();
@@ -1404,40 +1824,13 @@ var KitchenetteCookingCard = class extends Base {
     this.#canvas.style.transform = "";
     this.#stage.hidden = true;
   }
-  #settleUrl(outfit, st) {
-    const pose = poseFor(st.outcome);
-    if (!pose) return null;
-    const keys = settleKeys(outfit, pose, st.icon);
-    const urls = keys.map((k) => this.#assetUrl(k));
-    if (urls.some((u) => !u)) return null;
-    const cacheKey = urls.join("|");
-    const hit = settleCache.get(cacheKey);
-    if (hit !== void 0) return hit || null;
-    settleCache.set(cacheKey, "");
-    const load = (u) => new Promise((ok, no) => {
-      const im = new Image();
-      im.crossOrigin = "anonymous";
-      im.onload = () => ok(im);
-      im.onerror = no;
-      im.src = u;
-    });
-    Promise.all(urls.map((u) => load(u))).then(([poseImg, front, dish]) => {
-      const c = document.createElement("canvas");
-      if (!drawSettle(c, pose, outfit, { pose: poseImg, front, dish })) return;
-      settleCache.set(cacheKey, c.toDataURL("image/png"));
-      if (this.#pot) this.#render();
-    }).catch(() => {
-    });
-    return null;
-  }
   #renderSprite(phase, outfit, segment, visible) {
     if (spriteOnStage(phase) && segment && !this.#packReady(outfit)) {
       this.#wantSeat(false);
       this.#clearSprite();
       return;
     }
-    let url = segment ? this.#assetUrl(assetKey(outfit, segment)) : null;
-    if (url && segment?.endsWith("_last") && this.#pot?.settlement) url = this.#settleUrl(outfit, this.#pot.settlement) ?? url;
+    const url = segment ? this.#assetUrl(assetKey(outfit, segment)) : null;
     const baseUrl = this.#assetUrl(assetKey(outfit, "base"));
     if (!spriteOnStage(phase) || !segment || !url) {
       this.#wantSeat(false);
@@ -1470,7 +1863,7 @@ var KitchenetteCookingCard = class extends Base {
         }
       }
     }
-    const playable = !still && this.#seat !== null;
+    const playable = !still && this.#seat.held;
     if (!playable) {
       for (const l of this.#layers) dropLayer(l);
       this.#layers = [];
@@ -1517,24 +1910,868 @@ var KitchenetteCookingCard = class extends Base {
     }
   }
 };
-function dropLayer(l) {
-  l.img.remove();
-  if (l.objectUrl) URL.revokeObjectURL(l.objectUrl);
-}
-function setText(el, text) {
-  if (el.textContent !== text) el.textContent = text;
-}
-function withSlash(url) {
-  return url.endsWith("/") ? url : `${url}/`;
+function fillLines(linesEl, chipsEl, lines, stamps) {
+  const key = JSON.stringify([lines, stamps]);
+  if (linesEl.dataset.key === key) return;
+  linesEl.dataset.key = key;
+  linesEl.replaceChildren();
+  for (const l of lines) {
+    const row = h("div", `line line-${l.key}`, linesEl);
+    h("div", "line-label", row).textContent = l.label;
+    const v = h("div", "line-value", row);
+    h("span", "line-text", v).textContent = l.text;
+    if (l.bar !== void 0 && l.bar !== null) {
+      const bar = h("span", "line-bar", v);
+      h("span", "line-bar-fill", bar).style.width = `${Math.round(l.bar * 1e3) / 10}%`;
+    }
+    if (l.sub) h("div", "line-sub", v).textContent = l.sub;
+  }
+  chipsEl.replaceChildren();
+  for (const s of stamps) h("span", "chip", chipsEl).textContent = s;
 }
 var TAG = "kitchenette-cooking-card";
 function defineCookingCard() {
   if (typeof customElements !== "undefined" && !customElements.get(TAG)) customElements.define(TAG, KitchenetteCookingCard);
 }
 
+// src/washApi.ts
+var num = (v, d = 0) => typeof v === "number" && Number.isFinite(v) ? v : d;
+var numOrNull = (v) => typeof v === "number" && Number.isFinite(v) ? v : null;
+var str = (v) => typeof v === "string" ? v : "";
+function factsFromAttachment(a) {
+  const o = a && typeof a === "object" ? a : null;
+  if (!o) return null;
+  const jobId = str(o.job_id) || str(o.id);
+  if (!jobId) return null;
+  const startedAt = numOrNull(o.started_at);
+  if (startedAt === null) return null;
+  return { jobId, startedAt, perS: num(o.per_s, 120), n: Math.max(0, Math.floor(num(o.n))) };
+}
+function parseWashRead(body) {
+  const o = body && typeof body === "object" ? body : null;
+  if (!o || !str(o.id) || numOrNull(o.started_at) === null) return null;
+  const c = o.counts && typeof o.counts === "object" ? o.counts : {};
+  const cn = (k) => Math.max(0, Math.floor(num(c[k])));
+  const dishes = (Array.isArray(o.dishes) ? o.dishes : []).flatMap((x) => {
+    const r = x && typeof x === "object" ? x : null;
+    if (!r || typeof r.i !== "number") return [];
+    return [{ i: Math.floor(r.i), state: str(r.state), doneAt: numOrNull(r.done_at) }];
+  });
+  return {
+    now: num(o.now),
+    state: str(o.state),
+    startedAt: num(o.started_at),
+    perS: num(o.per_s, 120),
+    n: Math.max(0, Math.floor(num(o.n))),
+    endedAt: numOrNull(o.ended_at),
+    counts: { washing: cn("washing"), clean: cn("clean"), broken: cn("broken"), machine: cn("machine") },
+    dishes,
+    timezone: str(o.timezone)
+  };
+}
+function factsFromRead(id, r) {
+  return { jobId: id, startedAt: r.startedAt, perS: r.perS, n: r.n };
+}
+async function fetchWashing(base, jobId, token) {
+  const url = `${base.replace(/\/+$/, "")}/api/dishes/jobs/${encodeURIComponent(jobId)}`;
+  let body;
+  try {
+    body = await getJson(url, token);
+  } catch (e) {
+    if (e instanceof KitchenFetchError && e.kind === "not_found") {
+      throw new KitchenFetchError("not_found", e.status, `the kitchen server has no washing with this id${e.status ? ` (status ${e.status})` : ""}`);
+    }
+    throw e;
+  }
+  const r = parseWashRead(body);
+  if (!r) throw new KitchenFetchError("bad_response", null, "the kitchen server's answer was not understood");
+  return r;
+}
+function washApiProbe(base, token) {
+  return async (jobId) => {
+    try {
+      return await fetchWashing(base, jobId, typeof token === "function" ? token() : token);
+    } catch (e) {
+      if (e instanceof KitchenFetchError && e.kind === "not_found") return null;
+      throw e;
+    }
+  };
+}
+
+// src/washSegments.ts
+var WASH_PARTS = ["dish_sleeve", "dish_soap", "dish_scrub", "dish_rinse", "dish_shake", "dish_dry", "dish_stack"];
+var WASH_SEGMENTS = [...WASH_PARTS, "dish_break", "dish_break_last"];
+var RESULT_WAIT_MS = 4e3;
+var BREAK_SHOW_MS = 5e3;
+var BREAK_LATE_MS = 2e4;
+function isFinal(read) {
+  return !!read && (read.state === "done" || read.state === "stopped");
+}
+function washEndMs(facts, read) {
+  const byTime = (facts.startedAt + Math.max(0, facts.n) * facts.perS) * 1e3;
+  if (isFinal(read) && read.endedAt !== null) return Math.min(byTime, read.endedAt * 1e3);
+  return byTime;
+}
+function dueMs(facts, i) {
+  return (facts.startedAt + (i + 1) * facts.perS) * 1e3;
+}
+function resultOf(m, i) {
+  const r = m.read;
+  if (!r) return void 0;
+  const d = r.dishes.find((x) => x.i === i);
+  if (d && d.state !== "washing") return d.state;
+  return r.now * 1e3 >= dueMs(m.facts, i) ? "clean" : void 0;
+}
+function breakWindow(m, i) {
+  if (resultOf(m, i) !== "broken") return null;
+  const due = dueMs(m.facts, i);
+  const seen2 = m.seenAtMs[i] ?? m.nowMs;
+  if (seen2 - due > BREAK_LATE_MS) return null;
+  const from = Math.max(due, seen2);
+  return { from, to: from + BREAK_SHOW_MS };
+}
+function partAt(m, t) {
+  const { facts } = m;
+  const id = facts.jobId;
+  const dishMs = facts.perS * 1e3;
+  const el = Math.max(0, t - facts.startedAt * 1e3);
+  const idx = Math.min(facts.n - 1, Math.floor(el / dishMs));
+  const within = el - idx * dishMs;
+  const part = Math.min(WASH_PARTS.length - 1, Math.floor(within / dishMs * WASH_PARTS.length));
+  if (part === 0 && idx === 0 && within < CLIP_MS) return { segment: "dish_sleeve", run: `${id}:0:0`, index: 0 };
+  if (part === 0) return { segment: "dish_soap", run: `${id}:${idx}:1`, index: idx };
+  return { segment: WASH_PARTS[part], run: `${id}:${idx}:${part}`, index: idx };
+}
+function breakClip(m, i, w) {
+  return { segment: m.nowMs - w.from < CLIP_MS ? "dish_break" : "dish_break_last", run: `${m.facts.jobId}:${i}:break` };
+}
+function washFrame(m) {
+  const { facts, read, nowMs } = m;
+  const id = facts.jobId;
+  const n = Math.max(0, Math.floor(facts.n));
+  const off = (phase, finished2, index2, stopped2 = false) => ({ phase, segment: null, run: "", index: index2, finished: finished2, stopped: stopped2 });
+  if (n <= 0 || !(facts.perS > 0)) return off("done", true, 0);
+  const startMs = facts.startedAt * 1e3;
+  const dishMs = facts.perS * 1e3;
+  const byTimeEnd = startMs + n * dishMs;
+  const endMs = washEndMs(facts, read);
+  const stopped = isFinal(read) && read.state === "stopped" && endMs < byTimeEnd;
+  const finished = nowMs >= endMs;
+  const index = finished ? n : Math.max(0, Math.min(n - 1, Math.floor((nowMs - startMs) / dishMs)));
+  if (m.mountedAtMs >= byTimeEnd || isFinal(read) && m.mountedAtMs >= endMs) return off("done", finished, index, stopped);
+  if (!read && !m.unavailable) return off("wait", finished, index, stopped);
+  if (finished) {
+    let leaveAt;
+    let last;
+    if (stopped) {
+      leaveAt = Math.max(endMs, m.endSeenAtMs ?? nowMs);
+      const due = Math.min(n, Math.floor((endMs - startMs) / dishMs)) - 1;
+      const w = due >= 0 ? breakWindow(m, due) : null;
+      if (w && w.to > leaveAt) {
+        if (nowMs < w.to) return { phase: "wash", ...breakClip(m, due, w), index, finished, stopped };
+        leaveAt = w.to;
+        last = { segment: "dish_break_last", run: `${id}:${due}:break` };
+      } else {
+        const at2 = partAt(m, Math.min(leaveAt, byTimeEnd) - 1);
+        last = { segment: at2.segment, run: at2.run };
+      }
+    } else {
+      const lastIdx = n - 1;
+      const result = resultOf(m, lastIdx);
+      const waitUntil = endMs + RESULT_WAIT_MS;
+      if (result === void 0 && !m.unavailable && nowMs < waitUntil) {
+        return { phase: "wash", segment: "dish_stack", run: `${id}:${lastIdx}:${WASH_PARTS.length - 1}`, index, finished, stopped };
+      }
+      const seen2 = m.seenAtMs[lastIdx];
+      const w = seen2 === void 0 || seen2 <= waitUntil ? breakWindow(m, lastIdx) : null;
+      if (w) {
+        if (nowMs < w.to) return { phase: "wash", ...breakClip(m, lastIdx, w), index, finished, stopped };
+        leaveAt = w.to;
+        last = { segment: "dish_break_last", run: `${id}:${lastIdx}:break` };
+      } else {
+        leaveAt = result === void 0 && !m.unavailable ? waitUntil : Math.max(endMs, seen2 !== void 0 && seen2 <= waitUntil ? seen2 : endMs);
+        last = { segment: "dish_stack", run: `${id}:${lastIdx}:${WASH_PARTS.length - 1}` };
+      }
+    }
+    if (m.mountedAtMs >= leaveAt) return off("done", finished, index, stopped);
+    if (nowMs < leaveAt + EXIT_MS) return { phase: "exit", ...last, index, finished, stopped };
+    return off("done", finished, index, stopped);
+  }
+  if (nowMs < startMs) return { phase: "wash", segment: "dish_sleeve", run: `${id}:0:0`, index: 0, finished, stopped };
+  const at = partAt(m, nowMs);
+  for (let i = at.index - 1; i >= Math.max(0, at.index - 10); i--) {
+    const w = breakWindow(m, i);
+    if (w && nowMs >= w.from && nowMs < w.to) return { phase: "wash", ...breakClip(m, i, w), index: i, finished, stopped, broke: i };
+  }
+  const prev = at.index - 1;
+  if (prev >= 0 && !m.unavailable && resultOf(m, prev) === void 0 && nowMs - dueMs(facts, prev) < RESULT_WAIT_MS) {
+    return { phase: "wash", segment: "dish_stack", run: `${id}:${prev}:${WASH_PARTS.length - 1}`, index: prev, finished, stopped };
+  }
+  return { phase: "wash", segment: at.segment, run: at.run, index, finished, stopped };
+}
+function nextReadAtMs(m, lastReadMs, pollMs, lagMs) {
+  if (isFinal(m.read)) return null;
+  const { facts } = m;
+  const byTimeEnd = (facts.startedAt + Math.max(0, facts.n) * facts.perS) * 1e3;
+  if (m.nowMs > byTimeEnd + 2 * pollMs) return null;
+  const startMs = facts.startedAt * 1e3;
+  const dishMs = facts.perS * 1e3;
+  const next = startMs + (Math.floor(Math.max(0, m.nowMs - startMs - lagMs) / dishMs) + 1) * dishMs;
+  const due = Math.min(next, byTimeEnd) + lagMs;
+  const candidates = [lastReadMs + pollMs];
+  if (due > m.nowMs) candidates.push(due);
+  return Math.max(m.nowMs, Math.min(...candidates));
+}
+function washStill(segment) {
+  if (segment.endsWith("_last")) return segment;
+  return segment === "dish_break" ? "dish_break_last" : "base";
+}
+function offsetFrom(read, deviceAtResponseMs) {
+  return read.now > 0 ? read.now * 1e3 - deviceAtResponseMs : 0;
+}
+function momentAt(s, deviceNowMs) {
+  const off = s.offsetMs;
+  const seen2 = {};
+  for (const [k, v] of Object.entries(s.seenAtDeviceMs)) seen2[Number(k)] = v + off;
+  return {
+    nowMs: deviceNowMs + off,
+    facts: s.facts,
+    read: s.read,
+    seenAtMs: seen2,
+    endSeenAtMs: s.endSeenAtDeviceMs === void 0 ? void 0 : s.endSeenAtDeviceMs + off,
+    unavailable: s.unavailable,
+    mountedAtMs: s.mountedAtDeviceMs + off
+  };
+}
+function nextReadAtDevice(s, deviceNowMs, lastReadDeviceMs, pollMs, lagMs) {
+  const off = s.offsetMs;
+  const at = nextReadAtMs({ facts: s.facts, read: s.read, nowMs: deviceNowMs + off }, lastReadDeviceMs + off, pollMs, lagMs);
+  return at === null ? null : at - off;
+}
+
+// src/washFace.ts
+function washFace(frame, facts, read, nowMs, t, tz) {
+  const n = Math.max(0, Math.floor(facts.n));
+  const total = n * facts.perS;
+  const start = fmtHM(facts.startedAt, tz);
+  if (!frame.finished) {
+    const el = Math.max(0, nowMs / 1e3 - facts.startedAt);
+    const remaining = fmtRemaining(Math.max(0, total - el));
+    return {
+      clock: remaining,
+      word: frame.broke !== void 0 ? t.plateBroke(frame.broke, n) : t.plateOf(frame.index, n),
+      result: "",
+      progress: total > 0 ? Math.min(1, el / total) : 1,
+      foot: t.footWashing(start, n, t.minutes(total), fmtHM(facts.startedAt + total, tz)),
+      aria: t.ariaWashing(frame.index, n, remaining)
+    };
+  }
+  const word = frame.stopped ? t.stopped : t.done;
+  const result = isFinal(read) ? t.result(read.counts, frame.stopped) : "";
+  const endSec = isFinal(read) && read.endedAt !== null ? Math.min(read.endedAt, facts.startedAt + total) : facts.startedAt + total;
+  const end = fmtHM(endSec, tz);
+  return {
+    clock: null,
+    word,
+    result,
+    progress: null,
+    foot: frame.stopped ? t.footStopped(start, n, end) : t.footDone(start, n, end),
+    aria: t.ariaDone(word, result)
+  };
+}
+
+// src/washStrings.ts
+var zh2 = {
+  symbol: "\u6C34",
+  symbolLabel: "SINK",
+  eyebrow: "\u5C0F\u53A8\u623F",
+  title: "\u5237\u76D8\u5B50",
+  plateOf: (i, n) => `\u7B2C ${Math.min(i + 1, n)} / ${n} \u53EA`,
+  plateBroke: (i, n) => `\u7B2C ${Math.min(i + 1, n)} / ${n} \u53EA \xB7 \u788E\u4E86`,
+  done: "\u5237\u5B8C\u4E86",
+  stopped: "\u505C\u4E0B\u4E86",
+  result: (c, stopped) => {
+    const washed = c.clean + c.broken;
+    const parts = [`\u5237\u4E86 ${washed} \u53EA`];
+    if (c.broken) parts.push(`\u788E\u4E86 ${c.broken} \u53EA`);
+    else if (!stopped && washed) parts.push("\u4E00\u53EA\u90FD\u6CA1\u788E");
+    if (c.machine) parts.push(`${c.machine} \u53EA\u8FDB\u4E86\u6D17\u7897\u673A`);
+    return parts.join(" \xB7 ");
+  },
+  minutes: fmtMinutes,
+  footWashing: (start, n, duration, due) => `${start} \u5F00\u5237 \xB7 ${n} \u53EA \xB7 \u7EA6 ${duration} \xB7 ${due} \u5237\u5B8C`,
+  footDone: (start, n, end) => `${start} \u5F00\u5237 \xB7 ${n} \u53EA \xB7 ${end} \u5237\u5B8C`,
+  footStopped: (start, n, end) => `${start} \u5F00\u5237 \xB7 ${n} \u53EA \xB7 ${end} \u505C\u4E0B`,
+  ariaWashing: (i, n, remaining) => `\u5237\u76D8\u5B50,\u5728\u5237\u7B2C ${Math.min(i + 1, n)} \u53EA,\u5171 ${n} \u53EA,\u8FD8\u5269 ${remaining}`,
+  ariaDone: (word, result) => result ? `\u5237\u76D8\u5B50,${word},${result}` : `\u5237\u76D8\u5B50,${word}`,
+  loadFailed: (kind, status) => `\u53D6\u4E0D\u5230\u8FD9\u4E00\u8D9F\u5237\u76D8\u5B50\uFF1A${{
+    unreachable: "\u8FDE\u4E0D\u4E0A\u53A8\u623F\u670D\u52A1\u3002",
+    blocked: "\u6D4F\u89C8\u5668\u62E6\u4E0B\u4E86\u8FD9\u6B21\u8BFB\u53D6\uFF0C\u53A8\u623F\u670D\u52A1\u7684\u8DE8\u7AD9\u540D\u5355\u91CC\u6CA1\u6709\u8FD9\u4E2A\u9875\u9762\u3002",
+    unauthorized: "\u53A8\u623F\u670D\u52A1\u62D2\u7EDD\u4E86\uFF0C\u53E3\u4EE4\u6CA1\u5E26\u6216\u4E0D\u5BF9\u3002",
+    not_found: "\u53A8\u623F\u670D\u52A1\u91CC\u6CA1\u6709\u8FD9\u4E00\u8D9F\u3002",
+    server: `\u53A8\u623F\u670D\u52A1\u51FA\u9519\u4E86${status ? `\uFF08\u72B6\u6001\u7801 ${status}\uFF09` : ""}\u3002`,
+    bad_response: "\u53A8\u623F\u670D\u52A1\u7684\u56DE\u7B54\u770B\u4E0D\u61C2\u3002"
+  }[kind]}`
+};
+var en2 = {
+  symbol: "\u6C34",
+  symbolLabel: "SINK",
+  eyebrow: "KITCHENETTE",
+  title: "Washing up",
+  plateOf: (i, n) => `plate ${Math.min(i + 1, n)} of ${n}`,
+  plateBroke: (i, n) => `plate ${Math.min(i + 1, n)} of ${n} \xB7 broke`,
+  done: "Done",
+  stopped: "Stopped",
+  result: (c, stopped) => {
+    const washed = c.clean + c.broken;
+    const parts = [`washed ${washed}`];
+    if (c.broken) parts.push(`${c.broken} broke`);
+    else if (!stopped && washed) parts.push("none broke");
+    if (c.machine) parts.push(`${c.machine} into the dishwasher`);
+    return parts.join(" \xB7 ");
+  },
+  minutes: (sec) => {
+    const m = Math.round(sec / 60);
+    if (m < 60) return `${m} min`;
+    const h2 = Math.floor(m / 60);
+    const r = m % 60;
+    return r === 0 ? `${h2} h` : `${h2} h ${r} min`;
+  },
+  footWashing: (start, n, duration, due) => `Started ${start} \xB7 ${n} plates \xB7 about ${duration} \xB7 done ${due}`,
+  footDone: (start, n, end) => `Started ${start} \xB7 ${n} plates \xB7 done ${end}`,
+  footStopped: (start, n, end) => `Started ${start} \xB7 ${n} plates \xB7 stopped ${end}`,
+  ariaWashing: (i, n, remaining) => `Washing up, plate ${Math.min(i + 1, n)} of ${n}, ${remaining} left`,
+  ariaDone: (word, result) => result ? `Washing up, ${word}, ${result}` : `Washing up, ${word}`,
+  loadFailed: (kind, status) => `Can't load this washing-up: ${{
+    unreachable: "the kitchen server can't be reached.",
+    blocked: "the browser blocked the request. This page is not on the kitchen server's list of allowed sites.",
+    unauthorized: "the kitchen server refused it. The token is missing or wrong.",
+    not_found: "the kitchen server has no washing-up with this id.",
+    server: `the kitchen server answered with an error${status ? ` (status ${status})` : ""}.`,
+    bad_response: "the kitchen server's answer was not understood."
+  }[kind]}`
+};
+var WASH_STRINGS = { zh: zh2, en: en2 };
+function washStringsFor(lang) {
+  return (lang ?? "").toLowerCase().startsWith("en") ? en2 : zh2;
+}
+
+// src/washElement.ts
+var TICK_MS2 = 250;
+var WASH_POLL_MS = 15e3;
+var WASH_READ_LAG_MS = 1200;
+var CROSSFADE_MS2 = 120;
+var HIDDEN_Y2 = STAGE_PX + 8;
+var KitchenetteWashingCard = class extends Base {
+  static {
+    this.observedAttributes = ["api-base", "job-id", "assets", "fonts", "lang", "timezone"];
+  }
+  // ── configuration (properties) ──
+  #washing = null;
+  #probe = null;
+  #clock = Date.now;
+  #manifest = CLAWD_MANIFEST;
+  #strings = {};
+  // ── state of the current mount ──
+  #facts = null;
+  #read = null;
+  #seenAt = {};
+  #endSeenAt;
+  #unavailable = false;
+  /** server clock minus device clock (ms), from the latest answer; 0 before the first */
+  #offset = 0;
+  #mountedAt = 0;
+  #firstSeen = false;
+  #frame = null;
+  #failure = null;
+  #serverTz = "";
+  #tick;
+  #nextReadAt = null;
+  #lastReadAt = -Infinity;
+  #reading = false;
+  #loadToken = 0;
+  #packWatched = false;
+  #preloaded = false;
+  // ── sprite ──
+  #layers = [];
+  #stillImg = null;
+  #seat = new SeatClaim(() => {
+    if (this.#facts) this.#render();
+  });
+  #slide = null;
+  #lastPhase = null;
+  #reduced = null;
+  // ── DOM ──
+  #root;
+  #wrap;
+  #stage;
+  #canvas;
+  #card;
+  #symText;
+  #symEn;
+  #eyebrow;
+  #title;
+  #note;
+  #clockEl;
+  #word;
+  #track;
+  #fill;
+  #foot;
+  constructor() {
+    super();
+    this.#root = this.attachShadow({ mode: "open" });
+    const style = document.createElement("style");
+    style.textContent = CARD_CSS;
+    this.#root.appendChild(style);
+    const wrap = this.#wrap = h("div", "wrap", this.#root);
+    wrap.hidden = true;
+    this.#stage = h("div", "stage", wrap);
+    this.#stage.setAttribute("aria-hidden", "true");
+    this.#stage.hidden = true;
+    this.#canvas = h("div", "canvas", this.#stage);
+    const frame = h("div", "frame", wrap);
+    h("div", "shadow", frame);
+    this.#card = h("div", "card", frame);
+    this.#card.setAttribute("role", "group");
+    const sym = h("div", "sym", this.#card);
+    sym.setAttribute("aria-hidden", "true");
+    this.#symText = h("span", "sym-text", sym);
+    this.#symEn = h("span", "sym-en", sym);
+    const body = h("div", "body", this.#card);
+    const content = h("div", "content", body);
+    const top = h("div", "top", content);
+    const left = h("div", "left", top);
+    this.#eyebrow = h("div", "eyebrow", left);
+    this.#title = h("div", "dish", left);
+    this.#note = h("div", "note", left);
+    const right = h("div", "right", top);
+    this.#clockEl = h("div", "clock", right);
+    this.#word = h("div", "state-word", right);
+    this.#track = h("div", "track", content);
+    this.#fill = h("div", "fill", this.#track);
+    this.#foot = h("div", "foot", content);
+  }
+  // ── public API ──
+  /** The washing, as the card attachment a [刷盘子] returned ({ job_id, n, per_s, started_at }) */
+  get washing() {
+    return this.#washing;
+  }
+  set washing(a) {
+    this.#washing = a;
+    if (!this.isConnected) return;
+    const f = factsFromAttachment(a);
+    if (f && this.#facts && f.jobId === this.#facts.jobId) return;
+    this.#mount();
+  }
+  /** Where the card reads the washing back. Defaults to the backend at `api-base` when that attribute is set. */
+  get probe() {
+    return this.#probe;
+  }
+  set probe(fn) {
+    this.#probe = fn;
+    if (this.isConnected) this.#mount();
+  }
+  /** The clock the card counts against, in epoch milliseconds. Defaults to Date.now. */
+  get clock() {
+    return this.#clock;
+  }
+  set clock(fn) {
+    this.#clock = fn;
+    if (this.isConnected) this.#mount();
+  }
+  /** The sprite registry. Defaults to the built-in Clawd pack. */
+  get manifest() {
+    return this.#manifest;
+  }
+  set manifest(m) {
+    this.#manifest = m;
+    if (this.isConnected) this.#mount();
+  }
+  /** Overrides for any of the words on the card (see washStrings.ts) */
+  get strings() {
+    return this.#strings;
+  }
+  set strings(s) {
+    this.#strings = s ?? {};
+    if (!this.isConnected) return;
+    if (this.#facts) this.#render();
+    else this.#renderFailure();
+  }
+  /** wait / wash / exit / done (null before any data) */
+  get phase() {
+    return this.#frame?.phase ?? null;
+  }
+  /** The clip on stage right now (null when the cook is not on stage) */
+  get segment() {
+    return this.#frame?.segment ?? null;
+  }
+  /** The outfit this washing wears (the cooking card's rule, by the washing's id) */
+  get outfit() {
+    return this.#facts ? outfitFor(this.#facts.jobId, this.#manifest.outfits) : null;
+  }
+  /** The latest answer from the backend (null = none yet) */
+  get result() {
+    return this.#read;
+  }
+  // ── lifecycle ──
+  connectedCallback() {
+    this.#reduced = typeof matchMedia === "function" ? matchMedia("(prefers-reduced-motion: reduce)") : null;
+    this.#reduced?.addEventListener("change", this.#onEnvChange);
+    document.addEventListener("visibilitychange", this.#onEnvChange);
+    this.#mount();
+  }
+  disconnectedCallback() {
+    this.#reduced?.removeEventListener("change", this.#onEnvChange);
+    document.removeEventListener("visibilitychange", this.#onEnvChange);
+    this.#unmount();
+  }
+  attributeChangedCallback(name, old, value) {
+    if (old === value || !this.isConnected) return;
+    if (name === "lang" || name === "timezone") {
+      if (this.#facts) this.#render();
+      else if (this.#failure) this.#renderFailure();
+    } else this.#mount();
+  }
+  #onEnvChange = () => {
+    if (this.#facts) {
+      if (document.visibilityState !== "hidden" && !isFinal(this.#read)) this.#nextReadAt = this.#clock();
+      this.#render();
+    } else if (this.#failure && document.visibilityState !== "hidden") this.#mount();
+  };
+  // ── mounting ──
+  #unmount() {
+    this.#loadToken++;
+    clearInterval(this.#tick);
+    this.#tick = void 0;
+    this.#wantSeat(false);
+    this.#clearSprite();
+    this.#facts = null;
+    this.#read = null;
+    this.#seenAt = {};
+    this.#endSeenAt = void 0;
+    this.#unavailable = false;
+    this.#offset = 0;
+    this.#frame = null;
+    this.#failure = null;
+    this.#serverTz = "";
+    this.#nextReadAt = null;
+    this.#lastReadAt = -Infinity;
+    this.#reading = false;
+    this.#lastPhase = null;
+    this.#packWatched = false;
+    this.#preloaded = false;
+    this.#card.classList.remove("failed");
+  }
+  #mount() {
+    this.#unmount();
+    const fonts = this.getAttribute("fonts");
+    if (fonts !== "none") ensureFonts(fonts ? withSlash(new URL(fonts, document.baseURI).href) : DEFAULT_FONTS);
+    const f = factsFromAttachment(this.#washing);
+    if (f) {
+      this.#begin(f);
+      return;
+    }
+    const id = this.getAttribute("job-id");
+    const probe = this.#activeProbe();
+    this.#wrap.hidden = true;
+    if (!id || !probe) return;
+    const token = this.#loadToken;
+    probe(id, true).then((r) => {
+      if (token !== this.#loadToken) return;
+      if (!r) return this.#fail(notFound());
+      this.#offset = offsetFrom(r, this.#clock());
+      this.#begin(factsFromRead(id, r));
+      this.#take(r);
+      this.#lastReadAt = this.#clock();
+      this.#render();
+    }).catch((e) => {
+      if (token === this.#loadToken) this.#fail(asKitchenError(e), e);
+    });
+  }
+  #fail(failure, cause = failure) {
+    this.#failure = failure;
+    this.#renderFailure();
+    this.dispatchEvent(
+      new CustomEvent("kitchenette-error", {
+        detail: { kind: failure.kind, status: failure.status, message: failure.message, error: cause }
+      })
+    );
+  }
+  #t() {
+    return { ...washStringsFor(this.getAttribute("lang")), ...this.#strings };
+  }
+  #renderFailure() {
+    const failure = this.#failure;
+    if (!failure) return;
+    const t = this.#t();
+    const line = t.loadFailed(failure.kind, failure.status);
+    this.#stage.hidden = true;
+    this.#card.classList.add("failed");
+    setText(this.#symText, t.symbol);
+    setText(this.#symEn, t.symbolLabel);
+    setText(this.#eyebrow, t.eyebrow);
+    setText(this.#note, line);
+    this.#note.hidden = false;
+    this.#card.setAttribute("aria-label", line);
+    this.#wrap.hidden = false;
+  }
+  #begin(f) {
+    this.#facts = f;
+    this.#mountedAt = this.#clock();
+    this.#firstSeen = isFirstSeen(`wash:${f.jobId}`);
+    this.#unavailable = this.#activeProbe() === null;
+    this.#nextReadAt = this.#unavailable ? null : this.#mountedAt;
+    this.#wrap.hidden = false;
+    this.#render();
+    this.#tick ??= setInterval(() => this.#render(), TICK_MS2);
+  }
+  #activeProbe() {
+    if (this.#probe) return this.#probe;
+    const base = this.getAttribute("api-base");
+    if (!base) return null;
+    return washApiProbe(new URL(base, document.baseURI).href, () => this.getAttribute("token"));
+  }
+  /** What the backend said: when each plate's result and the end were first seen are kept */
+  #take(r) {
+    const now = this.#clock();
+    this.#offset = offsetFrom(r, now);
+    for (const d of r.dishes) if (d.state !== "washing" && this.#seenAt[d.i] === void 0) this.#seenAt[d.i] = now;
+    if (isFinal(r) && this.#endSeenAt === void 0) this.#endSeenAt = now;
+    if (r.timezone) this.#serverTz = r.timezone;
+    this.#read = r;
+    this.#unavailable = false;
+  }
+  #readBack() {
+    const facts = this.#facts;
+    const probe = this.#activeProbe();
+    if (!facts || !probe || this.#reading) return;
+    this.#reading = true;
+    this.#lastReadAt = this.#clock();
+    const token = this.#loadToken;
+    probe(facts.jobId, true).then((r) => {
+      if (token !== this.#loadToken) return;
+      if (r) this.#take(r);
+      else if (!this.#read) this.#unavailable = true;
+    }).catch(() => {
+      if (token === this.#loadToken && !this.#read) this.#unavailable = true;
+    }).finally(() => {
+      if (token !== this.#loadToken) return;
+      this.#reading = false;
+      this.#planRead();
+      this.#render();
+    });
+  }
+  #planRead() {
+    const facts = this.#facts;
+    if (!facts || !this.#activeProbe()) {
+      this.#nextReadAt = null;
+      return;
+    }
+    this.#nextReadAt = nextReadAtDevice(this.#state(facts), this.#clock(), this.#lastReadAt, WASH_POLL_MS, WASH_READ_LAG_MS);
+  }
+  #state(facts) {
+    return {
+      facts,
+      read: this.#read,
+      offsetMs: this.#offset,
+      seenAtDeviceMs: this.#seenAt,
+      endSeenAtDeviceMs: this.#endSeenAt,
+      unavailable: this.#unavailable,
+      mountedAtDeviceMs: this.#mountedAt
+    };
+  }
+  // ── one tick ──
+  #render() {
+    const facts = this.#facts;
+    if (!facts) return;
+    const nowMs = this.#clock();
+    const visible = document.visibilityState !== "hidden";
+    if (visible && this.#nextReadAt !== null && nowMs >= this.#nextReadAt && !this.#reading) {
+      this.#nextReadAt = null;
+      this.#readBack();
+    }
+    const moment = momentAt(this.#state(facts), nowMs);
+    const frame = washFrame(moment);
+    this.#frame = frame;
+    this.#renderSprite(frame, facts, visible);
+    const t = this.#t();
+    const tz = pickTimeZone(this.#serverTz, this.getAttribute("timezone"));
+    const face = washFace(frame, facts, this.#read, moment.nowMs, t, tz);
+    setText(this.#symText, t.symbol);
+    setText(this.#symEn, t.symbolLabel);
+    setText(this.#eyebrow, t.eyebrow);
+    setText(this.#title, t.title);
+    setText(this.#note, face.result);
+    this.#note.hidden = !face.result;
+    this.#clockEl.hidden = face.clock === null;
+    if (face.clock !== null) setText(this.#clockEl, face.clock);
+    setText(this.#word, face.word);
+    this.#track.hidden = face.progress === null;
+    if (face.progress !== null) this.#fill.style.width = `${Math.round(face.progress * 1e3) / 10}%`;
+    setText(this.#foot, face.foot);
+    if (this.#card.getAttribute("aria-label") !== face.aria) this.#card.setAttribute("aria-label", face.aria);
+    const settled = isFinal(this.#read) || this.#unavailable || this.#nextReadAt === null;
+    if (frame.phase === "done" && frame.finished && settled && !this.#reading) {
+      clearInterval(this.#tick);
+      this.#tick = void 0;
+    }
+  }
+  // ── sprite ──
+  #assetsFolder() {
+    const base = this.getAttribute("assets");
+    return base ? withSlash(new URL(base, document.baseURI).href) : DEFAULT_ASSETS;
+  }
+  #assetUrl(key) {
+    const file = this.#manifest.files[key];
+    if (file === void 0) return null;
+    const url = new URL(file, this.#assetsFolder()).href;
+    return broken.has(url) ? null : url;
+  }
+  #packReady(outfit) {
+    const folder = this.#assetsFolder();
+    const file = this.#manifest.files[assetKey(outfit, "base")] ?? Object.values(this.#manifest.files)[0];
+    if (file === void 0) return false;
+    const pack = checkPack(folder, new URL(file, folder).href);
+    if (pack.state === "checking" && !this.#packWatched) {
+      this.#packWatched = true;
+      const token = this.#loadToken;
+      void pack.ready.then(() => {
+        if (token === this.#loadToken && this.#facts) this.#render();
+      });
+    }
+    if (pack.state === "ok" && !this.#preloaded) {
+      this.#preloaded = true;
+      for (const s of ["base", ...WASH_SEGMENTS]) {
+        const url = this.#assetUrl(assetKey(outfit, s));
+        if (url) void preload(url);
+      }
+    }
+    return pack.state === "ok";
+  }
+  #wantSeat(wanted) {
+    this.#seat.want(wanted);
+  }
+  #clearSprite() {
+    this.#slide?.cancel();
+    this.#slide = null;
+    for (const l of this.#layers) dropLayer(l);
+    this.#layers = [];
+    this.#stillImg?.remove();
+    this.#stillImg = null;
+    this.#canvas.style.transform = "";
+    this.#stage.hidden = true;
+  }
+  #renderSprite(frame, facts, visible) {
+    const outfit = outfitFor(facts.jobId, this.#manifest.outfits);
+    const onStage = (frame.phase === "wash" || frame.phase === "exit") && !!frame.segment;
+    if (!onStage) {
+      this.#wantSeat(false);
+      this.#clearSprite();
+      this.#lastPhase = frame.phase;
+      if (frame.phase === "done") markSeen(`wash:${facts.jobId}`);
+      return;
+    }
+    if (!this.#packReady(outfit)) {
+      this.#wantSeat(false);
+      this.#clearSprite();
+      return;
+    }
+    const still = !!this.#reduced?.matches || !visible;
+    const shown = still ? washStill(frame.segment) : frame.segment;
+    const url = this.#manifest.files[assetKey(outfit, frame.segment)] === void 0 ? null : this.#assetUrl(assetKey(outfit, shown)) ?? this.#assetUrl(assetKey(outfit, "base"));
+    if (!url) {
+      this.#wantSeat(false);
+      this.#clearSprite();
+      this.#lastPhase = frame.phase;
+      return;
+    }
+    this.#wantSeat(!still);
+    this.#stage.hidden = false;
+    if (this.#lastPhase !== frame.phase) {
+      const from = this.#lastPhase;
+      this.#lastPhase = frame.phase;
+      const id = `wash:${facts.jobId}`;
+      if (frame.phase === "wash" && (from === null || from === "wait")) {
+        if (this.#firstSeen && !still) {
+          const frames = springFrames(HIDDEN_Y2, 0);
+          this.#slide?.cancel();
+          this.#canvas.style.transform = "translateY(0px)";
+          this.#slide = this.#canvas.animate(
+            frames.values.map((y) => ({ transform: `translateY(${y.toFixed(2)}px)` })),
+            { duration: frames.durationMs, easing: "linear" }
+          );
+          this.#slide.onfinish = () => markSeen(id);
+          setTimeout(() => markSeen(id), ENTER_MS);
+        } else markSeen(id);
+      } else if (frame.phase === "exit") {
+        this.#slide?.cancel();
+        this.#canvas.style.transform = `translateY(${HIDDEN_Y2}px)`;
+        if (!still && from === "wash") {
+          this.#slide = this.#canvas.animate(
+            [{ transform: "translateY(0px)" }, { transform: `translateY(${HIDDEN_Y2}px)` }],
+            { duration: EXIT_MS, easing: "cubic-bezier(0.32, 0, 0.67, 0)" }
+          );
+        }
+      }
+    }
+    const playable = !still && this.#seat.held;
+    if (!playable) {
+      for (const l of this.#layers) dropLayer(l);
+      this.#layers = [];
+      if (!this.#stillImg) {
+        this.#stillImg = document.createElement("img");
+        this.#stillImg.alt = "";
+        this.#stillImg.draggable = false;
+        this.#canvas.appendChild(this.#stillImg);
+      }
+      const src = still ? url : this.#assetUrl(assetKey(outfit, washStill(frame.segment))) ?? url;
+      if (this.#stillImg.dataset.url !== src) {
+        this.#stillImg.dataset.url = src;
+        this.#stillImg.src = src;
+      }
+      return;
+    }
+    this.#stillImg?.remove();
+    this.#stillImg = null;
+    const top = this.#layers[this.#layers.length - 1];
+    if (top && top.url === url && top.run === frame.run) return;
+    const img = document.createElement("img");
+    img.alt = "";
+    img.draggable = false;
+    const blob = blobs.get(url);
+    const objectUrl = blob ? URL.createObjectURL(blob) : null;
+    if (!objectUrl) {
+      img.onerror = () => {
+        broken.add(url);
+        if (this.#facts) this.#render();
+      };
+    }
+    img.src = objectUrl ?? url;
+    const layer = { url, img, objectUrl, run: frame.run };
+    for (const old of this.#layers.slice(0, -1)) dropLayer(old);
+    this.#layers = [...this.#layers.slice(-1), layer];
+    this.#canvas.appendChild(img);
+    if (this.#layers.length > 1) {
+      const fade = img.animate([{ opacity: 0 }, { opacity: 1 }], { duration: CROSSFADE_MS2, easing: "linear" });
+      fade.onfinish = () => {
+        if (this.#layers[this.#layers.length - 1] !== layer) return;
+        for (const old of this.#layers.slice(0, -1)) dropLayer(old);
+        this.#layers = [layer];
+      };
+    }
+  }
+};
+var WASH_TAG = "kitchenette-washing-card";
+function defineWashingCard() {
+  if (typeof customElements !== "undefined" && !customElements.get(WASH_TAG)) customElements.define(WASH_TAG, KitchenetteWashingCard);
+}
+
 // src/index.ts
 defineCookingCard();
+defineWashingCard();
 export {
+  BREAK_LATE_MS,
+  BREAK_SHOW_MS,
   CANVAS_PX,
   CHOP_FRAC,
   CHOP_MAX_S,
@@ -1550,11 +2787,13 @@ export {
   IDLE_AT_S,
   KitchenFetchError,
   KitchenetteCookingCard,
+  KitchenetteWashingCard,
   MAX_ANIMATED,
   METHOD_DEFAULT,
   METHOD_LABEL,
   METHOD_PARTS,
   OUTCOME_WAIT_MS,
+  RESULT_WAIT_MS,
   SERVE_MS,
   SERVE_PLAY_MS,
   SERVE_SWAP_MS,
@@ -1568,32 +2807,57 @@ export {
   TASTE_FRAC,
   TASTE_MAX_S,
   WASH_MIN_TOTAL_S,
+  WASH_PARTS,
+  WASH_POLL_MS,
+  WASH_READ_LAG_MS,
+  WASH_SEGMENTS,
+  WASH_STRINGS,
+  WASH_TAG,
   apiProbe,
   assetKey,
+  breakWindow,
   cookProgress,
   cookSegment,
   defineCookingCard,
+  defineWashingCard,
+  dueMs,
+  factsFromAttachment,
+  factsFromRead,
   fetchKitchen,
   fetchSession,
+  fetchWashing,
   fmtHM,
   fmtMinutes,
   fmtRemaining,
   hashStr,
   isFailOutcome,
+  isFinal,
   kitchenPhase,
   kitchenTiming,
   missingChoreKeys,
   missingKeys,
+  momentAt,
+  nextReadAtDevice,
+  nextReadAtMs,
+  offsetFrom,
   outcomeWord,
   outfitFor,
   parseAnswer,
   parseMethod,
   parseOutcome,
+  parseWashRead,
   phaseIsLive,
   pickTimeZone,
   probeFromSession,
   requiredSegments,
+  resultOf,
   revealAtMs,
   spriteOnStage,
-  stringsFor
+  stringsFor,
+  washApiProbe,
+  washEndMs,
+  washFace,
+  washFrame,
+  washStill,
+  washStringsFor
 };

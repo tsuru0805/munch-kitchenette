@@ -11,8 +11,9 @@ CROP = (80, 240, 620, 560)
 # One-shot clips (serve, fail) rest on their last frame before the GIF loops
 HOLD_MS = 1500
 CREDIT = ("Adapted from clawds-new-clothes (https://github.com/CharlieLuinaris/clawds-new-clothes): Clawd animation & engine by "
-          "Luin Luinaris, postie concept & pixel corrections by Charlie Luinaris. Chef outfits & cooking moves by tsuru0805 "
-          "for munch-kitchenette. Unofficial fan work. Clawd (c) Anthropic. Art CC BY-NC-SA 4.0.")
+          "Luin Luinaris, postie concept & pixel corrections by Charlie Luinaris. Chef and street vendor outfits, cooking "
+          "and chore moves, and the street vendor's cart by tsuru0805 for munch-kitchenette. Unofficial fan work. "
+          "Clawd (c) Anthropic. Art CC BY-NC-SA 4.0.")
 METHODS = ["stirfry", "fry", "deepfry", "boil", "steam", "bake", "mix"]
 
 def frames_of(path):
@@ -61,13 +62,13 @@ clip("scarf", "stirfry_look", "stirfry-look-scarf")
 clip("toque", "steam_hot", "steam-hot-toque")
 clip("scarf", "mix_hot", "mix-hot-scarf")
 clip("scarf", "fry_taste", "fry-taste-scarf")
-# ── the chores the kitchen page plays (buying from the vendor, washing up, the dishwasher) ──
+# ── the chores the kitchen page plays (the vendor at his cart, washing up, the dishwasher) ──
 # Each a run of whole clips in the order the page plays them, every clip 3 s here (on the page a washing-up
 # step lasts a seventh of each plate's time, and the dishwasher runs for 8 s). The strip puts the three side
 # by side; each lane is eight clips long, so they loop together.
 CHORE_CROP = (16, 234, 616, 574)        # everything a chore draws lies inside x 26-606, y 244-564
 LANES = {
-    "vendor": ("scarf", ["vendor_call", "vendor_pay", "vendor_take", "vendor_carry", "vendor_carry", "vendor_carry", "vendor_call", "vendor_call"]),
+    "vendor": ("scarf", ["vendor_th_arrive", "vendor_th_call", "vendor_th_walkin", "vendor_th_pay", "vendor_th_give", "vendor_th_eat", "vendor_th_walkout", "vendor_th_leave"]),
     "wash": ("toque", ["dish_sleeve", "dish_soap", "dish_scrub", "dish_rinse", "dish_shake", "dish_dry", "dish_stack", "dish_break"]),
     "washer": ("scarf", ["machine_load", "machine_close", "machine_start", "machine_run", "machine_run", "machine_run", "machine_done", "machine_done_last"]),
 }
@@ -79,8 +80,16 @@ def chore_frames(outfit, seg):
     w, h = (CHORE_CROP[2] - CHORE_CROP[0]) // 2, (CHORE_CROP[3] - CHORE_CROP[1]) // 2
     out = []
     n = getattr(im, "n_frames", 1)
+    # A frame that does not change is stored once with the delays added up: lay the stored frames out on
+    # the clip's own clock and pick, for each of the 45 frame slots, the one showing at that moment
+    starts, t = [], 0
+    for j in range(n):
+        im.seek(j); im.load()
+        starts.append(t); t += im.info.get("duration") or 70
+    t = 0
     for i in range(45):
-        im.seek(min(i, n - 1))
+        im.seek(max(j for j in range(n) if starts[j] <= t))
+        t += [70, 60, 70][i % 3]
         f = im.convert("RGBA").crop(CHORE_CROP).resize((w, h), Image.NEAREST)
         tile = Image.new("RGBA", f.size, BG + (255,))
         tile.alpha_composite(f)

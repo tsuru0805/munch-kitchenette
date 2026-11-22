@@ -1,5 +1,7 @@
-// Writes src/kitchen/choreArt.generated.ts: the chore clips of the cook (assets/clawd/<outfit>/, the same
-// files the cooking card plays from) for the panels of the sheet, plus the still base pose.
+// Writes src/kitchen/choreArt.generated.ts: the chore clips (assets/clawd/<outfit>/, the same files the
+// cooking card plays from) for the panels of the sheet: the vendor at his cart, the dishwasher, plus the still
+// base pose. The washing-up
+// clips (dish_*) are not here: they play on the washing card in the chat.
 // The page uses them from there rather than keeping a second copy (metro.config.js watches the folder).
 // Usage: node scripts/gen-chores.mjs     (run from web/page/ after the sprite pack changed)
 import { existsSync, writeFileSync } from "node:fs";
@@ -9,9 +11,9 @@ import { fileURLToPath } from "node:url";
 const page = join(dirname(fileURLToPath(import.meta.url)), "..");
 const pack = join(page, "..", "..", "assets", "clawd");
 const OUTFITS = ["toque", "scarf"];
+const VENDOR = ["arrive", "call", "wait", "leave", "leave_last", "walkin", "walkin_last", "pay", "give", "give_last", "eat", "eat_last", "walkout", "walkout_hold", "walkout_empty", "still"];
 const SEGMENTS = [
-  "vendor_call", "vendor_pay", "vendor_take", "vendor_take_last", "vendor_carry",
-  "dish_sleeve", "dish_soap", "dish_scrub", "dish_rinse", "dish_shake", "dish_dry", "dish_stack", "dish_break", "dish_break_last",
+  ...VENDOR.map((p) => `vendor_${p}`), ...VENDOR.map((p) => `vendor_th_${p}`),
   "machine_load", "machine_close", "machine_start", "machine_run", "machine_done", "machine_done_last",
   "base",
 ];

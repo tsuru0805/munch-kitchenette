@@ -6,8 +6,9 @@
 // - The three jars stand on the counter: empty, or what is sealed in it (sugar / honey = fruit, salt =
 //   pickles).
 // - The drying rack and the sink: how many plates, and foam while the role is washing.
-// A play that is switched off draws nothing of its own (the empty picture already has the sill, the
-// counter, the sink and the rack).
+// A play that is switched off shows its things as they stand empty: the empty picture already has the
+// sill, the sink and the rack; the three jars are pieces, so with the jars off they are put back empty
+// (and nothing there can be tapped: pick.ts only makes them tappable while the jars are on).
 import { SCENE_PIECES, type Light } from "./sceneArt.generated";
 
 export const DUSK_FROM = 17 * 60;
@@ -71,7 +72,7 @@ export function rackCount(job: { state: string; startedAt: number; perS: number;
 export interface SceneState {
   /** null = no bunch on the sill (or the vendor is off) */
   flower: SceneFlower | null;
-  /** null = sealed jars are off */
+  /** null = sealed jars are off (or not read yet): the three jars stand empty */
   jars: SceneJar[] | null;
   /** null = plates are off */
   plates: ScenePlates | null;
@@ -89,9 +90,7 @@ export function scenePieces(light: Light, s: SceneState): string[] {
     const look = FLOWER_LOOK[s.flower.state];
     if (f && look !== undefined) add(f[0], f[1] * 3 + look + 1);
   }
-  if (s.jars) {
-    for (let i = 0; i < 3; i++) add("jars", i * 3 + jarLook(s.jars.find((j) => j.slot === i + 1)) + 1);
-  }
+  for (let i = 0; i < 3; i++) add("jars", i * 3 + jarLook(s.jars?.find((j) => j.slot === i + 1)) + 1);
   if (s.plates) {
     add("dish", fullness(s.plates.rack) + 1);
     add("dish", 3 + sinkLook(s.plates) + 1);

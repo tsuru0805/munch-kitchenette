@@ -21,9 +21,31 @@ export interface CardStrings {
   ariaCooking: (dish: string, remaining: string) => string;
   ariaServed: (dish: string, served: string) => string;
   ariaCancelled: (dish: string) => string;
-  /** The settled lines under a served pot (when the backend sends a settlement) */
-  settleTier: (tier: string, toNext: number | null) => string;
+  // ── the settled card (a served pot whose backend sent a settlement) ──
+  /** The small line above the dish name once the pot is done */
+  settleEyebrow: (eyebrow: string) => string;
+  /** The small titles on the left of the three lines */
+  settleLabelOutcome: string;
+  settleLabelTier: string;
+  settleLabelMishap: string;
+  /** How it turned out: great | ok | burnt | spoiled | ruined */
+  settleOutcome: (outcome: string) => string;
+  /** A tier's name as shown (the backend names them 生疏 / 拿手 / 招牌) */
+  settleTierName: (tier: string) => string;
+  /** The small line under the tier: how many more pots to the next tier, by name */
+  settleToNext: (toNext: number, nextTier: string) => string;
+  /**
+   * @deprecated The 0.2.0 way of writing the tier, kept so an override of it still works: when you set it,
+   * the tier line reads what it returns (toNext = pots to the next tier, null at the top) and the small line
+   * under it is left out. Not set by default; use settleTierName / settleToNext instead.
+   */
+  settleTier?: (tier: string, toNext: number | null) => string;
+  /** The mishap line when it is known that nothing happened */
   settleSmooth: string;
+  /** The time line of a settled card */
+  footSettled: (start: string, duration: string) => string;
+  /** The time line of a pot a bad egg ruined the moment it was started */
+  footRuined: (start: string) => string;
   /** The one line shown when the card was asked to fetch a pot and could not (status = HTTP status, if any) */
   loadFailed: (kind: KitchenErrorKind, status: number | null) => string;
 }
@@ -44,8 +66,16 @@ const zh: CardStrings = {
   ariaCooking: (dish, remaining) => `${dish},在火上,还剩 ${remaining}`,
   ariaServed: (dish, served) => `${dish},${served}`,
   ariaCancelled: (dish) => `${dish},关火了`,
-  settleTier: (tier, toNext) => (toNext ? `${tier} · 再做 ${toNext} 次升档` : tier),
+  settleEyebrow: (eyebrow) => `${eyebrow} · 做好了`,
+  settleLabelOutcome: "成色",
+  settleLabelTier: "熟练",
+  settleLabelMishap: "意外",
+  settleOutcome: (o) => ({ great: "很好", ok: "普通", burnt: "糊了", spoiled: "坏了", ruined: "毁了" })[o] ?? o,
+  settleTierName: (tier) => tier,
+  settleToNext: (n, next) => `再做 ${n} 次升${next}`,
   settleSmooth: "一路顺利",
+  footSettled: (start, duration) => `${start} 下锅 · 做了 ${duration}`,
+  footRuined: (start) => `${start} 下锅`,
   loadFailed: (kind, status) =>
     `取不到这一锅：${
       {
@@ -83,8 +113,16 @@ const en: CardStrings = {
   ariaCooking: (dish, remaining) => `${dish}, on the stove, ${remaining} left`,
   ariaServed: (dish, served) => `${dish}, ${served}`,
   ariaCancelled: (dish) => `${dish}, heat off`,
-  settleTier: (tier, toNext) => (toNext ? `${tier} · ${toNext} more to the next` : tier),
+  settleEyebrow: (eyebrow) => `${eyebrow} · DONE`,
+  settleLabelOutcome: "Result",
+  settleLabelTier: "Skill",
+  settleLabelMishap: "Mishap",
+  settleOutcome: (o) => ({ great: "great", ok: "ok", burnt: "burnt", spoiled: "spoiled", ruined: "ruined" })[o] ?? o,
+  settleTierName: (tier) => ({ 生疏: "learning", 拿手: "practised", 招牌: "signature" })[tier] ?? tier,
+  settleToNext: (n, next) => `${n} more to ${next}`,
   settleSmooth: "no mishaps",
+  footSettled: (start, duration) => `On at ${start} · cooked ${duration}`,
+  footRuined: (start) => `On at ${start}`,
   loadFailed: (kind, status) =>
     `Can't load this pot: ${
       {

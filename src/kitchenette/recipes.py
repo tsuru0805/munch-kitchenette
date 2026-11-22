@@ -107,6 +107,8 @@ BUILD_ALIASES: dict[str, str] = {
     "茶树菇": "mushroom", "煎蛋": "egg", "温泉蛋": "egg", "牛柳": "beef", "牛腱子": "beef", "牛腱子肉": "beef",
     "鸡": "chicken", "半只鸡": "chicken", "手枪腿": "chicken", "鸡全翅": "wings", "粟米": "corn",
     "海虾": "shrimp", "活虾": "shrimp", "阿根廷红虾": "shrimp", "香芹": "celery", "新鲜菜心": "bokchoy",
+    "黑虎虾": "shrimp", "明虾": "shrimp", "葱头": "onion", "美人椒": "pepper", "菜心": "bokchoy",
+    "通心粉": "noodles", "奶油": "cream",
 }
 
 # Spring onion and coriander are garnish: they go among the optional ingredients.
@@ -131,18 +133,19 @@ STAPLES_EXTRA: frozenset[str] = frozenset("""
 干辣椒段 干辣椒碎 朝天椒 子弹头辣椒 糍粑辣椒 剁椒 泡姜 生姜片 生姜末 姜蒜 蒜水 蒜仔 白熟芝麻 芝麻粒
 郫县豆瓣 豆瓣 红油豆瓣 豆鼓 味素 味极鲜 麻辣鲜 老干妈 饮用水 凉白开 凉白开水 矿泉水 盐巴 方糖 冰
 月桂叶 肉桂 肉桂皮 肉桂棒 豆蔻 白蔻 红豆蔻 小豆蔻 山奈 草寇 砂仁 荜拨 香茅 甘草 孜然籽 青芥末
+香果 干线椒 干红椒 葱姜 葱姜水 葱姜花椒水 凉水 火锅底料 黑盐 印度黑盐 藏红花 东北米
 """.split())
 STAPLE_SUFFIX = ("粉", "酱", "精", "油", "醋", "汁")
 TOOL_WORDS = ("锅", "刀", "碗", "盘", "勺", "铲", "筷", "烤箱", "微波", "机", "器", "纸", "膜", "板", "签",
               "盆", "杯", "模具", "秤", "袋", "锡", "刷", "网", "擀面杖", "炉", "夹", "剪", "布", "架", "盖",
               "手套", "电饭煲", "量杯", "温度计", "牙签", "棉线", "绳", "蒸笼", "秒表", "吸管", "研杵",
               "雪克瓶", "瓦罐", "煲汤盅", "鏊子", "燃气灶", "炭火", "冰箱", "蒸箱", "披萨石", "电饼铛", "斧头",
-              "汤匙", "簸箕", "砵", "蘸料碟", "捣药罐", "蒸篦子", "玻璃", "克称", "克数称", "搅拌")
+              "汤匙", "簸箕", "砵", "蘸料碟", "捣药罐", "蒸篦子", "玻璃", "克称", "克数称", "搅拌", "臼", "明火", "笊篱")
 DROP_WORDS = frozenset({"", "必备", "原料", "工具", "可选", "注", "注意", "其他", "其它", "调料", "配料", "主料",
                         "辅料", "食材", "以下", "如下", "大约", "原则", "配菜", "小料", "炒料",
                         "蔬菜", "肉类", "面食材料", "菜类材料", "牛羊鱼虾等肉类", "其他调味料", "调味料", "菜码",
                         "叶菜类蔬菜", "可根据口味选择增加", "其余配菜例如马蹄", "带脚", "直径", "一个容量在",
-                        "新鲜绿叶", "汤料包", "卤料包", "烧烤料", "烧烤撒料", "面"})
+                        "新鲜绿叶", "汤料包", "卤料包", "烧烤料", "烧烤撒料", "面", "容量在"})
 
 
 class RecipesUnavailable(Exception):
@@ -166,6 +169,7 @@ def resolve_extra(name: str) -> str | None:
 
 
 _VENDOR_NAMES: dict[str, str] = {}
+_VENDOR_ALIAS: dict[str, str] = {}       # v_ id of an old name -> the id the index uses now
 _VENDOR_ONLY = {it["id"]: it for it in VENDOR_ONLY_INGREDIENTS}
 _VENDOR_ONLY_NAMES = {n: it["id"] for it in VENDOR_ONLY_INGREDIENTS for n in (it["name"], *it.get("aliases", ()))}
 
@@ -244,6 +248,44 @@ def names_of(item_id: str) -> tuple[str, ...]:
     return tuple(out)
 
 
+# A known ingredient inside a longer word only names that word when what follows it is a cut or a
+# part ("黄瓜丝", "五花肉片", "白菜心"). Anything else after it makes a different thing: "红豆腐乳" is
+# fermented bean curd, not tofu; "牛肉丸" are meatballs; "花生酱" is a sauce.
+CUT_TAIL = frozenset("丝片丁块段条末粒碎泥茸蓉心叶根头尖仁瓣卷馅液薄细结")
+# Seasonings that end other foods' names too ("百香果" is a fruit, not 香果).
+SUFFIX_UNSAFE = frozenset({"香果"})
+# Noodle-like things that end in 粉 but are not a powder or a seasoning.
+NOODLE_ENDS = ("河粉", "米粉", "粉丝", "粉条", "粉皮", "凉粉", "肠粉", "螺蛳粉", "米线")
+
+
+def _sub_hit(t: str, keys) -> str | None:
+    """The known word inside ``t`` that names it (see CUT_TAIL), longest and right-most first."""
+    best = None
+    for k in keys:
+        if len(k) < 2 or k == t:
+            continue
+        i = t.rfind(k)
+        if i < 0:
+            continue
+        tail = t[i + len(k):]
+        if len(tail) > 2 or any(c not in CUT_TAIL for c in tail):
+            continue
+        rank = (len(k), -i)          # longest, then the one that starts first ("牛肉末" -> 牛肉)
+        if best is None or rank > best[0]:
+            best = (rank, k)
+    return best[1] if best else None
+
+
+def is_known_staple(tok: str) -> bool:
+    """A seasoning the kitchen always has, by name ("白醋", "玉米油", "红酱油") — not merely a word that
+    ends like one ("奶粉", "石榴粉")."""
+    t = (tok or "").strip()
+    staples = STAPLES_EXTRA | frozenset(config.get().fridge_staple_aliases)
+    if t in _alias_index():
+        return False
+    return t in staples or any(len(s) >= 2 and t.endswith(s) and s not in SUFFIX_UNSAFE for s in staples)
+
+
 def classify_token(tok: str) -> tuple[str, str]:
     """For the index builder: one recipe ingredient -> (kind, value); kind is skip / tool / staple /
     main / vendor. main's value is a catalog id, staple's is the name, vendor's is a v_ id."""
@@ -251,19 +293,28 @@ def classify_token(tok: str) -> tuple[str, str]:
     if (t in DROP_WORDS or len(t) > 10 or re.fullmatch(r"[\W_a-zA-Z0-9]*", t)
             or any(w in t for w in ("?", "？", " or ", "!", "牌子", "品牌", "一个", "一包"))):
         return "skip", t
-    if any(w in t for w in GARNISH_WORDS) and "洋葱" not in t:
-        return "main", "scallion"
     idx = _alias_index()
     if t in idx:
         return "main", idx[t]
-    if t in STAPLES_EXTRA or t in config.get().fridge_staple_aliases:
+    bare = t.rstrip("".join(CUT_TAIL)) or t
+    if "洋葱" not in t and (bare in GARNISH_WORDS or bare.endswith(GARNISH_WORDS)):
+        return "main", "scallion"
+    staples = STAPLES_EXTRA | frozenset(config.get().fridge_staple_aliases)
+    if t in staples:
         return "staple", t
+    if t in _VENDOR_ONLY_NAMES:                 # "板栗" holds 板, a tool word
+        return "vendor", _VENDOR_ONLY_NAMES[t]
     if any(w in t for w in TOOL_WORDS) and not any(k in t for k in idx):
         return "tool", t
-    hits = sorted((k for k in idx if len(k) >= 2 and k in t), key=len, reverse=True)
-    if hits:
-        return "main", idx[hits[0]]
-    if t.endswith(STAPLE_SUFFIX) or any(s in t for s in ("调料", "香料", "酱汁")):
+    if t.endswith(NOODLE_ENDS):
+        return "vendor", vendor_id(t)
+    # a seasoning that ends the word wins over a food inside it ("红豆腐乳" -> 腐乳)
+    if any(len(s) >= 2 and t.endswith(s) and s not in SUFFIX_UNSAFE for s in staples):
+        return "staple", t
+    hit = _sub_hit(t, idx)
+    if hit:
+        return "main", idx[hit]
+    if t.endswith(STAPLE_SUFFIX) or any(s in t for s in ("调料", "调味料", "香料", "酱汁", "蘸水")):
         return "staple", t
     if any(w in t for w in TOOL_WORDS):
         return "tool", t
@@ -311,13 +362,12 @@ def load() -> dict:
             raw = json.load(f)
         if raw.get("schema") != 1 or not isinstance(raw.get("recipes"), list):
             raise ValueError("wrong shape")
-        out = []
-        for r in raw["recipes"]:
-            if not r.get("id") or not r.get("name") or r.get("method") not in METHOD_CN:
-                raise ValueError(f"incomplete entry {r.get('id')}")
-            out.append(r)
+        out = _entries(raw)
         for n in raw.get("vendor_items") or ():
             _VENDOR_NAMES[vendor_id(n)] = n
+        _VENDOR_ALIAS.clear()
+        for n, target in (raw.get("vendor_aliases") or {}).items():
+            _VENDOR_ALIAS[vendor_id(n)] = str(target)
     except Exception as e:  # noqa: BLE001
         raise RecipesUnavailable(f"index broken: {e!r}") from e
     data = {"by_id": {r["id"]: r for r in out}, "list": out, "source": raw.get("source") or {}}
@@ -326,11 +376,70 @@ def load() -> dict:
     return data
 
 
-def get(rid: str) -> dict | None:
+def _entries(raw: dict) -> list[dict]:
+    if raw.get("schema") != 1 or not isinstance(raw.get("recipes"), list):
+        raise ValueError("wrong shape")
+    out = []
+    for r in raw["recipes"]:
+        if not r.get("id") or not r.get("name") or r.get("method") not in METHOD_CN:
+            raise ValueError(f"incomplete entry {r.get('id')}")
+        v = r.get("version", 1)                 # an index from before versions: every entry is 1
+        if not isinstance(v, int) or v < 1:
+            raise ValueError(f"bad version {r.get('id')}")
+        out.append(r if "version" in r else {**r, "version": 1})
+    return out
+
+
+_history: dict = {"dir": None, "sig": None, "by_key": {}}
+
+
+def _history_dir() -> str:
+    """Earlier indexes, kept as they were (history/<name>.r<revision>.index.json next to the index)."""
+    return os.path.join(os.path.dirname(os.path.abspath(_index_path())), "history")
+
+
+def _history_entries() -> dict[tuple[str, int], dict]:
+    d = _history_dir()
+    files = sorted(glob.glob(os.path.join(d, "*.index.json")))
+    sig = tuple((f, os.stat(f).st_mtime_ns) for f in files)
+    with _lock:
+        if _history["dir"] == d and _history["sig"] == sig:
+            return _history["by_key"]
+    by_key: dict[tuple[str, int], dict] = {}
+    for f in files:
+        try:
+            with open(f, encoding="utf-8") as fh:
+                for r in _entries(json.load(fh)):
+                    by_key.setdefault((r["id"], r["version"]), r)
+        except Exception as e:  # noqa: BLE001
+            log.warning("old recipe index %s unreadable: %r", f, e)
+    with _lock:
+        _history.update(dir=d, sig=sig, by_key=by_key)
+    return by_key
+
+
+def get(rid: str, version: int | None = None) -> dict | None:
+    """A public recipe by id; with a version, that version (a pot keeps the version it followed: an
+    older one is read from the kept earlier indexes). None when not found."""
+    rid = (rid or "").strip()
     try:
-        return load()["by_id"].get((rid or "").strip())
-    except RecipesUnavailable:
+        r = load()["by_id"].get(rid)
+        if version is None or (r is not None and r["version"] == int(version)):
+            return r
+        return _history_entries().get((rid, int(version)))
+    except (RecipesUnavailable, ValueError, OSError):
         return None
+
+
+def vendor_alias(item_id: str) -> str | None:
+    """A recipe-only ingredient the index now calls something else -> the id it uses now (a box bought
+    under the old name counts as the new thing), else None."""
+    if _cache["data"] is None:
+        try:
+            load()
+        except RecipesUnavailable:
+            return None
+    return _VENDOR_ALIAS.get(str(item_id))
 
 
 def item_name(item_id: str) -> str:
@@ -526,12 +635,18 @@ def _stable(seed: str) -> float:
     return int(hashlib.sha1(seed.encode()).hexdigest()[:8], 16) / 0xFFFFFFFF
 
 
+PICKS_MAX = 3      # "today you could try": three dishes in all
+
+
 def recommend(*, have: dict[str, int], meh_items: set[str], cooked_names: set[str], recent_names: set[str],
               stop: set[str], dis: set[str], sig: dict, day: str, who: str) -> dict:
-    """Three picks, each with its own job: one that can be made now, one that uses up something going
-    stale, one never made before. Dishes cooked recently are skipped. Fewer when fewer fit. "Ready" and
-    "one thing short" are listed apart. The same day and fridge give the same picks.
-    Returns {"ready": [r...], "near": [(r, short)...]}."""
+    """Three dishes in all (PICKS_MAX), as the receipt reads: two that the fridge can make now and
+    one that is one thing short. When nothing is one thing short, the third is one more that can be
+    made now; when fewer can be made now, fewer are given — a dish that is short is never added to
+    fill the gap, and at most one is listed. Among the ones that can be made: first one that uses up
+    something going stale, then one never made before, then the rest by weather and the day's draw.
+    Dishes cooked recently are skipped. The same day and fridge give the same picks.
+    Returns {"ready": [r...], "near": [(r, short)...]}, len(ready) + len(near) <= PICKS_MAX."""
     data = load()
     pool = [r for r in data["list"]
             if r.get("category") not in NOT_A_MEAL and r["main"]
@@ -548,20 +663,21 @@ def recommend(*, have: dict[str, int], meh_items: set[str], cooked_names: set[st
             near.append((r, f["short"]))
     ready.sort(key=score, reverse=True)
     near.sort(key=lambda x: score(x[0]), reverse=True)
+    near = near[:1]
+    room = PICKS_MAX - len(near)
     picked: list[dict] = []
 
     def take(cands):
         for r in cands:
-            if r not in picked:
+            if len(picked) < room and r not in picked:
                 picked.append(r)
                 return True
         return False
-    take(ready)
     take([r for r in ready if any(e["item"] in meh_items for e in r["main"])])
     take([r for r in ready if r["name"] not in cooked_names])
-    while len(picked) < 3 and take(ready):
+    while take(ready):
         pass
-    return {"ready": picked[:3], "near": near[:1]}
+    return {"ready": picked, "near": near}
 
 
 def kitchen_day(ts: float) -> str:

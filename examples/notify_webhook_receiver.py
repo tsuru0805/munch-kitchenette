@@ -15,7 +15,8 @@ Each delivery is one POST with a JSON body:
      "notes": [{"id": 1, "kind": "kitchen.served", "text": "...", "body": "...", "payload": {...}}]}
 
 Answer 2xx once the notes are safely on their way to the role. Any other
-status (or no answer) makes the server try again on its next scan.
+status (or no answer) makes the server try again on its next scan. This
+receiver also skips note ids it has already handled, in case one comes again.
 
 What you do in `deliver` is the part that is yours: start a turn for the
 model with `text` as input, push a message into a chat, write to a file.
@@ -32,10 +33,16 @@ def deliver(who: str, text: str, notes: list[dict]) -> None:
     print(text, flush=True)
 
 
+_seen: set[int] = set()       # note ids already handled (kept in memory: a real receiver would store them)
+
+
 class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))) or b"{}")
-        deliver(body.get("who", ""), body.get("text", ""), body.get("notes", []))
+        fresh = [n for n in body.get("notes", []) if n.get("id") not in _seen]
+        if fresh:
+            deliver(body.get("who", ""), "\n".join(n.get("text", "") for n in fresh), fresh)
+            _seen.update(n.get("id") for n in fresh)
         self.send_response(204)
         self.end_headers()
 

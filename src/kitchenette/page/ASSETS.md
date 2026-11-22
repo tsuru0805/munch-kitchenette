@@ -27,7 +27,8 @@ An ingredient kind you add yourself has no picture in this package. It shows the
 
 | Files (under `assets/`) | Count | What |
 |---|---|---|
-| `__assets/clawd/{toque,scarf}/{vendor,dish,machine}_*.{webp,png}`, `__assets/clawd/{toque,scarf}/base.png` | 42 | The little cook in his two outfits buying from the vendor, washing up and loading the dishwasher (17 animated clips each, 3 still last frames each), and his still standing pose, played in the vendor and plates tabs. Copies of the same files in `assets/clawd/` at the repository root. |
+| `__assets/clawd/{toque,scarf}/{vendor,machine}_*.{webp,png}`, `__assets/clawd/{toque,scarf}/base.png` | 24 | The little cook in his two outfits buying from the vendor and loading the dishwasher (9 animated clips each, 2 still last frames each), and his still standing pose, played in the vendor and plates tabs. (Washing up by hand plays on the washing card in the chat, not here.) Copies of the same files in `assets/clawd/` at the repository root. |
+| `__assets/clawd/dishes/<kind>_cells.png` | 14 | The fourteen small pixel dishes the cook holds up on the settled card (stir-fry, soup, noodles, rice bowl, fried rice, fried egg, fish, meat, steamer, bake, salad, dessert, drink, plain bowl), one pixel per cell, drawn by tsuru0805 on the cook's grid (they do not depict Clawd; same license). The dish book shows one where a page has no picture of its own: in colour for a dish made, as a flat grey silhouette for one only collected. Copies of the same files in `assets/clawd/dishes/`. |
 
 These are not the authors' own material in the sense above: the cook is Clawd, a character created by Anthropic for Claude Code, drawn with the engine of [clawds-new-clothes](https://github.com/CharlieLuinaris/clawds-new-clothes) (animation and engine by Luin Luinaris, postie concept and pixel corrections by Charlie Luinaris); the outfits and moves were added for this project. They are licensed **CC BY-NC-SA 4.0**, unofficial fan work, not affiliated with or endorsed by Anthropic. Credits and what was changed: `assets/clawd/ATTRIBUTION.md` at the repository root.
 
@@ -69,7 +70,8 @@ A copy of Noto Serif SC / Source Han Serif SC installed on the device is used fi
 
 | 文件（`assets/` 下） | 个数 | 是什么 |
 |---|---|---|
-| `__assets/clawd/{toque,scarf}/{vendor,dish,machine}_*.{webp,png}`、`__assets/clawd/{toque,scarf}/base.png` | 42 | 小厨师穿两套衣服跟小贩买东西、刷盘子、往洗碗机放盘子（每套 17 段动图、3 张末帧），以及他站好的静止姿势，在小贩、盘子两页里放。和仓库根目录 `assets/clawd/` 里是同一批文件。 |
+| `__assets/clawd/{toque,scarf}/{vendor,machine}_*.{webp,png}`、`__assets/clawd/{toque,scarf}/base.png` | 24 | 小厨师穿两套衣服跟小贩买东西、往洗碗机放盘子（每套 9 段动图、2 张末帧），以及他站好的静止姿势，在小贩、盘子两页里放。（自己刷盘子在聊天里的刷盘子卡上放，不在这里。）和仓库根目录 `assets/clawd/` 里是同一批文件。 |
+| `__assets/clawd/dishes/<类别>_cells.png` | 14 | 结算卡上小厨师举着的十四类像素小菜（炒菜、汤、面、盖饭、炒饭、煎蛋、鱼、肉、蒸笼、烤物、沙拉、甜品、饮料、普通一碗），一格一像素，由 tsuru0805 在小厨师的格子上画（画的不是 Clawd，许可相同）。图鉴里没有自己那张图的菜页用它顶上：做过的上色，只收藏没做的是一色灰的剪影。和仓库根目录 `assets/clawd/dishes/` 里是同一批文件。 |
 
 它们不属于上面说的「作者自己的素材」：小厨师是 Clawd——Anthropic 为 Claude Code 创作的角色，用 [clawds-new-clothes](https://github.com/CharlieLuinaris/clawds-new-clothes) 的引擎画成（动画与引擎：Luin Luinaris；信差设定与像素修订：Charlie Luinaris），衣服和动作是本项目加的。按 **CC BY-NC-SA 4.0** 提供，非官方同人作品，与 Anthropic 没有隶属关系，没有得到其背书。署名和改了什么见仓库根目录的 `assets/clawd/ATTRIBUTION.md`。
 

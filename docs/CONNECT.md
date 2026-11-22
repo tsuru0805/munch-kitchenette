@@ -123,6 +123,21 @@ with those lines removed (for display) and one receipt per marker; pass the
 receipts' `rendered` text to the model with its next turn. Sending the same
 `message_id` again repeats nothing. `examples/inline_markers.py` runs it.
 
+A receipt can carry a card, the way `kitchen_cook` does. With plates switched
+on, a `[刷盘子]` that started a washing answers:
+
+```json
+{"marker": "刷盘子", "args": "", "ok": true, "text": "开始刷了:3 只盘子,大概 6 分钟。", "rendered": "…",
+ "attachments": [{"kind": "kitchen_washing", "job_id": "…", "who": "companion",
+                  "n": 3, "per_s": 120.0, "started_at": 1794467301.27}]}
+```
+
+A chat page can show it as the washing card (`<kitchenette-washing-card>`, see
+[`web/README.md`](../web/README.md#the-washing-card)), which reads
+`GET /api/dishes/jobs/<job_id>` while the washing goes on to learn which plates
+broke. Every other marker, and a `[刷盘子]` that started nothing (an empty sink,
+a washing already going on), has an empty `attachments`.
+
 `inline.enabled` says whether you do this. It takes three values:
 
 | Value | The kitchen's sentences | `/api/inline` |
@@ -329,6 +344,16 @@ enabled = true     # 一直教他写方括号标签
 ```
 
 把每条回复连同一个 `message_id` 送给 `POST /api/inline`。你会拿回去掉这些行的回复（用来显示），以及每个方括号的一条回执；把回执里的 `rendered` 在下一轮带给模型。同一个 `message_id` 再送一次，什么都不会重复发生。`examples/inline_markers.py` 可以直接跑。
+
+回执也可以像 `kitchen_cook` 那样带一张卡。刷盘子开着时，开始了一趟刷盘子的 `[刷盘子]` 回的是：
+
+```json
+{"marker": "刷盘子", "args": "", "ok": true, "text": "开始刷了:3 只盘子,大概 6 分钟。", "rendered": "…",
+ "attachments": [{"kind": "kitchen_washing", "job_id": "…", "who": "companion",
+                  "n": 3, "per_s": 120.0, "started_at": 1794467301.27}]}
+```
+
+聊天页面可以拿它显示刷盘子卡（`<kitchenette-washing-card>`，见 [`web/README.md`](../web/README.md#刷盘子卡)），卡在刷的过程中用 `GET /api/dishes/jobs/<job_id>` 读回哪只碎了。别的标签，以及什么都没开始的 `[刷盘子]`（水槽是空的、已经在刷了），`attachments` 都是空的。
 
 `inline.enabled` 说的是「你有没有这么做」，可以填三种值：
 

@@ -1,0 +1,91 @@
+# Flags of tools/check_recipe_index.py that a person checked against the HowToCook page (commit
+# 58c1b9a) and judged right. One line: id  flag  what the page says.  Re-check when the index is rebuilt
+# from another commit.
+
+# ── ingredients ──
+hc-f8e9d126  NAME     阳朔啤酒鱼:页面用的是漓泉啤酒,已在主料
+hc-47fd34a2  NAME     香干芹菜炒肉:页面写「豆干」,香干即豆干,已在主料
+hc-4142992b  INSIDE   意式猪肉香肠 -> 火腿肠(香肠一类),页面也允许辣香肠或午餐肉
+hc-fb50b48c  INSIDE   马斯卡彭芝士 -> 奶酪;无菌鸡蛋 -> 鸡蛋
+hc-a621da35  INSIDE   可口可乐 -> 可乐
+hc-3a96f071  INSIDE   梅头猪肉 -> 猪肉
+hc-3eef259e  INSIDE   手枪腿鸡腿 -> 鸡腿
+hc-afc81712  INSIDE   鲜仔鸭肉 -> 鸭肉
+hc-19c90b60  INSIDE   内脂豆腐 -> 豆腐
+hc-b3451f38  INSIDE   黔式腊肠 -> 火腿肠(目录里「火腿肠」的别名含腊肠)
+hc-98cb1e74  INSIDE   半成品意大利面 -> 面条(意面算面条)
+hc-130942cf  INSIDE   冷冻去皮基围虾 -> 虾
+hc-a0249b42  INSIDE   冷冻玉米粒 -> 玉米
+hc-6b07ebe9  INSIDE   灯影牛肉丝 -> 牛肉,页面标「备选」,在可选料里
+hc-664f763c  INSIDE   火锅牛肉卷 -> 牛肉
+hc-01fd2701  INSIDE   日本豆腐 -> 豆腐(日本豆腐是鸡蛋做的,按豆腐算是近似)
+hc-75bd289c  INSIDE   日本豆腐 -> 豆腐(同上,近似)
+hc-81078336  INSIDE   长条青椒 -> 青椒
+hc-86f549d2  ODDNAME  金枪鱼罐头:页面原名「水浸金枪鱼罐头」,就是罐头
+hc-3a96f071  ODDNAME  菠萝罐头:页面「罐头菠萝片」
+hc-67604694  ODDNAME  豆豉鲮鱼罐头:页面「甘竹牌鲮鱼罐头」,去掉牌子
+hc-aa0553b5  ODDNAME  复配食品增稠剂:页面标「低脂版本」用,在可选料里
+hc-cfa2562d  ODDNAME  巴斯马蒂长粒香米:页面原名,印度香米
+hc-cfa2562d  MANY     印度焖饭:页面列的确实是九样(含封锅口的面团)
+hc-37d41a4e  EMPTY    油酥:面粉、油、盐,都是常备
+hc-d2ad6a92  EMPTY    炸串酱料:全是调料
+hc-1b2e4d18  EMPTY    简易版炒糖色:只有糖
+hc-23568410  EMPTY    糖醋汁:全是调料
+hc-008cae67  EMPTY    蒜香酱油:全是调料
+hc-d47fbea3  EMPTY    蔗糖糖浆:糖和水
+hc-e4526ca8  EMPTY    米粥:米和水
+hc-9c745a33  EMPTY    手工水饺:页面只列了面皮的料(面粉、水、香油)
+hc-aea4c8cd  EMPTY    披萨饼皮:面粉、酵母、盐、油、糖
+hc-0f433ab4  EMPTY    烙饼:面粉和油
+hc-078824e7  EMPTY    芝麻烧饼:面粉、酵母、调料
+hc-ed24a937  EMPTY    煮锅蒸米饭:米和水
+hc-93986e84  EMPTY    电饭煲蒸米饭:米和水
+
+# ── minutes ──
+hc-b32183a3  SHORT    吐司果酱:页面「只需大约 2 分钟」
+hc-f70c47e7  SHORT    太阳蛋:页面「只需 3 分钟」
+hc-7dd6ad99  SHORT    微波炉荷包蛋:页面「约 2 分钟」
+hc-5f15bb0a  SHORT    微波炉蛋糕:页面「最快仅需 2 分钟」
+hc-37d41a4e  SHORT    油酥:页面「只需 3 分钟」
+hc-98cb1e74  SHORT    半成品意面:页面「约 2 分钟」
+hc-1da9d96c  WAIT     姜炒鸡:1 小时含腌 30 分钟
+hc-b98b6b37  SIMPLE   孜然牛肉:「算上腌肉和备菜,全程大约 45 分钟」,腌 30 分钟不到一小时照算
+hc-7bb4727d  SIMPLE   老妈蹄花:页面全程约 2 小时(已写明不含提前一晚泡豆),高压锅压煮;做法被归成了炒,分钟没错
+hc-2a54035b  LONG     腊八粥:页面「除去浸泡等准备时间,熬煮约需 3 小时」,小火熬 30+60+60 分钟
+hc-6be49859  SIMPLE   糖醋鲤鱼:1 小时含腌 30 分钟、等 30 分钟
+hc-1217aaf8  SIMPLE   口水鸡:煮鸡、冷却到淋汁约 1.5 小时
+hc-43af0fa8  SIMPLE   啤酒鸭:中火烧 30 分钟,共约 1 小时
+hc-c986da05  SIMPLE   尖椒炒牛肉:1 小时含腌 30-40 分钟
+hc-ff87d13b  SIMPLE   煎烤羊排:高压锅约 1 小时(先压后煎)
+hc-4ac9edb8  SIMPLE   香菇滑鸡:页面约 1 小时
+hc-fa23cbae  SIMPLE   中式馅饼:页面约 1 小时,含腌 30 分钟
+hc-a0249b42  SIMPLE   火腿饭团:从煮饭算约 1 小时
+hc-0f433ab4  SIMPLE   烙饼:页面约 1 小时(和面、醒面、烙)
+hc-40042df0  LONG     无厨师机蜂蜜面包:约 3 小时,发面在中间
+hc-b16b2f46  LONG     基础牛奶面包:约 200 分钟,发酵在中间
+hc-670343f5  LONG     带把肘子:约 3.5 小时,长时间蒸
+hc-011864d2  LONG     柱候牛腩:普通炖锅约 3 小时(高压锅约 1 小时)
+hc-65d24c7f  LONG     猪肉烩酸菜:约 3 小时,慢炖 1.5-2 小时
+hc-9c745a33  LONG     手工水饺:约 3 小时,醒面在中间
+hc-d2975b10  SIMPLE   黄油煎虾:页面「总耗时约一小时」(处理活虾)
+hc-445bbaf9  SHORT    牛奶燕麦:页面「全程约三分钟」
+hc-b9c29618  SIMPLE   小炒黄牛肉:页面「从切配到出锅大约一小时」
+hc-d590049c  OTHER    巴斯克:取「从准备到出炉约 30 分钟」,8 小时含冷藏过夜
+hc-d30bc5b6  OTHER    草莓冰淇淋:8 小时大多是冷冻,取「实际动手几十分钟」读作 30
+hc-4644ef61  OTHER    百香果橙子特调:24 小时是提前腌,取实际动手 30 分钟
+hc-5ee30eb9  OTHER    砂糖椰子冰沙:10 小时是提前冷冻,取「动手仅需几分钟」读作 5
+hc-3ff388fe  OTHER    台式卤肉饭:全程约 1.5 小时,动手半小时,剩下是小火慢炖(在锅上),取 90
+hc-a93aca8e  OTHER    空气炸锅鸡翅中:全程约四十分钟在炸锅里,动手几分钟,取 40
+hc-f2354630  OTHER    鲣鱼海苔玉米饭:加上煮饭总共约 40 分钟,动手 5 分钟,取 40
+hc-670c9f12  OTHER    凉粉:3-4 小时大多是冷藏,取「动手操作约半小时」
+hc-eeefc8ee  DEFAULT  龟苓膏:页面只写了之后冷藏约两小时,动手时间没写,按默认 10 分钟
+hc-01e9b639  DEFAULT  海边落日:页面没写时长,调酒按默认 15 分钟(估)
+hc-a894bdb5  DEFAULT  葱烧鸡腿:页面没写总时长,步骤里腌 10 分钟加几段两三分钟,按默认 40 分钟(估)
+hc-aea4c8cd  DEFAULT  披萨饼皮:页面只写算上隔夜冷藏 10-14 小时,烤 16-18 分钟,按默认 40 分钟(估)
+hc-8a59297c  WAIT     意式烤鸡:「从腌制到出炉总计约 50 分钟」,腌制不到一小时照算
+
+# ── a list line whose last item says 或: read as 或 joining only that item ──
+# (罗氏虾、意式香肠北非蛋、煎饺 are whole-list "any one" lines, kept in the builder's WHOLE_OR)
+hc-6fab7519  ALTSCOPE 奶茶:是杯子那行,工具
+hc-da037491  ALTSCOPE 枝竹羊腩煲:其余配菜马蹄、土豆或萝卜,整行可选,逐项读也都是可选
+hc-27764b15  ALTSCOPE 西红柿鸡蛋挂面:酱油、蚝油或者鸡精,读作酱油加(蚝油或鸡精),都是常备调料

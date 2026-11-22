@@ -1,15 +1,21 @@
 // What the page reads and writes for the upgrade (docs/UPGRADE.md, docs/API.md "The upgrade"):
 //   GET  /api/features                      which of the seventeen are on (an entrance is hidden when off)
 //   GET  /api/recipes?q=&who=               the public recipes      GET /api/recipes/today?who=
+//   PUT  /api/recipes/<id>/stop             a recipe with a mistake out of picks (and back)   GET /api/recipes/stopped
+//   GET /api/prefs · POST /api/prefs/dislike · DELETE /api/prefs/dislike/<item>   ingredients not to recommend, one at a time
+//   GET /api/recipes/missing?who=&recipe=   what a recipe lacks      POST /api/recipes/buy_missing   buying it (worked out by the server)
 //   GET  /api/book?who=                     the role's own pages     DELETE /api/book/<page>?who=
 //   GET/POST/DELETE /api/orders             ordering a dish from a recipe
 //   GET  /api/codes?who=&page=              a page as a code         POST /api/codes/preview · /api/codes/import
-//   GET  /api/dex?who=                      the dish book and the achievements   PUT /api/dex/note
+//   GET  /api/dex?who=                      the dish book and the achievements   PUT /api/dex/note · /api/dex/merge
+//   POST /api/dex/art/redraw · PUT /api/dex/art/choice · GET /api/dex/art?page_key=&version=   a page's pictures
 //   GET  /api/dishes?who=                   plates                   PUT /api/dishes/settings
 //   GET  /api/jars?who=                     the jars and what came out    PUT /api/jars/cap · POST /api/jars/feed
 //   GET  /api/vendor?who=                   the vendor downstairs, the sill   POST /api/vendor/treat · /api/vendor/flowers/<id>
+//   GET  /api/vendor/ledger?who=            one line per order (read only)
 //   POST /api/wallet/grant                  pocket money into the built-in ledger
-import { req, type Viewer } from "./fridgeApi";
+import { getConn } from "../runtime/session";
+import { req, type ArtAuth, type Viewer } from "./fridgeApi";
 
 const q = (v: string) => encodeURIComponent(v);
 type J = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -77,6 +83,65 @@ export async function searchRecipes(viewer: Viewer, text: string): Promise<{ tot
   return parseRecipes(await req(`/api/recipes?who=${q(viewer)}&limit=60${text ? `&q=${q(text)}` : ""}`));
 }
 
+/** Take a recipe with a mistake out of picks and search (stopped = false puts it back); pots and pages stay */
+export async function stopRecipe(id: string, stopped: boolean, why = ""): Promise<void> {
+  await req(`/api/recipes/${q(id)}/stop`, { method: "PUT", body: { stopped, why } });
+}
+
+export interface StoppedRecipe { id: string; name: string; why: string }
+export function parseStopped(j: unknown): StoppedRecipe[] {
+  const list = j && typeof j === "object" ? (j as J).recipes : null;
+  return Array.isArray(list)
+    ? list.filter((r: J) => r && typeof r.id === "string").map((r: J) => ({ id: r.id, name: String(r.name ?? r.id), why: String(r.why ?? "") }))
+    : [];
+}
+export async function fetchStopped(): Promise<StoppedRecipe[]> {
+  return parseStopped(await req("/api/recipes/stopped"));
+}
+
+/** The ingredients (catalog ids) the human does not want recommended to this role */
+export async function fetchDislikes(viewer: Viewer): Promise<string[]> {
+  const j = (await req(`/api/prefs?who=${q(viewer)}`)) as J;
+  return Array.isArray(j?.dislike) ? j.dislike.map(String) : [];
+}
+const dislikeList = (j: J | null): string[] => (Array.isArray(j?.dislike) ? j!.dislike.map(String) : []);
+/** Add one ingredient (already there = nothing changes); answers the whole list as it is now */
+export async function addDislike(viewer: Viewer, item: string): Promise<string[]> {
+  return dislikeList((await req("/api/prefs/dislike", { method: "POST", body: { who: viewer, item } })) as J);
+}
+/** Take one ingredient off (not there = nothing changes); answers the whole list as it is now */
+export async function removeDislike(viewer: Viewer, item: string): Promise<string[]> {
+  return dislikeList((await req(`/api/prefs/dislike/${q(item)}?who=${q(viewer)}`, { method: "DELETE" })) as J);
+}
+
+export interface Missing { itemId: string; name: string; short: number; sold: boolean; packs: number }
+export function parseMissing(j: unknown): { name: string; missing: Missing[] } {
+  const r = (j ?? {}) as J;
+  return {
+    name: String(r.name ?? ""),
+    missing: Array.isArray(r.missing) ? r.missing.filter((m: J) => m && typeof m.item_id === "string").map((m: J) => ({
+      itemId: m.item_id, name: String(m.name ?? m.item_id), short: Number(m.short ?? 0), sold: m.sold === true, packs: Math.max(1, m.packs | 0),
+    })) : [],
+  };
+}
+/** What the fridge lacks for a recipe (or a page of the role's book), in whole packs */
+export async function fetchMissing(viewer: Viewer, recipe: string): Promise<{ name: string; missing: Missing[] }> {
+  return parseMissing(await req(`/api/recipes/missing?who=${q(viewer)}&recipe=${q(recipe)}`));
+}
+/**
+ * Buy what a recipe lacks for the role. `opId`: one per buying, the same for a retry of it (the server
+ * answers a retry with the receipt it kept and buys nothing more; a new buying works the shortage out
+ * again). Answers the fridge's sentence and what is still missing
+ */
+export async function buyMissing(viewer: Viewer, recipe: string, opId: string): Promise<{ text: string; bought: boolean; missing: Missing[] }> {
+  const j = (await req("/api/recipes/buy_missing", { method: "POST", body: { who: viewer, recipe, op_id: opId } })) as J;
+  return { text: String(j?.text ?? ""), bought: Array.isArray(j?.added) && j.added.length > 0, missing: parseMissing(j).missing };
+}
+/** The ids to hand to the human's buying for what is missing: one per pack, only what the shop sells */
+export function missingToBuy(missing: Missing[]): string[] {
+  return missing.filter((m) => m.sold).flatMap((m) => Array.from({ length: m.packs }, () => m.itemId));
+}
+
 export async function fetchToday(viewer: Viewer): Promise<string> {
   const j = (await req(`/api/recipes/today?who=${q(viewer)}`)) as J;
   return String(j?.text ?? "");
@@ -128,22 +193,56 @@ export async function importCode(viewer: Viewer, code: string): Promise<J> {
   return (await req("/api/codes/import", { method: "POST", body: { who: viewer, code } })) as J;
 }
 
-export interface DexPage { key: string; name: string; made: number; good: number; eaten: number; best: string | null; firstAt: number; pending: boolean; method: string; ingredients: string[]; humanNote: string; roleNote: string; artVersion: number | null }
+/** A page's pictures: every version is kept; `chosen` = the one shown (null = none ready yet, the placeholder is shown) */
+export interface DexArt {
+  chosen: number | null;
+  /** the versions that are ready, oldest first (the ones the human can switch back to) */
+  ready: number[];
+  /** the newest version is being drawn / failed (and why) */
+  drawing: boolean;
+  failed: string | null;
+}
+export interface DexPage {
+  key: string; name: string; made: number; good: number; eaten: number; best: string | null; firstAt: number; pending: boolean;
+  method: string; ingredients: string[]; humanNote: string; roleNote: string;
+  /** which of the fourteen small pixel dishes stands in while there is no picture */
+  icon: string;
+  art: DexArt;
+  /** the unsorted dish names merged into this page (each can be taken back out) */
+  mergedIn: string[];
+}
 export interface Achievement { key: string; name: string; earned: boolean; why: string }
-export interface Dex { pages: DexPage[]; silhouettes: string[]; total: number | null; madePublic: number; artMissing: number; drawing: boolean; achievements: Achievement[] }
+export interface Silhouette { name: string; recipeId: string; icon: string }
+export interface Dex { pages: DexPage[]; silhouettes: Silhouette[]; total: number | null; madePublic: number; artMissing: number; drawing: boolean; achievements: Achievement[] }
+
+export function parseDexArt(a: unknown): DexArt {
+  const r = (a && typeof a === "object" ? a : {}) as J;
+  const versions: J[] = Array.isArray(r.versions) ? r.versions.filter((v: J) => v && typeof v.version === "number") : [];
+  const last = versions[versions.length - 1];
+  return {
+    chosen: typeof r.chosen === "number" ? r.chosen : null,
+    ready: versions.filter((v) => v.state === "ready").map((v) => v.version as number),
+    drawing: last?.state === "pending",
+    failed: last?.state === "failed" ? String(last.err || "没画成") : null,
+  };
+}
 
 export function parseDex(j: unknown): Dex {
   const r = (j ?? {}) as J;
   const t = (r.totals ?? {}) as J;
+  const merges: J[] = Array.isArray(r.merges) ? r.merges : [];
   return {
     pages: Array.isArray(r.pages) ? r.pages.map((p: J) => ({
       key: String(p.key), name: String(p.name ?? ""), made: p.made | 0, good: p.good | 0, eaten: p.eaten | 0,
       best: typeof p.best === "string" ? p.best : null, firstAt: typeof p.first_at === "number" ? p.first_at : 0,
       pending: p.pending === true, method: String(p.method ?? ""), ingredients: Array.isArray(p.ingredients) ? p.ingredients.map(String) : [],
       humanNote: String(p.human_note ?? ""), roleNote: String(p.role_note ?? ""),
-      artVersion: p.art && typeof p.art.chosen === "number" ? p.art.chosen : null,
+      icon: String(p.icon ?? ""), art: parseDexArt(p.art),
+      mergedIn: merges.filter((m) => m && m.page_key === p.key).map((m) => String(m.dish ?? "")),
     })) : [],
-    silhouettes: Array.isArray(r.silhouettes) ? r.silhouettes.map((s: J) => String(s.name ?? "")) : [],
+    silhouettes: Array.isArray(r.silhouettes)
+      ? r.silhouettes.map((s: J) => ({ name: String(s.name ?? ""), recipeId: String(s.recipe_id ?? ""), icon: String(s.icon ?? "") }))
+      : [],
     total: typeof t.public === "number" ? t.public : null,
     madePublic: t.made_public | 0,
     artMissing: t.art_missing | 0,
@@ -159,6 +258,24 @@ export async function fetchDex(viewer: Viewer): Promise<Dex> {
 }
 export async function saveDexNote(viewer: Viewer, pageKey: string, text: string): Promise<void> {
   await req("/api/dex/note", { method: "PUT", body: { who: viewer, page_key: pageKey, text } });
+}
+/** The dish name an unsorted page stands for (its key without "d:"), as /api/dex/merge wants it */
+export const unsortedDish = (pageKey: string): string => (pageKey.startsWith("d:") ? pageKey.slice(2) : pageKey);
+/** Merge an unsorted dish into a page; merging it onto its own key ("d:" + dish) takes it back out */
+export async function mergeDex(viewer: Viewer, dish: string, pageKey: string): Promise<void> {
+  await req("/api/dex/merge", { method: "PUT", body: { who: viewer, dish, page_key: pageKey } });
+}
+/** Ask for a new picture of a page (drawn in the background; the one shown stays until it is ready) */
+export async function redrawDex(pageKey: string): Promise<void> {
+  await req("/api/dex/art/redraw", { method: "POST", body: { page_key: pageKey } });
+}
+/** Show an older (or newer) version of a page's picture */
+export async function chooseDexArt(pageKey: string, version: number): Promise<void> {
+  await req("/api/dex/art/choice", { method: "PUT", body: { page_key: pageKey, version } });
+}
+/** One version of a page's picture, fetched with the token as a header */
+export function dexArtSource(auth: ArtAuth, pageKey: string, version: number): { uri: string; headers: Record<string, string> } {
+  return { uri: `${auth.base}/api/dex/art?page_key=${q(pageKey)}&version=${version}`, headers: auth.headers };
 }
 export const BEST_WORD: Record<string, string> = { great: "很好", ok: "普通", spoiled: "坏了", burnt: "糊了", ruined: "毁了" };
 
@@ -214,9 +331,14 @@ export async function setJarCap(viewer: Viewer, cap: number): Promise<void> {
 
 export interface VendorGood { id: string; name: string; kind: string; unit: string; price: number; left: number }
 /** One of the role's orders on this visit (for the cook at the window) */
-export interface VendorOrder { id: string; name: string; payer: string; state: string; createdAt: number; updatedAt: number }
+export interface VendorOrder { id: string; name: string; payer: string; state: string; createdAt: number; updatedAt: number; kind?: string }
+export interface VendorVisit { id: string; vendor: string; name: string; who: string; leftS: number; leaveAt: number; goods: VendorGood[] }
 export interface VendorView {
-  visit: { id: string; name: string; who: string; leftS: number; goods: VendorGood[] } | null;
+  /** `vendor` = which vendor (e.g. "tanghulu"), for the look of his cart; `leaveAt` in server seconds */
+  visit: VendorVisit | null;
+  /** The visit that just ended, for a short while after it did (nothing can be bought from it): only so the
+   *  panel can finish showing an order under way and the vendor leaving. `mine` is then its orders. */
+  ended: VendorVisit | null;
   /** the role's orders on this visit, oldest first */
   mine: VendorOrder[];
   /** the server's "now" (seconds) and this device's clock (ms) when it was read */
@@ -224,17 +346,26 @@ export interface VendorView {
   spent: number; cap: number; balance: number | null; localWallet: boolean;
   flower: { name: string; variety: string; state: string; gifted: boolean; note: string } | null;
   requests: { id: string; name: string; state: string }[];
+  /** Which server and role this was read for (the vendor panel keeps a show per server + role + visit) */
+  scope?: string;
+}
+function visitOf(v: J, now: unknown): VendorVisit {
+  const leftS = Number(v.left_s ?? 0);
+  return { id: String(v.id ?? ""), vendor: String(v.vendor ?? ""), name: String(v.name ?? ""), who: String(v.who ?? ""), leftS,
+    leaveAt: typeof v.leave_at === "number" ? v.leave_at : (typeof now === "number" ? now : 0) + leftS,
+    goods: Array.isArray(v.goods) ? v.goods.map((g: J) => ({ id: String(g.id), name: String(g.name ?? ""), kind: String(g.kind ?? ""),
+      unit: String(g.unit ?? ""), price: g.price | 0, left: g.left | 0 })) : [] };
 }
 export function parseVendor(j: unknown): VendorView {
   const r = (j ?? {}) as J;
   const v = r.visit as J | null;
   return {
-    visit: v ? { id: String(v.id ?? ""), name: String(v.name ?? ""), who: String(v.who ?? ""), leftS: Number(v.left_s ?? 0),
-      goods: Array.isArray(v.goods) ? v.goods.map((g: J) => ({ id: String(g.id), name: String(g.name ?? ""), kind: String(g.kind ?? ""),
-        unit: String(g.unit ?? ""), price: g.price | 0, left: g.left | 0 })) : [] } : null,
+    visit: v ? visitOf(v, r.now) : null,
+    ended: r.ended ? visitOf(r.ended, r.now) : null,
     mine: Array.isArray(r.mine) ? r.mine.filter((o: J) => o && o.id != null).map((o: J) => ({
       id: String(o.id), name: String(o.item_name ?? ""), payer: String(o.payer ?? ""), state: String(o.state ?? ""),
-      createdAt: Number(o.created_at ?? 0), updatedAt: Number(o.updated_at ?? o.created_at ?? 0) })) : [],
+      createdAt: Number(o.created_at ?? 0), updatedAt: Number(o.updated_at ?? o.created_at ?? 0),
+      ...(o.kind ? { kind: String(o.kind) } : {}) })) : [],
     now: typeof r.now === "number" ? r.now : 0, readAt: Date.now(),
     spent: r.today?.spent | 0, cap: r.today?.cap | 0,
     balance: typeof r.wallet?.balance === "number" ? r.wallet.balance : null, localWallet: r.wallet?.local === true,
@@ -243,12 +374,27 @@ export function parseVendor(j: unknown): VendorView {
   };
 }
 export async function fetchVendor(viewer: Viewer): Promise<VendorView> {
-  return parseVendor(await req(`/api/vendor?who=${q(viewer)}`));
+  return { ...parseVendor(await req(`/api/vendor?who=${q(viewer)}`)), scope: `${getConn().base}|${viewer}` };
 }
 export async function treat(viewer: Viewer, itemId: string, requestId: string): Promise<boolean> {
   const j = (await req("/api/vendor/treat", { method: "POST", body: { who: viewer, item_id: itemId, qty: 1, request_id: requestId } })) as J;
   return j?.ok === true;
 }
+export interface LedgerLine { id: string; name: string; qty: number; total: number; payer: string; state: string; at: number }
+export function parseLedger(j: unknown): LedgerLine[] {
+  const list = j && typeof j === "object" ? (j as J).orders : null;
+  return Array.isArray(list) ? list.filter((o: J) => o && o.id != null).map((o: J) => ({
+    id: String(o.id), name: String(o.item_name ?? ""), qty: o.qty | 0, total: o.total | 0, payer: String(o.payer ?? ""),
+    state: String(o.state ?? ""), at: Number(o.created_at ?? 0),
+  })) : [];
+}
+export async function fetchLedger(viewer: Viewer): Promise<LedgerLine[]> {
+  return parseLedger(await req(`/api/vendor/ledger?who=${q(viewer)}`));
+}
+/** How an order stands, in a word (the money is settled by the server; this only reads it) */
+export const LEDGER_STATE: Record<string, string> = {
+  created: "在办", debiting: "在扣钱", debit_failed: "没买成", paid: "付了", delivered: "到手了", refunding: "在退钱", refunded: "退了钱",
+};
 export async function decideFlower(id: string, approve: boolean): Promise<void> {
   await req(`/api/vendor/flowers/${q(id)}`, { method: "POST", body: { approve } });
 }

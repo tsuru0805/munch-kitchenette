@@ -40,6 +40,55 @@ export function onSeatFree(fn: () => void): () => void {
   };
 }
 
+/**
+ * One card's claim on a seat, the way every card on a page uses the seats (the cooking card and the washing
+ * card alike, so they share the same cap). want(true) takes a seat (newest first: the oldest holder is
+ * pushed out); a card pushed out goes still and, while it still wants one, takes the next seat that is
+ * released without pushing anyone out; want(false) gives the seat back. `onChange` is called whenever the
+ * seat was taken away or came back, for the card to draw itself again.
+ */
+export class SeatClaim {
+  #seat: Holder | null = null;
+  #wanted = false;
+  #offSeatFree: (() => void) | null = null;
+  readonly #onChange: () => void;
+
+  constructor(onChange: () => void) {
+    this.#onChange = onChange;
+  }
+
+  /** Holds a seat right now (= may animate) */
+  get held(): boolean {
+    return this.#seat !== null;
+  }
+
+  want(wanted: boolean): void {
+    if (wanted === this.#wanted) return;
+    this.#wanted = wanted;
+    if (wanted) {
+      const revoke = (): void => {
+        // A newer card took the seat: back to the still pose, and wait for a free one
+        this.#seat = null;
+        this.#onChange();
+      };
+      // Mounting takes a seat (newest first); after losing it, only a free seat is taken, nobody is pushed out
+      this.#seat = acquireSeat(revoke);
+      this.#offSeatFree = onSeatFree(() => {
+        if (this.#seat || !seatFree()) return;
+        this.#seat = acquireSeat(revoke);
+        this.#onChange();
+      });
+    } else {
+      this.#offSeatFree?.();
+      this.#offSeatFree = null;
+      if (this.#seat) {
+        releaseSeat(this.#seat);
+        this.#seat = null;
+      }
+    }
+  }
+}
+
 /** For tests: clear the seats */
 export function _resetSeats(): void {
   holders.length = 0;

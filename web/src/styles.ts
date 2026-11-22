@@ -1,11 +1,16 @@
 // The card's look: a ticket-stub strip (paper ground, ink outline, an offset solid shadow, an accent
-// block with a glyph on the left, a dashed divider). Every colour and font is a custom property, so a
+// block with a glyph on the left, a dashed divider; once settled, the picture column takes the block's place). Every colour and font is a custom property, so a
 // host page can restyle the card from outside without touching the shadow tree.
 import { CANVAS_PX, STAGE_PX } from "./manifest";
+import { PIC_NARROW_BELOW_PX, PIC_PAD_Y, PIC_SCALE, PIC_SCALE_NARROW, picBox } from "./settle";
+
+const PIC = picBox(PIC_SCALE);
+const PIC_NARROW = picBox(PIC_SCALE_NARROW);
 
 export const CARD_CSS = `
 :host {
   display: block;
+  container: kitchenette-card / inline-size;
   margin: 8px 0;
   /* Text settings a host page may have set on an ancestor do not leak into the card */
   font-size: 14px; line-height: normal; font-weight: 400; font-style: normal; letter-spacing: normal;
@@ -73,8 +78,52 @@ export const CARD_CSS = `
 .track { height: 2px; background: var(--_hair); margin-top: 8px; overflow: hidden; }
 .fill { height: 2px; background: var(--_accent); }
 .foot { font-family: var(--_serif); font-size: 10.5px; line-height: 16px; color: var(--_mute); margin-top: 6px; font-variant-numeric: tabular-nums; }
-.settle { font-family: var(--_serif); font-size: 10.5px; line-height: 16px; color: var(--_mute); margin-top: 4px; padding-top: 4px; border-top: 1px dashed currentColor; white-space: pre-line; }
-.settle[hidden] { display: none; }
+/* The settled card: the picture column on the left (him with the dish, feet on one line), a dashed line,
+   then the dish and one line per fact, each with its small title on the left */
+.pic {
+  flex: none; width: ${PIC.col}px; min-height: ${PIC.minH}px; position: relative; overflow: hidden;
+  display: flex; align-items: center; justify-content: center; padding: ${PIC_PAD_Y}px 0;
+  border-right: 1px dashed var(--_ink);
+}
+/* Every pose through the same frame at the same scale, the frame in the middle of the column: the same
+   size, feet on the same line */
+.pic-img {
+  display: block; flex: none; width: ${PIC.w}px; height: ${PIC.h}px;
+  image-rendering: pixelated; user-select: none; -webkit-user-drag: none;
+}
+/* A narrow card: every still a size smaller (still all the same size) */
+@container kitchenette-card (max-width: ${PIC_NARROW_BELOW_PX - 1}px) {
+  .pic { width: ${PIC_NARROW.col}px; min-height: ${PIC_NARROW.minH}px; }
+  .pic-img { width: ${PIC_NARROW.w}px; height: ${PIC_NARROW.h}px; }
+}
+.card.settled .sym, .card.settled .right, .card.settled .track { display: none; }
+.card.settled .body { padding: 9px 11px 9px 12px; display: grid; align-content: start; }
+/* The invisible fullest card shares the content's place: the card is as tall as the taller of the two,
+   content at the top. Every settled card is then one height, before and after its lines arrive. */
+.sizer { display: none; visibility: hidden; pointer-events: none; }
+.card.settled .content, .card.settled .sizer { grid-area: 1 / 1; min-width: 0; }
+.card.settled .sizer { display: block; }
+.sizer .line-text { white-space: pre-line; }
+.card.settled .foot { font-size: 10px; line-height: 15px; margin-top: 5px; }
+.lines {
+  display: grid; grid-template-columns: max-content minmax(0, 1fr);
+  margin-top: 6px; border-top: 1px solid var(--_hair);
+  font-family: var(--_serif); font-size: 11px; line-height: 17px;
+}
+.line { display: contents; }
+.line-label, .line-value { padding: 3px 0; border-bottom: 1px solid var(--_hair); }
+.line-label { min-width: 34px; padding-right: 8px; color: var(--_mute); }
+.line-value { min-width: 0; color: var(--_ink); overflow-wrap: anywhere; }
+.line-bar { display: inline-block; position: relative; width: 46px; height: 2px; margin-left: 6px; vertical-align: middle; background: var(--_hair); }
+.line-bar-fill { position: absolute; left: 0; top: 0; height: 2px; background: var(--_accent); }
+/* A mishap is at most two lines */
+.line-mishap .line-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.line-sub { font-size: 10px; line-height: 15px; color: var(--_mute); }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.chip {
+  font-family: var(--_serif); font-size: 9.5px; line-height: 14px; letter-spacing: 0.5px; padding: 0 5px;
+  color: var(--_accent); border: 1px solid var(--_accent);
+}
 .right { flex: none; display: flex; flex-direction: column; align-items: flex-end; justify-content: center; }
 .clock { font-family: var(--_display); font-size: 26px; color: var(--_ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .state-word { font-family: var(--_serif); font-size: 12.5px; line-height: 19px; color: var(--_accent); text-align: right; }

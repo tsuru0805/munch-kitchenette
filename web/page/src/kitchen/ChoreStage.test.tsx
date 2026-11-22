@@ -20,17 +20,20 @@ const shown = (r: TestRenderer.ReactTestRenderer) =>
 afterEach(() => jest.restoreAllMocks());
 
 test("plays the named clip", async () => {
-  const r = await render(false, "dish_scrub");
-  expect(shown(r)).toBe("cook-dish_scrub");
+  const r = await render(false, "machine_run");
+  expect(shown(r)).toBe("cook-machine_run");
   act(() => r.unmount());
 });
 
 test("reduce motion: a looping clip stands still in the base pose; one that plays once, on its last frame", async () => {
-  let r = await render(true, "dish_scrub");
+  let r = await render(true, "machine_run");
   expect(shown(r)).toBe("cook-base");
   act(() => r.unmount());
-  r = await render(true, "dish_break");
-  expect(shown(r)).toBe("cook-dish_break_last");
+  r = await render(true, "vendor_th_give");
+  expect(shown(r)).toBe("cook-vendor_th_give_last");
+  act(() => r.unmount());
+  r = await render(true, "vendor_call");
+  expect(shown(r)).toBe("cook-vendor_still");
   act(() => r.unmount());
   r = await render(true, "machine_done");
   expect(shown(r)).toBe("cook-machine_done_last");

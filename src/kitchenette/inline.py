@@ -17,7 +17,7 @@ import hashlib
 import json
 import re
 import uuid
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 
 from . import db, roles, tools
 from .texts import MARKER_BUY, MARKER_EAT, MARKER_SNACK, MARKER_TOSS, t
@@ -60,6 +60,7 @@ class Receipt:
     ok: bool
     text: str          # the bare outcome
     rendered: str      # the outcome phrased as "that marker in your reply ..." for the next turn
+    attachments: list[dict] = field(default_factory=list)   # e.g. the washing card of a [刷盘子] that started
 
 
 def parse(text: str) -> list[Action]:
@@ -126,14 +127,17 @@ def execute(who: str | None, text: str, message_id: str | None = None, *, told: 
         if tool == "play":
             from . import playkit, service
             service.serve_due(who)
-            ok, text_ = playkit.run_marker(who, a.marker, a.args, key=key or uuid.uuid4().hex)
-            receipt = Receipt(a.marker, a.args, ok, text_, render(a.marker, ok, text_))
+            run_key = key or uuid.uuid4().hex
+            ok, text_ = playkit.run_marker(who, a.marker, a.args, key=run_key)
+            cards = playkit.marker_attachments(a.marker, run_key) if ok else []
+            receipt = Receipt(a.marker, a.args, ok, text_, render(a.marker, ok, text_), cards)
             if key:
                 _store(key, receipt)
             out.append(receipt)
             continue
         res = tools.call(tool, {arg: a.args}, who, key=key, told=told)
-        receipt = Receipt(a.marker, a.args, not res.is_error, res.text, render(a.marker, not res.is_error, res.text))
+        receipt = Receipt(a.marker, a.args, not res.is_error, res.text, render(a.marker, not res.is_error, res.text),
+                          list(res.attachments))
         if key:
             _store(key, receipt)
         out.append(receipt)

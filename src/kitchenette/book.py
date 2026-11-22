@@ -51,9 +51,9 @@ def _too_long() -> BookError:
 
 # ── ids ─────────────────────────────────────────────────────────────────
 
-def _page_row(conn, who: str, pid: str):
-    return conn.execute("SELECT * FROM recipe_pages WHERE id=? AND who=? AND deleted_at IS NULL",
-                        (pid, who)).fetchone()
+def _page_row(conn, who: str, pid: str, *, deleted_too: bool = False):
+    return conn.execute("SELECT * FROM recipe_pages WHERE id=? AND who=?"
+                        + ("" if deleted_too else " AND deleted_at IS NULL"), (pid, who)).fetchone()
 
 
 def page_version(conn, pid: str, version: int | None = None):
@@ -73,21 +73,23 @@ def _content(v) -> dict:
 
 
 def _public(r: dict, page_id: str | None) -> dict:
-    return {"identity": r["id"], "version": 1, "name": r["name"], "main": r["main"],
+    return {"identity": r["id"], "version": r.get("version", 1), "name": r["name"], "main": r["main"],
             "optional": r.get("optional", []), "method": r["method"], "minutes": r["minutes"],
             "kind": "public", "page_id": page_id, "note": ""}
 
 
-def resolve_ref(conn, who: str, ref: str, *, allow_menu: bool = False) -> dict | None:
+def resolve_ref(conn, who: str, ref: str, *, allow_menu: bool = False, version: int | None = None) -> dict | None:
     """An id -> {identity, version, name, main, optional, method, minutes, kind, page_id}; None when
-    not found, someone else's, deleted, or belonging to something switched off."""
+    not found, someone else's, deleted, or belonging to something switched off. With a version (what a
+    pot recorded), that version of the page or of the public entry, not the current one — and a page
+    deleted since is still read (an old pot still finds what it followed)."""
     ref = (ref or "").strip()
     if not ref:
         return None
     if ref.startswith(PAGE_PREFIX):
         if not play.on("recipe_book"):
             return None
-        p = _page_row(conn, who, ref)
+        p = _page_row(conn, who, ref, deleted_too=version is not None)
         if p is None:
             return None
         if p["kind"] == "menu":
@@ -96,14 +98,16 @@ def resolve_ref(conn, who: str, ref: str, *, allow_menu: bool = False) -> dict |
             if not allow_menu:
                 return {"kind": "menu", "name": page_version(conn, ref)["name"], "identity": ref}
         if p["kind"] == "fav":
-            r = recipes.get(p["ref_id"]) if play.on("recipes_public") else None
+            r = recipes.get(p["ref_id"], version) if play.on("recipes_public") else None
             return _public(r, ref) if r else None
-        v = page_version(conn, ref)
+        v = page_version(conn, ref, version)
+        if v is None:
+            return None
         return {"identity": ref, "version": v["version"], **_content(v), "kind": p["kind"], "page_id": ref,
                 "menu": json.loads(v["menu_json"] or "[]") if p["kind"] == "menu" else None}
     if not play.on("recipes_public"):
         return None
-    r = recipes.get(ref)
+    r = recipes.get(ref, version)
     return _public(r, None) if r else None
 
 
@@ -129,7 +133,7 @@ def favorite(conn, who: str, q: str, now: float) -> str:
         return tp("fav_dup", name=r["name"], rid=r["id"])
     pid = _new_page_id()
     conn.execute("INSERT INTO recipe_pages (id, who, kind, ref_id, ref_version, cur_version, created_at)"
-                 " VALUES (?,?,?,?,?,1,?)", (pid, who, "fav", r["id"], 1, now))
+                 " VALUES (?,?,?,?,?,1,?)", (pid, who, "fav", r["id"], r.get("version", 1), now))
     conn.execute("INSERT INTO recipe_page_versions (page_id, version, name, items_json, optional_json, method, minutes,"
                  " note, created_at) VALUES (?,?,?,?,?,?,?,?,?)",
                  (pid, 1, r["name"], json.dumps(r["main"], ensure_ascii=False),
@@ -233,6 +237,16 @@ def my_pages(conn, who: str) -> list[dict]:
         if v is None:
             continue
         c = _content(v)
+        if p["kind"] == "fav":
+            # A collected public recipe follows the public entry (cooking by it reads the current one, see
+            # resolve_ref), so the page shows that entry as it is now, not the copy taken when it was
+            # collected: the index may change an entry later (0.2.1 did, for collections made in 0.2.0).
+            # The page's own note stays. Public recipes off or the entry gone: the copy, as before.
+            cur = recipes.get(p["ref_id"]) if play.on("recipes_public") else None
+            if cur is not None:
+                c.update(name=cur["name"], main=[dict(e) for e in cur["main"]],
+                         optional=[dict(e) for e in cur.get("optional", [])], method=cur["method"],
+                         minutes=cur["minutes"])
         for e in c["main"] + c["optional"]:
             e.setdefault("name", recipes.item_name(e["item"]))
         out.append({"id": p["id"], "kind": p["kind"], "ref_id": p["ref_id"], "version": v["version"],

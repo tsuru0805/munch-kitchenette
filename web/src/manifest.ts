@@ -23,12 +23,17 @@ export function requiredSegments(): string[] {
 }
 
 /**
- * The chores, played by the kitchen page (not by this card): buying from the vendor, washing plates by
- * hand, loading the dishwasher. Optional for a pack of your own: without them the page simply shows no
- * cook in those panels. `_last` = the still last frame of a clip that plays once.
+ * The chores: washing plates by hand (played by the washing card in the chat), the vendor at his cart and
+ * loading the dishwasher (played by the kitchen page). Optional for a pack of your own: without them the
+ * washing card only counts, and the page shows no cook in those panels. `_last` = the still last frame of
+ * a clip that plays once. The vendor's scenes come in two looks of the cart: `vendor_th_` for the tanghulu
+ * seller, `vendor_` for every other vendor; `_still` is the vendor standing by his cart ("reduce motion").
  */
 export const CHORE_SEGMENTS = [
-  "vendor_call", "vendor_pay", "vendor_take", "vendor_take_last", "vendor_carry",
+  "vendor_arrive", "vendor_call", "vendor_wait", "vendor_leave", "vendor_leave_last", "vendor_walkin", "vendor_walkin_last", "vendor_pay",
+  "vendor_give", "vendor_give_last", "vendor_eat", "vendor_eat_last", "vendor_walkout", "vendor_walkout_hold", "vendor_walkout_empty", "vendor_still",
+  "vendor_th_arrive", "vendor_th_call", "vendor_th_wait", "vendor_th_leave", "vendor_th_leave_last", "vendor_th_walkin", "vendor_th_walkin_last", "vendor_th_pay",
+  "vendor_th_give", "vendor_th_give_last", "vendor_th_eat", "vendor_th_eat_last", "vendor_th_walkout", "vendor_th_walkout_hold", "vendor_th_walkout_empty", "vendor_th_still",
   "dish_sleeve", "dish_soap", "dish_scrub", "dish_rinse", "dish_shake", "dish_dry", "dish_stack", "dish_break", "dish_break_last",
   "machine_load", "machine_close", "machine_start", "machine_run", "machine_done", "machine_done_last",
 ] as const;

@@ -53,6 +53,20 @@ def run_marker(who: str, name: str, args: str, *, key: str, now: float | None = 
         return False, tp("store_failed", marker=name)
 
 
+def marker_attachments(name: str, key: str) -> list[dict]:
+    """Cards a marker hands the chat along with its receipt (by the key it ran under): the washing card of a
+    [刷盘子] that started a washing. Empty for every other marker, and for a [刷盘子] that started nothing."""
+    if name != "刷盘子":
+        return []
+    from . import dishes
+    conn = db.connect()
+    try:
+        card = dishes.card_for_key(conn, key)
+    finally:
+        conn.close()
+    return [card] if card else []
+
+
 def _book_marker(who: str, name: str, args: str, *, key: str, now: float) -> tuple[bool, str]:
     from . import book, fridge
     conn = db.connect()

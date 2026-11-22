@@ -1,8 +1,7 @@
 // munch-kitchenette · tools/dump_chores.cjs · unofficial Clawd fan work, Clawd belongs to Anthropic
 // SPDX-FileCopyrightText: 2026 tsuru0805
 // SPDX-License-Identifier: MIT
-// Renders the seventeen chore moves (states/chores/: buying from the vendor, washing plates by hand, the
-// dishwasher) in one outfit and writes the raw RGBA of each, 45 frames of 300 x 300 one after another.
+// Renders the thirteen chore moves (states/chores/: washing plates by hand, the dishwasher) in one outfit and writes the raw RGBA of each, 45 frames of 300 x 300 one after another.
 // Usage: node dump_chores.cjs <engine dir> <output dir> <outfit> [move id ...]     (called by export_chores.py)
 const path = require('node:path'), fs = require('node:fs');
 const [, , engDir, outDir, outfit, ...only] = process.argv;

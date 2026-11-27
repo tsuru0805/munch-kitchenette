@@ -1,6 +1,6 @@
 {
   "name": "kitchenette-cooking-card",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "type": "module",
   "description": "A framework-free custom element: a real-time cooking card with a tiny cook on top.",

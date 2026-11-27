@@ -3,8 +3,8 @@
 // - The light follows the kitchen's clock: day 06:00–17:00, dusk 17:00–19:00, night the rest.
 // - The sill holds one bunch of flowers at a time: the kind and how it looks (fresh / droopy / wilted)
 //   come from the vendor answer; no bunch, or a kind that has no picture, = an empty sill.
-// - The three jars stand on the counter: empty, or what is sealed in it (sugar / honey = fruit, salt =
-//   pickles).
+// - The three jars stand on the counter: empty, or what is sealed in it (salt first = pickles, any other
+//   seasoning first = the fruit jar).
 // - The drying rack and the sink: how many plates, and foam while the role is washing.
 // A play that is switched off shows its things as they stand empty: the empty picture already has the
 // sill, the sink and the rack; the three jars are pieces, so with the jars off they are put back empty
@@ -39,11 +39,10 @@ export function flowerDrawn(f: SceneFlower | null): boolean {
 export interface SceneJar { slot: number; state: string; how: string }
 export interface ScenePlates { sink: number; washing: number; rack: number }
 
-/** One jar's look: 0 empty, 1 fruit (sugar / honey), 2 pickles (salt) */
+/** One jar's look: 0 empty, 2 pickles (salt first), 1 the fruit jar for anything else sealed (a sealed jar never looks empty) */
 export function jarLook(j: SceneJar | undefined): number {
   if (!j || j.state !== "sealed") return 0;
-  if (j.how === "salt") return 2;
-  return j.how === "sugar" || j.how === "honey" ? 1 : 0;
+  return j.how === "salt" ? 2 : 1;
 }
 
 /** How full: 0 none, 1 a few (1–3), 2 many (4 and more) */

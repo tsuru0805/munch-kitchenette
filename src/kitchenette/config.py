@@ -260,7 +260,7 @@ class Settings:
     play_recipe_codes: bool = False        # share a page as a string of characters
     play_vendor: bool = False              # street vendors who come by now and then
     play_dishwash: bool = False            # plates: a dishwasher, or the role washes them
-    play_seal_jars: bool = False           # jars on the sill: fruit and vegetables turn into treats
+    play_seal_jars: bool = False           # jars on the sill: what is in the fridge turns into treats
 
     # ── [recipes] ───────────────────────────────────────────────────────
     recipes_skilled_at: int = 3            # pots made well before a dish counts as practised...

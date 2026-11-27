@@ -34,9 +34,9 @@ describe("the pieces", () => {
       expect(fl("day", { variety: v, state: s })).toHaveLength(1);
     }
   });
-  test("the jars: empty, fruit (sugar / honey), pickles (salt), by slot from the left", () => {
-    expect([undefined, { slot: 1, state: "empty", how: "" }, { slot: 1, state: "sealed", how: "sugar" }, { slot: 1, state: "sealed", how: "honey" }, { slot: 1, state: "sealed", how: "salt" }].map(jarLook))
-      .toEqual([0, 0, 1, 1, 2]);
+  test("the jars: empty, fruit (sugar / honey / anything else), pickles (salt), by slot from the left", () => {
+    expect([undefined, { slot: 1, state: "empty", how: "" }, { slot: 1, state: "sealed", how: "sugar" }, { slot: 1, state: "sealed", how: "honey" }, { slot: 1, state: "sealed", how: "salt" }, { slot: 1, state: "sealed", how: "other" }, { slot: 1, state: "sealed", how: "" }].map(jarLook))
+      .toEqual([0, 0, 1, 1, 2, 1, 1]);
     expect(scenePieces("day", { ...none, jars: [{ slot: 2, state: "sealed", how: "salt" }, { slot: 1, state: "sealed", how: "honey" }] }))
       .toEqual(["day_jars_2", "day_jars_6", "day_jars_7"]);
     expect(scenePieces("day", { ...none, jars: [] })).toEqual(["day_jars_1", "day_jars_4", "day_jars_7"]);

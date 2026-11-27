@@ -786,7 +786,6 @@ def test_sealing_waiting_opening_and_taking(clock):
     play_on("seal_jars")
     stock("apple", "apple", "carrot")
     assert one("[封罐 苹果 冰糖 | 给冬天]").text.startswith("封上了:苹果、冰糖。")
-    assert "封不了" in one("[封罐 胡萝卜 冰糖]").text
     assert one("[封罐 胡萝卜 盐]").ok
     assert one("[封罐 苹果 蜂蜜]").ok
     assert one("[封罐 苹果 糖]").text.startswith("没封成:三只罐子都用着")
@@ -817,6 +816,76 @@ def test_something_spoiled_in_a_jar_comes_out_spoiled(clock):
     clock["now"] += 3 * DAY + 60
     service.scan_all()
     assert any("开出来是坏的" in n["text"] for n in notify.pending(A))
+
+
+def test_anything_in_the_fridge_with_any_seasonings_and_a_name_of_its_own(clock):
+    play_on("seal_jars")
+    stock("egg", "tofu")
+    r = one("[封罐 鸡蛋 酱油、糖、小米辣 = 麻药鸡蛋 | 等周五开]")
+    assert r.ok and r.text.startswith("封上了:鸡蛋、酱油、糖、小米辣(开出来叫麻药鸡蛋)。明天") \
+        and r.text.endswith("纸条:「等周五开」")
+    assert one("[封罐 豆腐 桂花酱]").text.startswith("封上了:豆腐、桂花酱。后天")    # a seasoning it never heard of
+    conn = db.connect()
+    try:
+        assert [j["goods_name"] for j in jars.jars_view(conn, A)][:2] == ["麻药鸡蛋", "桂花酱豆腐"]
+    finally:
+        conn.close()
+    clock["now"] += DAY + 60
+    service.scan_all()
+    assert any("麻药鸡蛋泡好了" in n["text"] for n in notify.pending(A))
+    r = tools.call("snack_eat", {"name": "麻药鸡蛋"}, A)
+    assert not r.is_error and r.text == "吃了一份麻药鸡蛋。封罐时的纸条:「等周五开」"
+    assert tools.call("snack_eat", {"name": "桂花酱豆腐"}, A).is_error                   # the tofu is not ready yet
+    clock["now"] += DAY
+    assert not tools.call("snack_eat", {"name": "桂花酱豆腐"}, A).is_error
+
+
+def test_how_long_a_jar_waits_and_what_comes_out_is_called():
+    from kitchenette.texts_play import vendor_id
+    days = {iid: jars.jar_days(fridge.item(iid), iid) for iid in ("apple", "lemon", "carrot", "egg", "tofu", "beef",
+                                                                 "noodles", vendor_id("山楂"), vendor_id("干桂花"))}
+    assert days == {"apple": 3, "lemon": 2, "carrot": 1, "egg": 1, "tofu": 2, "beef": 2, "noodles": 2,
+                    vendor_id("山楂"): 2, vendor_id("干桂花"): 1}
+    name = jars.auto_name
+    assert (name("桃子", "fruit", ["冰糖"]), name("柠檬", "fruit", ["蜂蜜"]), name("白萝卜", "root", ["盐"])) == \
+        ("桃子酒", "柠檬蜜", "腌白萝卜")                                               # the three from before
+    assert (name("干桂花", "veg", ["糖"]), name("豆腐", "dairy", ["盐"]), name("梨", "fruit", ["蜂蜜", "盐"]),
+            name("鸡蛋", "dairy", ["酱油", "糖"]), name("黄瓜", "veg", ["醋"])) == \
+        ("糖渍干桂花", "盐渍豆腐", "梨蜜", "酱油鸡蛋", "醋黄瓜")
+    assert jars.goods_name("布丁") == "布丁(罐)" and jars.goods_name("麻药鸡蛋") == "麻药鸡蛋"
+
+
+def test_the_marker_reads_loosely_and_still_says_how_when_it_cannot():
+    assert jars.parse("鸡蛋 酱油,糖，小米辣 ＝ 麻药 鸡蛋 ｜ 纸条") == ("鸡蛋", ["酱油", "糖", "小米辣"], "麻药鸡蛋", "纸条")
+    assert jars.parse("桃子 冰糖 | 给冬天") == ("桃子", ["冰糖"], "", "给冬天")             # the old way
+    assert jars.parse("桃子 糖 糖") == ("桃子", ["糖"], "", "")
+    for bad in ("桃子", "", "= 名字 | 纸条"):
+        with pytest.raises(jars.JarError) as e:
+            jars.parse(bad)
+        assert e.value.text == "没封成:写成 [封罐 食材 调料 | 纸条] 这样,如 [封罐 鸡蛋 酱油、糖 = 麻药鸡蛋 | 纸条]。"
+    with pytest.raises(jars.JarError):
+        jars.parse("桃子 " + "、".join("糖盐醋酒姜蒜葱"))                                    # seven seasonings
+
+
+def test_a_combination_known_to_go_wrong_is_sealed_and_mostly_comes_out_spoiled(clock, monkeypatch):
+    play_on("seal_jars")
+    milk, beef, udon = (fridge.item(i) for i in ("milk", "beef", "udon"))
+    assert jars.is_odd(milk, ["盐"]) and jars.is_odd(milk, ["醋"]) and not jars.is_odd(milk, ["糖"])
+    assert jars.is_odd(beef, ["糖", "蜂蜜"]) and not jars.is_odd(beef, ["酱油", "糖"])
+    assert jars.is_odd(udon, ["糖"]) and not jars.is_odd(fridge.item("egg"), ["酱油"])
+    stock("milk", "milk")
+    monkeypatch.setattr(jars, "JAR_ODD_FAIL_P", 1.0)
+    assert one("[封罐 牛奶 盐、醋 | 试试]").ok                     # not refused when sealing
+    clock["now"] += 2 * DAY + 60
+    service.scan_all()
+    assert "窗台上那罐牛奶、盐、醋开出来味道不对,整罐扔了,罐子洗干净空出来了。" in [n["text"] for n in notify.pending(A)
+                                                                     if n["kind"] == jars.KIND_OPENED][-1]
+    r = tools.call("snack_eat", {"name": "盐渍牛奶"}, A)
+    assert r.is_error
+    monkeypatch.setattr(jars, "JAR_ODD_FAIL_P", 0.0)               # the other one in five: it came out fine
+    assert one("[封罐 牛奶 盐]").ok
+    clock["now"] += 2 * DAY + 60
+    assert not tools.call("snack_eat", {"name": "盐渍牛奶"}, A).is_error
 
 
 # ── vendors ─────────────────────────────────────────────────────────────

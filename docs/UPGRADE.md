@@ -1,5 +1,37 @@
 # What the upgrade changed
 
+<a id="upgrade-0.2.2"></a>
+### From 0.2.1 to 0.2.2
+
+**Run these**, in the directory you cloned into:
+
+```sh
+git pull
+source .venv/bin/activate          # your own environment; Windows: .venv\Scripts\activate
+pip install -U .                   # installed with -e before? do it the same way again: pip install -e .
+```
+
+Then restart `kitchenette serve`: stop it (Ctrl-C in its window, or however you keep it running) and start it again. Once the new one runs, `GET /api/about` answers `"version": "0.2.2"`. Coming from an older version? The same commands take you straight to 0.2.2; read [the 0.2.1 section](#upgrade-0.2.1) below too (and the 0.2.0 one, if you come from before that).
+
+**Your data needs nothing from you.** The database is the one you have. On start 0.2.2 adds four columns: two to the jars (the name of what will come out, fixed when the jar is sealed, and whether it is a combination that goes wrong) and two to what came out of them (why one came out spoiled, and its seasonings). Nothing in it is deleted or changed, and starting again adds nothing more. What was made under 0.2.1 reads back the way it was made:
+
+- A jar sealed under 0.2.1 opens on the day it was due, under the name the old rule gave it (苹果酒, 柠檬蜜, 腌胡萝卜), and its slip comes with it.
+- What was already on the snack shelf from the jars stays there, with the servings left and the slips; a jar thrown away stays thrown away.
+
+**What you will see change** (only with the jars on: `seal_jars` under `[play]`, off by default):
+
+- Sealing is freer. The marker is `[封罐 食材 调料、调料… = 成品名 | 纸条]`: anything in the fridge can go in, with any seasonings (several of them separated by 「、」; they count as always at hand, nothing is taken from the fridge for them), and the role may name what will come out. The name and the slip are both optional, and the older `[封罐 桃子 冰糖 | 纸条]` still works.
+- How long a jar waits goes by what is in it: fruit three days (sour fruit like lemon or haws two), vegetables one, eggs one, anything else two.
+- What comes out is called by the role's name if it gave one; otherwise the three from before (fruit with sugar = 桃子酒, fruit with honey = 柠檬蜜, vegetable with salt = 腌白萝卜), and for anything else 糖渍 / 蜜渍 / 盐渍 before the ingredient, or the first seasoning before it (酱油鸡蛋). "(罐)" is still added when a snack already has that name.
+- Nothing is refused any more for not going together (the receipt "X 配 Y 封不了" is gone). A few combinations known to spoil — milk with salt, soy sauce or vinegar; raw meat or fish in nothing but sugar or honey; noodles, rice and other staples — are sealed all the same and come out tasting wrong about eight times in ten, thrown away, the jar emptied. The list is `JAR_ODD_COMBOS` in `texts_play.py`; edit it if you like.
+- The sentence that teaches the jars and the receipt for a marker written wrong now show the new way. If you copied the kitchen's rules into your model's prompt by hand, take them again from `GET /api/play/teaching`; through the tools there is nothing to do.
+- The candied-haw seller's note on haws says two days in a jar, not three.
+- The kitchen page: a jar whose first seasoning is salt shows the pickle jar, any other sealed jar the fruit jar (a sealed jar never looks empty). A kitchen page already open in a browser needs one refresh.
+
+**If you built on its interfaces:**
+
+- `GET /api/jars`: each jar also has `goods_name` (null while empty, and for a jar sealed under 0.2.1) and `odd` (0 or 1); each entry of `goods` has `why` (`""`, `"bad"` sealed spoiled, `"odd"` a combination that went wrong) and `how_word` (its seasonings). A jar's `how` (the first seasoning's kind) can now also be `"other"`, besides `sugar`, `honey` and `salt`.
+
 <a id="upgrade-0.2.1"></a>
 ### From 0.2.0 to 0.2.1
 
@@ -87,6 +119,38 @@ The four optional hooks — a wallet, a small model playing the vendor, a weathe
 ---
 
 # 中文：这次升级改了什么
+
+<a id="upgrade-0.2.2-zh"></a>
+### 从 0.2.1 升到 0.2.2
+
+**照着敲**，在你当初 clone 下来的那个目录里：
+
+```sh
+git pull
+source .venv/bin/activate          # 你自己的环境；Windows 用: .venv\Scripts\activate
+pip install -U .                   # 当初用 -e 装的，就照原样再装一遍：pip install -e .
+```
+
+然后重启 `kitchenette serve`：把正在跑的停掉（在它的窗口里按 Ctrl-C，或者用你平时让它常驻的那种方式停），再启动一次。新的跑起来以后，`GET /api/about` 回的是 `"version": "0.2.2"`。还在用更早的版本？同样这几行就直接到 0.2.2，下面 [0.2.1 那一节](#upgrade-0.2.1-zh) 也看一下（从 0.2.0 之前来的，再看 0.2.0 那一节）。
+
+**数据不用你动。** 数据库还是原来那个。启动时 0.2.2 只加四个列：罐子表两个（封的时候就定下的成品名、是不是明显不搭的组合），罐子成品表两个（开出来坏了是为什么坏、放了哪些调料）；原有的数据一条不删、一条不改，再启动多少次也不会再加东西。0.2.1 时留下的东西，读出来还是当时的样子：
+
+- 0.2.1 时封上的罐子，到日子照样开，名字照当时的规矩起（苹果酒、柠檬蜜、腌胡萝卜），纸条也跟着。
+- 零食架上已经有的罐子成品还在，剩几份、纸条都不变；当时扔掉的那罐还是扔掉了。
+
+**看得见的变化**（只在罐子开着时：`[play]` 里的 `seal_jars`，默认关）：
+
+- 封罐放开了。标签是 `[封罐 食材 调料、调料… = 成品名 | 纸条]`：冰箱里有的都能封；调料写什么都认，几样用「、」隔开（调料算灶台上常备的，不从冰箱里扣）；他还可以给泡出来的东西起名。名字和纸条都可以不写，原来的 `[封罐 桃子 冰糖 | 纸条]` 照样认。
+- 等几天看封的是什么：水果三天（柠檬、山楂这类酸的两天），蔬菜一天，鸡蛋一天，其余两天。
+- 开出来叫什么：他起了名就用他的；没起，原来那三种照旧（水果加糖＝桃子酒，水果加蜜＝柠檬蜜，蔬菜加盐＝腌白萝卜），其余是「糖渍 / 蜜渍 / 盐渍」加食材，或者第一样调料加食材（酱油鸡蛋）。和已有零食重名，照旧加「(罐)」。
+- 不再因为「不搭」拒封（「X 配 Y 封不了」那句没有了）。几种公认会坏的搭配——牛奶配盐、酱油、醋；生肉生鱼虾只放糖或蜜；面条、米饭这类主食——照样封得进去，到日子大约八成开出来味道不对，整罐扔掉，罐子空出来。清单在 `texts_play.py` 的 `JAR_ODD_COMBOS`，可以自己改。
+- 教他封罐的那句话、标签写错时的回执，都换成了新写法。当初把厨房规矩手动抄进提示词的，从 `GET /api/play/teaching` 再取一次；走工具的不用管。
+- 卖糖葫芦的那儿山楂的小字，改成「封罐泡两天」。
+- 厨房页：第一样调料是盐的罐子画成腌菜罐，封了别的都画成水果罐（封着的罐子不会画成空的）。浏览器里本来就开着的厨房页，刷新一下。
+
+**如果你接过它的接口：**
+
+- `GET /api/jars`：每只罐子多了 `goods_name`（空着、或 0.2.1 时封的是 null）和 `odd`（0 或 1）；`goods` 里每样多了 `why`（`""`；`"bad"` 封进去时就坏了；`"odd"` 不搭开坏了）和 `how_word`（放了哪些调料）。罐子的 `how`（第一样调料的类）除了 `sugar`、`honey`、`salt`，现在也可能是 `"other"`。
 
 <a id="upgrade-0.2.1-zh"></a>
 ### 从 0.2.0 升到 0.2.1
@@ -220,7 +284,7 @@ pip install .                      # 当初用 -e 装的，就照原样再装一
 | `[出码 编号]` | 食谱码 |
 | `[问小贩 …]`、`[买 东西 数量]`、`[送花 一句话]`、`[想要花 花名]` | 流动小贩 |
 | `[刷盘子]` | 刷盘子 |
-| `[封罐 食材 糖或盐 \| 纸条]` | 窗台密封罐（取用走现有的 `[零食 名字]`） |
+| `[封罐 食材 调料、调料… = 成品名 \| 纸条]`（名字和纸条可不写） | 窗台密封罐（取用走现有的 `[零食 名字]`） |
 
 ### 页面用的新接口
 

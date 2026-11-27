@@ -19,10 +19,19 @@ JAR_COUNT = 3
 JAR_DAYS_FRUIT = 3
 JAR_DAYS_SOUR_FRUIT = 2
 JAR_DAYS_VEG = 1
+JAR_DAYS_EGG = 1
+JAR_DAYS_OTHER = 2                 # anything else from the fridge: meat, tofu, staples, what the vendors bring…
 SOUR_FRUITS = ("柠檬", "青梅", "梅子", "山楂", "百香果")
 JAR_PORTIONS_MIN, JAR_PORTIONS_MAX = 3, 5
-JAR_SWEET_WORDS = ("糖", "冰糖", "白糖", "红糖", "砂糖", "蜂蜜", "蜜")
-JAR_SALT_WORDS = ("盐",)
+JAR_SEASONINGS_MAX = 6
+# Seasonings: any word goes in (they count as always at hand, nothing is taken from the fridge). A word is
+# sorted by the characters in it, only to name what comes out, to pick the jar's look and to spot the odd
+# combinations below; no seasoning is ever refused.
+JAR_HONEY_KEYS = ("蜜",)
+JAR_SWEET_KEYS = ("糖", "蜜")
+JAR_SALT_KEYS = ("盐",)
+JAR_SALTY_KEYS = ("盐", "酱油", "生抽", "老抽", "鱼露", "豉油", "味噌", "蚝油")
+JAR_SOUR_KEYS = ("醋",)
 JAR_SUFFIX = "(罐)"
 NIGHT_HOURS = (22, 23, 0, 1, 2, 3)
 WEATHER_COLD_C = 8.0
@@ -49,8 +58,9 @@ TEXTS: dict[str, str] = {
     "teach_menus": "[配一桌 编号 编号 编号 | 一句话] 单独成行,把几道配成一顿。",
     "teach_recipe_codes": "[出码 编号] 单独成行,把你食谱本里的一页变成一串码,可以发给别人。",
     "teach_dishwash": "[刷盘子] 单独成行,开始刷水槽里的盘子。真实计时,一只一小段。",
-    "teach_seal_jars": ("[封罐 食材 糖或盐 | 纸条] 单独成行,把东西封进窗台的罐子。竖线后面的纸条可以不写。"
-                        "水果要等两三天,蔬菜等一天,到日子自己开,成品进零食架,用 [零食 名字] 取。"),
+    "teach_seal_jars": ("[封罐 食材 调料 | 纸条] 单独成行,把冰箱里的东西封进窗台的罐子。调料写什么都行,几样用「、」隔开;"
+                        "想给泡出来的东西起名,在调料后面写「= 名字」,如 [封罐 鸡蛋 酱油、糖、小米辣 = 麻药鸡蛋 | 等周五开]。"
+                        "纸条和名字都可以不写。等一到三天,到日子自己开,成品进零食架,用 [零食 名字] 取。"),
     "teach_vendor": ("楼下有小贩的时候:[问小贩 你想问的话] 单独成行,跟他说话;[买 东西 数量] 单独成行,"
                      "用你的零花钱买。他的回话下一轮才看得到。"
                      "[送花 一句话] 单独成行,把买来的花送给{human},附一句话。"
@@ -166,14 +176,15 @@ TEXTS: dict[str, str] = {
     # ── jars ──
     "jar_sealed": "封上了:{what}。{ready}好。{note}",
     "jar_sealed_note": "纸条:「{note}」",
+    "jar_sealed_named": "{what}(开出来叫{name})",
     "jar_full": "没封成:三只罐子都用着,最早的一只{when}空出来。",
     "jar_full_later": "过几天",
     "jar_no_item": "没封成:冰箱里没有{name}。",
-    "jar_bad_combo": "没封成:水果配糖或蜂蜜,蔬菜配盐;{name}配{how}封不了。",
-    "jar_bad_format": "没封成:写成 [封罐 桃子 冰糖 | 纸条] 这样。",
+    "jar_bad_format": "没封成:写成 [封罐 食材 调料 | 纸条] 这样,如 [封罐 鸡蛋 酱油、糖 = 麻药鸡蛋 | 纸条]。",
     "jar_unknown": "没封成:{name}不是冰箱里会有的东西。",
     "jar_opened": "窗台上的{goods}泡好了,收进零食架了({n} 份)。",
     "jar_failed": "窗台上那罐{name}开出来是坏的(封进去的时候就坏了),整罐扔了,罐子洗干净空出来了。",
+    "jar_failed_odd": "窗台上那罐{what}开出来味道不对,整罐扔了,罐子洗干净空出来了。",
     "jar_take": "{verb}了一份{goods}。封罐时的纸条:「{note}」",
     "jar_take_no_note": "{verb}了一份{goods}。",
     "jar_fed": "{human}喂了你一份{goods}。",
@@ -278,6 +289,19 @@ MISHAPS: dict[str, tuple[str, ...]] = {
 
 WASH_BREAK_LINES = ("手一滑,打碎了一只盘子。", "洗洁精太滑,一只盘子掉进水槽磕成了两半。", "盘子没码稳,倒下来碎了一只。")
 
+# ── jars: combinations that go wrong ───────────────────────────────────
+# Sealed all the same (never refused at the jar); on the day it opens, such a jar mostly comes out
+# tasting wrong and is thrown away (JAR_ODD_FAIL_P of them). Small on purpose: only what is known to spoil.
+# names = ingredient names, cats = fridge categories; when: "any" = whatever went with it,
+# "salty_or_sour" = with something salty or sour, "only_sweet" = with nothing but sweet things.
+JAR_ODD_COMBOS: tuple[dict, ...] = (
+    {"names": ("牛奶", "酸奶", "奶油", "黄油"), "cats": (), "when": "salty_or_sour"},   # milk with salt, soy, vinegar: curdles
+    {"names": (), "cats": ("meat",), "when": "only_sweet"},                         # raw meat, fish, prawns in sugar only
+    {"names": (), "cats": ("staple_food",), "when": "any"},                         # noodles, udon, rice: go soggy and sour
+)
+JAR_ODD_FAIL_P = 0.8
+
+
 # ── achievements: (key, name, the line that says how it was earned) ────
 ACHIEVEMENTS: tuple[tuple[str, str, str], ...] = (
     ("one_method", "学会一种做法", "{method}做成了 3 锅。"),
@@ -357,7 +381,7 @@ VENDORS: dict[str, dict] = {
             {"id": "strawberry_stick", "name": "草莓糖葫芦", "kind": "snack", "unit": "串",
              "price": 8, "stock": (1, 3), "satiety": 5.0, "energy": 0.03, "aliases": ("草莓的",)},
             {"id": "hawthorn", "name": "山楂", "kind": "ingredient", "ingredient": vendor_id("山楂"), "unit": "份",
-             "price": 8, "stock": (2, 4), "note": "山楂 — 加冰糖熬成山楂酱,或者封罐泡三天。"},
+             "price": 8, "stock": (2, 4), "note": "山楂 — 加冰糖熬成山楂酱,或者封罐泡两天。"},
         ),
         "persona": "你是推着车在居民楼下卖糖葫芦的大叔,手脚麻利,爱夸自己的糖壳脆。",
         "fixed": {"greet": "刚蘸的,糖壳还脆着呢。", "deal": "好嘞,拿稳了,签子尖。",

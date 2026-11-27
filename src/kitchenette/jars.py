@@ -1,15 +1,22 @@
 """Three jars on the window sill.
 
-- [封罐 <ingredient> <sugar|honey|salt> | <a slip>]: in one transaction, find an empty jar (two at once
-  cannot both win), take one portion of that ingredient from the fridge (picked the way cooking picks)
-  and seal it. Sugar, honey and salt are always at hand. Fruit with sugar or honey waits three days
-  (sour fruit like lemon two); vegetables with salt one day; nothing else goes together.
+- [封罐 <ingredient> <seasoning>、<seasoning>… = <a name> | <a slip>]: anything in the fridge can go in, with
+  any seasonings (they are always at hand: nothing is looked up or taken for them); the name and the slip
+  are both optional, and the older [封罐 桃子 冰糖 | 纸条] still reads. In one transaction: find an empty
+  jar (two at once cannot both win), take one portion of that ingredient from the fridge (picked the way
+  cooking picks) and seal it. How long it waits goes by the ingredient: fruit three days (sour fruit like
+  lemon two), vegetables one, eggs one, anything else two.
+- Nothing is refused for going badly together. A combination known to go wrong (``JAR_ODD_COMBOS``: milk
+  with salt or vinegar, raw meat in sugar only, noodles or rice) is sealed all the same, and on the day
+  it opens mostly comes out tasting wrong: thrown away, the jar emptied.
 - What went in stays as it was: the jar remembers how fresh it was when sealed. Something already
   spoiled makes a spoiled jar: on the day it is opened, thrown away, the jar emptied.
 - Jars open themselves when due (settled on read, at the due moment): the result goes on the snack
   shelf and the role hears it on its next turn.
-- The result is named after what went in (桃子 + sugar = 桃子酒, 柠檬 + honey = 柠檬蜜, 白萝卜 + salt =
-  腌白萝卜), with "(罐)" added if that name is already a snack.
+- The result's name is fixed when the jar is sealed: the role's own if it gave one, else from what went
+  in, by the first seasoning (fruit + sugar = 桃子酒, fruit + honey = 柠檬蜜, vegetable + salt = 腌白萝卜;
+  anything else 糖渍X / 蜜渍X / 盐渍X, or the seasoning put before it: 酱油鸡蛋), with "(罐)" added if
+  that name is already a snack. A jar sealed before names were stored is named by the old rule when it opens.
 - Taking one goes through the existing [零食 <name>]: the fixed snacks first, then the jars. All jar
   servings share one daily cap (``[jars] daily_cap``, per role; the human feeding one counts too) that
   resets with the snack day. Each serving gives what the lowest snack gives. Jar treats never get worms.
@@ -22,9 +29,10 @@ from datetime import timedelta
 
 from . import clock, config, db, notify, play
 from .texts import t
-from .texts_play import (JAR_COUNT, JAR_DAYS_FRUIT, JAR_DAYS_SOUR_FRUIT, JAR_DAYS_VEG, JAR_PORTIONS_MAX,
-                         JAR_PORTIONS_MIN, JAR_SALT_WORDS, JAR_SUFFIX, JAR_SWEET_WORDS, SOUR_FRUITS, TAG_NAME_MAX,
-                         TAG_NOTE_MAX, tp)
+from .texts_play import (JAR_COUNT, JAR_DAYS_EGG, JAR_DAYS_FRUIT, JAR_DAYS_OTHER, JAR_DAYS_SOUR_FRUIT,
+                         JAR_DAYS_VEG, JAR_HONEY_KEYS, JAR_ODD_COMBOS, JAR_ODD_FAIL_P, JAR_PORTIONS_MAX,
+                         JAR_PORTIONS_MIN, JAR_SALT_KEYS, JAR_SALTY_KEYS, JAR_SEASONINGS_MAX, JAR_SOUR_KEYS,
+                         JAR_SUFFIX, JAR_SWEET_KEYS, SOUR_FRUITS, TAG_NAME_MAX, TAG_NOTE_MAX, tp)
 
 DAY = 86400.0
 BY_SELF, BY_HUMAN = "self", "her"
@@ -60,33 +68,98 @@ def lowest_snack() -> tuple[float, float]:
     return (min(gains) if gains else 0.0), (min(sat.values()) if sat else 0.0)
 
 
-def parse(line: str) -> tuple[str, str, str]:
-    body, _, note = (line or "").partition("|")
-    toks = body.split()
-    if len(toks) != 2:
+_SEP = re.compile(r"[\s、,，+＋/／;；]+")
+_DIRTY = re.compile(r"[\[\]【】\r\n]")
+_VEG = ("veg", "leafy", "root")
+_OLD_NAMES = {"sugar": "{x}酒", "honey": "{x}蜜", "salt": "腌{x}"}     # the only three before 0.2.2
+
+
+def parse(line: str) -> tuple[str, list[str], str, str]:
+    """-> (ingredient, seasonings, the name the role gave or "", slip). Seasonings may be split by spaces,
+    、 or commas; full-width ＝ and ｜ read as = and |."""
+    text = (line or "").replace("｜", "|").replace("＝", "=")
+    body, _, note = text.partition("|")
+    body, _, named = body.partition("=")
+    toks = [w for w in _SEP.split(_DIRTY.sub("", body)) if w]
+    if len(toks) < 2:
         raise JarError(tp("jar_bad_format"), "bad_format")
+    item, seas = toks[0], list(dict.fromkeys(toks[1:]))
+    named = re.sub(r"\s+", "", _DIRTY.sub("", named))
     note = note.strip()
-    if len(note) > TAG_NOTE_MAX or len(toks[0]) > TAG_NAME_MAX:
+    if (len(note) > TAG_NOTE_MAX or len(item) > TAG_NAME_MAX or len(named) > TAG_NAME_MAX
+            or len(seas) > JAR_SEASONINGS_MAX or any(len(w) > TAG_NAME_MAX for w in seas)):
         raise JarError(tp("tag_too_long"), "too_long")
-    return toks[0], toks[1], re.sub(r"[\[\]【】\r\n]", "", note)
+    return item, seas, named, _DIRTY.sub("", note)
 
 
-def _how(word: str) -> str | None:
-    if word in ("蜂蜜", "蜜"):
+def _has(word: str, keys: tuple[str, ...]) -> bool:
+    return any(k in word for k in keys)
+
+
+def _how(word: str) -> str:
+    """What kind of seasoning (the first one decides the name and the jar's look): honey | sugar | salt | other."""
+    if _has(word, JAR_HONEY_KEYS):
         return "honey"
-    if word in JAR_SWEET_WORDS:
+    if _has(word, JAR_SWEET_KEYS):
         return "sugar"
-    if word in JAR_SALT_WORDS:
+    if _has(word, JAR_SALT_KEYS):
         return "salt"
-    return None
+    return "other"
 
 
-def goods_name(item_name: str, how: str) -> str:
+def jar_days(it: dict, iid: str | None) -> int:
+    cat, name = it.get("category"), it.get("name") or ""
+    if cat == "fruit":
+        return JAR_DAYS_SOUR_FRUIT if any(w in name for w in SOUR_FRUITS) else JAR_DAYS_FRUIT
+    if cat in _VEG:
+        return JAR_DAYS_VEG
+    if iid == "egg" or "蛋" in name:
+        return JAR_DAYS_EGG
+    return JAR_DAYS_OTHER
+
+
+def is_odd(it: dict, seas: list[str]) -> bool:
+    """A combination known to go wrong (JAR_ODD_COMBOS): sealed all the same, mostly spoiled when opened."""
+    cat, name = it.get("category"), it.get("name") or ""
+    salty_sour = any(_has(w, JAR_SALTY_KEYS) or _has(w, JAR_SOUR_KEYS) for w in seas)
+    only_sweet = all(_has(w, JAR_SWEET_KEYS) for w in seas)
+    for rule in JAR_ODD_COMBOS:
+        if name not in rule["names"] and cat not in rule["cats"]:
+            continue
+        when = rule["when"]
+        if when == "any" or (when == "salty_or_sour" and salty_sour) or (when == "only_sweet" and only_sweet):
+            return True
+    return False
+
+
+def auto_name(item_name: str, category: str | None, seas: list[str]) -> str:
+    """The result's name when the role gave none (before the "(罐)" a clash adds)."""
+    first = seas[0] if seas else ""
+    how = _how(first)
+    if category == "fruit" and how in ("sugar", "honey"):
+        return _OLD_NAMES[how].format(x=item_name)
+    if category in _VEG and how == "salt":
+        return _OLD_NAMES["salt"].format(x=item_name)
+    return {"honey": "蜜渍", "sugar": "糖渍", "salt": "盐渍"}.get(how, first) + item_name
+
+
+def goods_name(base: str) -> str:
+    """The name on the shelf: "(罐)" added if a snack is already called that."""
     from . import snacks
-    base = {"sugar": f"{item_name}酒", "honey": f"{item_name}蜜", "salt": f"腌{item_name}"}[how]
     if snacks.resolve_name(base)[0] is not None or base in {s["name"] for s in snacks.catalog()}:
         return base + JAR_SUFFIX
     return base
+
+
+def _name_when_opened(j) -> str:
+    if j["goods_name"]:
+        return j["goods_name"]
+    old = _OLD_NAMES.get(j["how"] or "")         # sealed before 0.2.2: named by the rule it was sealed under
+    if old:
+        return goods_name(old.format(x=j["item_name"]))
+    from . import fridge
+    cat = (fridge.item(j["item_id"]) or {}).get("category") if j["item_id"] else None
+    return goods_name(auto_name(j["item_name"], cat, [w for w in _SEP.split(j["how_word"] or "") if w]))
 
 
 def _fmt_left(sec: float) -> str:
@@ -112,17 +185,15 @@ def seal(who: str, line: str, *, key: str, now: float | None = None) -> str:
     now = now or clock.now()
     if not play.on("seal_jars"):
         return tp("feature_off")
-    name, word, note = parse(line)
-    how = _how(word)
+    name, seas, named, note = parse(line)
     iid = fridge.resolve(name, gone=True)
     if iid is None:
         raise JarError(tp("jar_unknown", name=name), "unknown_item")
     it = fridge.item(iid) or {}
-    cat = it.get("category")
-    fruit = cat == "fruit"
-    veg = cat in ("veg", "leafy", "root")
-    if how is None or (fruit and how == "salt") or (veg and how != "salt") or not (fruit or veg):
-        raise JarError(tp("jar_bad_combo", name=it.get("name", name), how=word), "bad_combo")
+    word = "、".join(seas)
+    how = _how(seas[0])
+    odd = is_odd(it, seas)
+    gname = goods_name(named or auto_name(it.get("name", name), it.get("category"), seas))
     conn = db.connect()
     try:
         conn.execute("BEGIN IMMEDIATE")
@@ -144,13 +215,15 @@ def seal(who: str, line: str, *, key: str, now: float | None = None) -> str:
             conn.rollback()
             raise JarError(tp("jar_no_item", name=it["name"]), "no_item") from None
         u = used[0]
-        days = (JAR_DAYS_SOUR_FRUIT if any(w in it["name"] for w in SOUR_FRUITS) else JAR_DAYS_FRUIT) if fruit \
-            else JAR_DAYS_VEG
-        due = now + days * DAY
+        due = now + jar_days(it, iid) * DAY
         conn.execute("UPDATE jars SET state='sealed', item_id=?, item_name=?, freshness=?, how=?, how_word=?, note=?,"
-                     " sealed_at=?, due_at=?, seal_key=? WHERE who=? AND slot=? AND state='empty'",
-                     (iid, it["name"], u["freshness"], how, word, note, now, due, key, who, empty["slot"]))
-        receipt = tp("jar_sealed", what=f"{it['name']}、{word}", ready=_ready_when(due, now),
+                     " sealed_at=?, due_at=?, seal_key=?, goods_name=?, odd=? WHERE who=? AND slot=? AND state='empty'",
+                     (iid, it["name"], u["freshness"], how, word, note, now, due, key, gname, 1 if odd else 0,
+                      who, empty["slot"]))
+        what = f"{it['name']}、{word}"
+        if named:
+            what = tp("jar_sealed_named", what=what, name=gname)
+        receipt = tp("jar_sealed", what=what, ready=_ready_when(due, now),
                      note=tp("jar_sealed_note", note=note) if note else "")
         fridge._log(conn, who, "jar_sealed", tp("jar_log", name=it["name"]), now)
         fridge._mark_once(conn, f"jar_seal:{key}", receipt)
@@ -165,15 +238,17 @@ def settle_in_tx(conn, who: str, now: float) -> list[str]:
     out = []
     for j in conn.execute("SELECT * FROM jars WHERE who=? AND state='sealed' AND due_at<=? ORDER BY due_at",
                           (who, now)).fetchall():
-        ok = j["freshness"] != "bad"
         gid = "g-" + hashlib.sha1(f"{who}:{j['slot']}:{j['sealed_at']}".encode()).hexdigest()[:10]
+        why = ("bad" if j["freshness"] == "bad"
+               else "odd" if j["odd"] and _h(gid + ":odd") < JAR_ODD_FAIL_P else "")
+        ok = not why
         n = JAR_PORTIONS_MIN + int(_h(gid) * (JAR_PORTIONS_MAX - JAR_PORTIONS_MIN + 1)) if ok else 0
-        conn.execute("INSERT OR IGNORE INTO jar_goods (id, who, name, item_name, ok, total, left_n, note, opened_at)"
-                     " VALUES (?,?,?,?,?,?,?,?,?)",
-                     (gid, who, goods_name(j["item_name"], j["how"]) if ok else j["item_name"], j["item_name"],
-                      1 if ok else 0, n, n, j["note"] or "", j["due_at"]))
+        conn.execute("INSERT OR IGNORE INTO jar_goods (id, who, name, item_name, ok, total, left_n, note, opened_at,"
+                     " why, how_word) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                     (gid, who, _name_when_opened(j) if ok else j["item_name"], j["item_name"],
+                      1 if ok else 0, n, n, j["note"] or "", j["due_at"], why, j["how_word"] or ""))
         conn.execute("UPDATE jars SET state='empty', item_id=NULL, item_name=NULL, freshness=NULL, how=NULL,"
-                     " how_word=NULL, note='', sealed_at=NULL, due_at=NULL, seal_key=NULL"
+                     " how_word=NULL, note='', sealed_at=NULL, due_at=NULL, seal_key=NULL, goods_name=NULL, odd=0"
                      " WHERE who=? AND slot=? AND sealed_at=?", (who, j["slot"], j["sealed_at"]))
         out.append(gid)
     if out and play.on("achievements"):
@@ -194,6 +269,14 @@ def status_text(conn, who: str, now: float) -> str:
     return "\n".join(lines)
 
 
+def _opened_text(g) -> str:
+    if g["ok"]:
+        return tp("jar_opened", goods=g["name"], n=g["total"])
+    if g["why"] == "odd":
+        return tp("jar_failed_odd", what=f"{g['item_name']}、{g['how_word']}" if g["how_word"] else g["item_name"])
+    return tp("jar_failed", name=g["item_name"])
+
+
 def tick(who: str, now: float) -> int:
     """Periodic scan: open what is due and leave a note for each jar opened."""
     if not play.on("seal_jars"):
@@ -202,8 +285,7 @@ def tick(who: str, now: float) -> int:
     try:
         conn.execute("BEGIN IMMEDIATE")
         settle_in_tx(conn, who, now)
-        todo = [(g["id"], tp("jar_opened", goods=g["name"], n=g["total"]) if g["ok"]
-                 else tp("jar_failed", name=g["item_name"]))
+        todo = [(g["id"], _opened_text(g))
                 for g in conn.execute("SELECT * FROM jar_goods WHERE who=? AND told=0 ORDER BY opened_at",
                                       (who,)).fetchall()]
         conn.commit()

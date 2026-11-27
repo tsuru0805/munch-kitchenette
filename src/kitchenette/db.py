@@ -316,12 +316,14 @@ CREATE TABLE IF NOT EXISTS wash_settings (who TEXT PRIMARY KEY, self_wash INTEGE
 CREATE TABLE IF NOT EXISTS jars (                   -- the three jars on the sill
   who TEXT NOT NULL, slot INTEGER NOT NULL, state TEXT NOT NULL DEFAULT 'empty', item_id TEXT, item_name TEXT,
   freshness TEXT, how TEXT, how_word TEXT, note TEXT NOT NULL DEFAULT '', sealed_at REAL, due_at REAL, seal_key TEXT,
+  goods_name TEXT, odd INTEGER NOT NULL DEFAULT 0,      -- the result's name, fixed when sealed; 1 = a combination that goes wrong
   PRIMARY KEY (who, slot)
 );
 CREATE TABLE IF NOT EXISTS jar_goods (
   id TEXT PRIMARY KEY, who TEXT NOT NULL, name TEXT NOT NULL, item_name TEXT NOT NULL, ok INTEGER NOT NULL,
   total INTEGER NOT NULL, left_n INTEGER NOT NULL, note TEXT NOT NULL DEFAULT '', opened_at REAL NOT NULL,
-  told INTEGER NOT NULL DEFAULT 0
+  told INTEGER NOT NULL DEFAULT 0,
+  why TEXT NOT NULL DEFAULT '', how_word TEXT NOT NULL DEFAULT ''   -- why it came out spoiled (bad | odd); its seasonings
 );
 CREATE INDEX IF NOT EXISTS idx_jar_goods_who ON jar_goods(who, name, opened_at);
 CREATE TABLE IF NOT EXISTS jar_takes (
@@ -374,7 +376,10 @@ _ADDED_COLUMNS = (("cook_sessions", "recipe_id", "TEXT"), ("cook_sessions", "rec
                   ("cook_sessions", "recipe_link", "TEXT"), ("cook_sessions", "mishap_id", "TEXT"),
                   ("cook_sessions", "mishap_ver", "INTEGER"),
                   # a push being sent: which flush has these notes, since when (notify.flush)
-                  ("notes", "claim_token", "TEXT"), ("notes", "claim_at", "REAL"))
+                  ("notes", "claim_token", "TEXT"), ("notes", "claim_at", "REAL"),
+                  # 0.2.2, the jars let go: the name fixed when sealed, a combination that goes wrong, why one spoiled
+                  ("jars", "goods_name", "TEXT"), ("jars", "odd", "INTEGER NOT NULL DEFAULT 0"),
+                  ("jar_goods", "why", "TEXT NOT NULL DEFAULT ''"), ("jar_goods", "how_word", "TEXT NOT NULL DEFAULT ''"))
 
 _initialized: set[str] = set()
 _init_lock = threading.Lock()      # one thread of this process sets a database up at a time

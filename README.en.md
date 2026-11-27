@@ -2,7 +2,7 @@
 
 [中文](README.md)
 
-> 🆕 **Installed the previous version?** [From 0.2.0 to 0.2.1: one command, your data moves over by itself →](docs/UPGRADE.md#upgrade-0.2.1)
+> 🆕 **Installed the previous version?** [From 0.2.1 to 0.2.2: one command, your data moves over by itself →](docs/UPGRADE.md#upgrade-0.2.2)
 
 **Build your AI companion a little kitchen of his own, one that smells of real cooking. ✨**
 
@@ -64,7 +64,7 @@ Once installed, open `http://127.0.0.1:8765/page/` in a browser and step into th
 
 <img src="docs/page/kitchen-page-lights.png" width="660" alt="The same kitchen three times side by side: by day with green trees outside the window, at dusk in a warm light, at night with the window dark and the lamps on; roses on the sill in all three, two filled jars on the counter, plates in the sink and a full drying rack">
 
-With some of the upgrade's plays switched on, the picture changes with them: the bunch bought from the vendor stands on the window sill in its vase (fresh, a little droopy and wilted each look different; no bunch, the sill stays empty); the three jars on the left of the counter stand empty or hold fruit or pickles (with jars switched off the three stand there empty and cannot be tapped); the sink fills with plates waiting to be washed, foams while he is washing, and what he washed stands on the drying rack for three hours. Tapping the flowers, a jar, the sink or the rack opens the matching page. When a vendor is downstairs, a line appears at the top of the page ("楼下有卖花的 · 还待 50 分钟 →", a flower seller is downstairs for another 50 minutes); tap it to see the goods.
+With some of the upgrade's plays switched on, the picture changes with them: the bunch bought from the vendor stands on the window sill in its vase (fresh, a little droopy and wilted each look different; no bunch, the sill stays empty); the three jars on the left of the counter stand empty, or hold pickles when salt was the first seasoning; any other seasoning shows the fruit jar (with jars switched off the three stand there empty and cannot be tapped); the sink fills with plates waiting to be washed, foams while he is washing, and what he washed stands on the drying rack for three hours. Tapping the flowers, a jar, the sink or the rack opens the matching page. When a vendor is downstairs, a line appears at the top of the page ("楼下有卖花的 · 还待 50 分钟 →", a flower seller is downstairs for another 50 minutes); tap it to see the goods.
 
 **A row of entrances under the hand**: one for each play that is switched on, none for those that are off. The first time an entrance appears it carries a small red 「新」 (new), which goes away once it has been opened (remembered by this device's browser).
 
@@ -140,7 +140,7 @@ Three things first:
 | Recipe codes | a page as a string to share | off | recipe book | one marker |
 | Street vendors | someone selling downstairs now and then | off | — | four markers |
 | Plates | a dishwasher, or the role washes up | off | — | one marker |
-| Jars on the sill | fruit and vegetables turn into treats | off | — | one marker |
+| Jars on the sill | anything in the fridge, with any seasonings, turns into a treat in one to three days | off | — | one marker |
 
 | The vendor at his cart | Washing up by hand | The dishwasher |
 |---|---|---|
